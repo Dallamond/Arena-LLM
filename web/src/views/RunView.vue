@@ -375,7 +375,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
 
       <!-- Peticiones -->
       <BlueprintCard v-if="detail?.items.length" fig="FIG.34" :title="`Peticiones (${detail.items.length})`" class="gap">
-        <table class="items mono">
+        <div class="scroll"><table class="items mono">
           <thead>
             <tr>
               <th>#</th>
@@ -419,7 +419,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
               </tr>
             </template>
           </tbody>
-        </table>
+        </table></div>
       </BlueprintCard>
     </template>
   </div>
@@ -546,6 +546,9 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
   border: 1px solid var(--line);
   padding: 1px 6px;
   font-size: 11px;
+}
+.scroll {
+  overflow-x: auto;
 }
 .items {
   width: 100%;

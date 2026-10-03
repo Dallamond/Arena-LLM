@@ -235,25 +235,28 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
   *Estado 03/10/2026: cumplido (agente real y simulado; agente caído → chip "sin respuesta", datos atenuados con sello SIN DATOS y último dato).*
 
 ### F3 — Servidores, modelos y detección
-- [ ] **Varios equipos (`hosts`)**: registrar agentes de distintas máquinas y cambiar de equipo en la GUI. Autodescubrimiento opcional en la red local.
-- [ ] CRUD de endpoints (URL del `llama-server`, URL del agente, dispositivo asociado, alias). Botón **Detectar** (§5).
-- [ ] Página **Modelos/Servidores**: tarjeta por servidor detectado con modelo, cuantización, contexto, `-ngl`, `-ts`, slots, KV, flags, GPU y VRAM que ocupa.
-- [ ] Carpeta de modelos configurable: lista de GGUF con **calculadora de encaje**.
-- [ ] Cada cambio de configuración detectado queda registrado con fecha.
-**Criterio:** relanzar un servidor con otro `-c` o `-ngl` se refleja en la GUI en menos de 10 s sin tocar nada.
+- [x] **Varios equipos (`hosts`)**: registrar agentes de distintas máquinas y cambiar de equipo en la GUI. Autodescubrimiento opcional en la red local. *(03/10/2026: registro de agentes y selector de equipo; sin autodescubrimiento en red)*
+- [ ] CRUD de endpoints (URL del `llama-server`, URL del agente, dispositivo asociado, alias). Botón **Detectar** (§5). *(03/10/2026: detección automática + alias; falta añadir un endpoint a mano)*
+- [x] Página **Modelos/Servidores**: tarjeta por servidor detectado con modelo, cuantización, contexto, `-ngl`, `-ts`, slots, KV, flags, GPU y VRAM que ocupa.
+- [ ] Carpeta de modelos configurable: lista de GGUF con **calculadora de encaje**. *(pendiente: la calculadora necesita tener en cuenta modelos híbridos, ver ESTADO.md)*
+- [x] Cada cambio de configuración detectado queda registrado con fecha.
+**Criterio:** relanzar un servidor con otro `-c` o `-ngl` se refleja en la GUI en menos de 10 s sin tocar nada.  
+  *Estado 03/10/2026: detección cada 5 s; un cambio de contexto se registra con su diff (probado con llama-server simulado). Falta probarlo relanzando el real.*
 
 ### F4 — Runner núcleo (prompt libre)
-- [ ] Streaming contra `/v1/chat/completions`; TTFT, t/s (servidor y cliente), tokens, `reasoning_content` aparte; guardar prompt, respuesta, métricas y `servers_snapshot`.
-- [ ] Errores (contexto excedido, endpoint caído, VRAM insuficiente) se guardan como resultado.
-- [ ] Pantalla de ejecución en vivo y detalle de un run.
-**Criterio:** un prompt real guarda un run completo con t/s coherente con `llama-bench` (±15 %).
+- [x] Streaming contra `/v1/chat/completions`; TTFT, t/s (servidor y cliente), tokens, `reasoning_content` aparte; guardar prompt, respuesta, métricas y `servers_snapshot`.
+- [x] Errores (contexto excedido, endpoint caído, VRAM insuficiente) se guardan como resultado.
+- [x] Pantalla de ejecución en vivo y detalle de un run.
+**Criterio:** un prompt real guarda un run completo con t/s coherente con `llama-bench` (±15 %).  
+  *Cumplido 03/10/2026: RTX 3060 · Qwen2.5-Coder 7B Q8 · b11379 → Arena 33,6 t/s (mediana, cliente = servidor) frente a llama-bench tg128 34,5 ± 0,7 (−2,7 %).*
 
 ### F5 — Telemetría sincronizada, resumen y estrés
-- [ ] Muestreo durante el run: línea base → carga → enfriamiento opcional; `samples` y `tps_series`.
-- [ ] Resumen: energía (Wh), tokens/Wh, % throttling, degradación (primer 20 % vs último 20 %), VRAM pico, estadísticas de t/s.
-- [ ] Suite **estrés** (duración, paralelo, tokens por petición) con gráfica en vivo.
-- [ ] **Aborto automático** por temperatura con umbrales **derivados de cada dispositivo** (temperatura de *slowdown* que reporta; valores por defecto por fabricante si no la reporta) y editables; registro del motivo.
-**Criterio:** una prueba de 5 min en cualquier GPU produce curva de t/s y temperatura; superar el umbral aborta y lo deja anotado.
+- [x] Muestreo durante el run: línea base → carga → enfriamiento opcional; `samples` y `tps_series`.
+- [x] Resumen: energía (Wh), tokens/Wh, % throttling, degradación (primer 20 % vs último 20 %), VRAM pico, estadísticas de t/s.
+- [x] Suite **estrés** (duración, paralelo, tokens por petición) con gráfica en vivo.
+- [x] **Aborto automático** por temperatura con umbrales **derivados de cada dispositivo** (temperatura de *slowdown* que reporta; valores por defecto por fabricante si no la reporta) y editables; registro del motivo.
+**Criterio:** una prueba de 5 min en cualquier GPU produce curva de t/s y temperatura; superar el umbral aborta y lo deja anotado.  
+  *Estado 03/10/2026: estrés real de 60 s en la 3060 con curvas de t/s, °C, W y reloj; aborto probado con umbral bajo en el laboratorio simulado. Falta la prueba de 5 min real (y la M40).*
 
 ### F6 — Rendimiento por componente (`llama-bench`)
 - [ ] El agente ejecuta `llama-bench` con lista cerrada de flags y rutas; devuelve JSON; el servidor lo guarda en `bench_rows` con telemetría.

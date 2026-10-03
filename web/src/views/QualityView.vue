@@ -119,7 +119,7 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
       <div v-else class="targets">
         <label v-for="e in endpoints" :key="e.id" class="target" :class="{ 'target--off': e.status !== 'listo', 'target--on': e.id === endpointId }">
           <input v-model="endpointId" type="radio" name="endpoint" :value="e.id" :disabled="e.status !== 'listo'" />
-          <span class="mono">
+          <span class="mono target__text">
             <b>{{ e.alias || e.snapshot?.model_file || e.base_url }}</b>
             <span class="dim"> · {{ e.base_url }} · {{ e.hostName }}</span><br />
             <span class="dim small">
@@ -260,7 +260,7 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
   opacity: 0.6;
   cursor: not-allowed;
 }
-.target .mono {
+.target__text {
   flex: 1;
 }
 .cards {

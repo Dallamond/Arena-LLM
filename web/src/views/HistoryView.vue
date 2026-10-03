@@ -42,7 +42,7 @@ const rows = computed(() => {
     </div>
     <BlueprintCard>
       <p v-if="!rows.length" class="mono dim">Sin runs todavía. Lanza uno desde <RouterLink to="/calidad">Calidad</RouterLink>.</p>
-      <table v-else class="runs mono">
+      <div v-else class="scroll"><table class="runs mono">
         <thead>
           <tr>
             <th>#</th>
@@ -76,7 +76,7 @@ const rows = computed(() => {
             <td>{{ fmtDuration(r.finished_at && r.started_at ? r.finished_at - r.started_at : null) }}</td>
           </tr>
         </tbody>
-      </table>
+      </table></div>
     </BlueprintCard>
   </div>
 </template>
@@ -102,6 +102,9 @@ const rows = computed(() => {
 }
 .dim {
   color: var(--ink-faint);
+}
+.scroll {
+  overflow-x: auto;
 }
 .runs {
   width: 100%;
