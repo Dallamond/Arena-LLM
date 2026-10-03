@@ -5,6 +5,7 @@ import sys
 
 from agent import __version__
 from agent.api import AgentApp, make_server
+from agent.config import load_config
 from agent.host import enrich_host, host_info
 from agent.processes import ServerDetector, default_process_source
 from agent.providers import detect_providers
@@ -22,6 +23,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="token de acceso; mejor por la variable ARENA_AGENT_TOKEN (la línea de comandos es visible)",
     )
     p.add_argument("--interval", type=float, default=1.0, help="intervalo de muestreo en segundos")
+    p.add_argument("--config", help="fichero JSON de configuración del agente")
+    p.add_argument(
+        "--models-dir", action="append", default=[], help="carpeta de modelos GGUF permitida (repetible)"
+    )
     p.add_argument("--simulate", choices=PROFILES, help="usar un perfil de hardware simulado")
     p.add_argument("-v", "--verbose", action="store_true")
     p.add_argument("--version", action="version", version=f"Agente Arena {__version__}")
@@ -34,6 +39,11 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    try:
+        config = load_config(args.config, args.models_dir)
+    except (OSError, ValueError) as exc:
+        print(f"Configuración inválida: {exc}", file=sys.stderr)
+        return 2
     token = args.token or os.environ.get("ARENA_AGENT_TOKEN") or None
     if args.simulate:
         host, providers, procs = build_profile(args.simulate)
@@ -49,6 +59,12 @@ def main(argv: list[str] | None = None) -> int:
         token=token,
         simulated=args.simulate,
         detector=ServerDetector(procs, providers),
+        config=config,
+    )
+    logging.info(
+        "Configuración: %s · carpetas de modelos: %s",
+        config.source or "ninguna (valores por defecto)",
+        ", ".join(map(str, config.model_dirs)) or "ninguna",
     )
     try:
         server = make_server(app, args.host, args.port)

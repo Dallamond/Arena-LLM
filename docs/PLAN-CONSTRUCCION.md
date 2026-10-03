@@ -155,7 +155,7 @@ Toda respuesta lleva `agent_api: 1` y `agent_version`. Valores ausentes = `null`
 | Fase | Primer paso técnico | Depende de |
 |---|---|---|
 | F2 GUI base | `server/` mínimo (FastAPI, registro de un agente, sondeo 1 Hz → SSE) + Vite con tokens, `BlueprintCard`, `GpuCard`, franja del equipo | F1 |
-| F3 Detección | `fake_llama.py` con `/props` de varias builds; `detect.py`; tabla `config_changes` | F2 + llama.cpp real |
+| F3 Detección | `fake_llama.py` con `/props` de varias builds; `detect.py`; tabla `config_changes`. **Calculadora de KV:** no suponer KV en todas las capas — hay modelos híbridos (p. ej. `qwen35`: capas SSM + atención completa cada `full_attention_interval`), `head_count_kv` puede ser un array por capa y `key_length`/`value_length` pueden faltar (usar `embedding_length / head_count`). Los `mmproj` (`general.type = mmproj`) no son modelos | F2 + llama.cpp real |
 | F4 Runner | streaming SSE de `/v1/chat/completions`, TTFT/t/s cliente y `timings` | F3 |
 | F5 Telemetría en runs | `samples`/`tps_series`, resumen (energía trapezoidal, degradación), aborto térmico | F4 |
 | F6 llama-bench | `agent/bench.py` con lista cerrada de flags, `-o json` | F1 + llama.cpp real |

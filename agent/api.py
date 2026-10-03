@@ -11,14 +11,19 @@ import hmac
 import ipaddress
 import json
 import logging
+import os
+import re
+import threading
 import time
 from collections.abc import Callable
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
-from agent import __version__
+from agent import __version__, gguf
+from agent.config import AgentConfig
 from agent.model import AGENT_API, HostInfo, to_jsonable
 from agent.processes import ServerDetector
 from agent.sampler import Sampler
@@ -26,6 +31,8 @@ from agent.sampler import Sampler
 log = logging.getLogger(__name__)
 
 LOOPBACK_NAMES = {"localhost"}
+MAX_MODEL_DEPTH = 4
+SPLIT_RE = re.compile(r"-(\d{5})-of-(\d{5})\.gguf$", re.IGNORECASE)
 
 
 class ApiError(Exception):
@@ -62,24 +69,30 @@ class AgentApp:
         token: str | None = None,
         simulated: str | None = None,
         detector: ServerDetector | None = None,
+        config: AgentConfig | None = None,
     ):
         self.host = host
+        self.config = config or AgentConfig()
+        self._gguf_cache: dict[tuple[str, int, int], gguf.GgufInfo] = {}
+        self._gguf_lock = threading.Lock()
         self.detector = detector
         self.simulated = simulated
         self.sampler = sampler
         self.token = token or None
         self.started = time.time()
-        self.routes: dict[str, Callable[[], dict[str, Any]]] = {
+        self.routes: dict[str, Callable[[dict[str, str]], dict[str, Any]]] = {
             "/health": self.health,
             "/info": self.info,
             "/metrics": self.metrics,
             "/servers": self.servers,
+            "/models": self.models,
+            "/gguf": self.gguf,
         }
 
-    def health(self) -> dict[str, Any]:
+    def health(self, query: dict[str, str] | None = None) -> dict[str, Any]:
         return {"status": "ok", "uptime_s": round(time.time() - self.started, 3), "simulated": self.simulated}
 
-    def info(self) -> dict[str, Any]:
+    def info(self, query: dict[str, str] | None = None) -> dict[str, Any]:
         devices, errors = self.sampler.devices()
         return {
             "host": self.host,
@@ -89,13 +102,72 @@ class AgentApp:
             "errors": errors,
         }
 
-    def metrics(self) -> dict[str, Any]:
+    def metrics(self, query: dict[str, str] | None = None) -> dict[str, Any]:
         return {"snapshot": self.sampler.latest()}
 
-    def servers(self) -> dict[str, Any]:
+    def servers(self, query: dict[str, str] | None = None) -> dict[str, Any]:
         if self.detector is None:
             raise ApiError(HTTPStatus.NOT_IMPLEMENTED, "no_detector", "Detección de servidores no disponible")
         return self.detector.detect()
+
+    def models(self, query: dict[str, str] | None = None) -> dict[str, Any]:
+        """Ficheros GGUF de las carpetas permitidas (sin leer cabeceras)."""
+        files: list[dict[str, Any]] = []
+        errors: dict[str, str] = {}
+        for d in self.config.model_dirs:
+            if not d.is_dir():
+                errors[str(d)] = "no existe o no es una carpeta"
+                continue
+            root_depth = len(d.parts)
+            for dirpath, dirnames, filenames in os.walk(d):
+                if len(Path(dirpath).parts) - root_depth >= MAX_MODEL_DEPTH:
+                    dirnames.clear()
+                for name in filenames:
+                    if not name.lower().endswith(".gguf"):
+                        continue
+                    fp = Path(dirpath) / name
+                    try:
+                        st = fp.stat()
+                    except OSError:
+                        continue
+                    m = SPLIT_RE.search(name)
+                    files.append(
+                        {
+                            "path": str(fp),
+                            "file": name,
+                            "dir": str(d),
+                            "size": st.st_size,
+                            "mtime": st.st_mtime,
+                            "split_part": int(m.group(1)) if m else None,
+                            "split_total": int(m.group(2)) if m else None,
+                        }
+                    )
+        files.sort(key=lambda f: f["path"].lower())
+        return {"model_dirs": [str(d) for d in self.config.model_dirs], "files": files, "errors": errors}
+
+    def gguf(self, query: dict[str, str] | None = None) -> dict[str, Any]:
+        raw = (query or {}).get("path", "")
+        if not self.config.model_dirs:
+            raise ApiError(HTTPStatus.FORBIDDEN, "no_model_dirs", "No hay carpetas de modelos configuradas")
+        path = self.config.allowed_model(raw)
+        if path is None:
+            raise ApiError(
+                HTTPStatus.FORBIDDEN, "path", "Ruta no permitida: debe ser un .gguf dentro de model_dirs"
+            )
+        st = path.stat()
+        key = (str(path), st.st_size, st.st_mtime_ns)
+        with self._gguf_lock:
+            cached = self._gguf_cache.get(key)
+        if cached is None:
+            try:
+                cached = gguf.read_header(path)
+            except gguf.GgufError as exc:
+                raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "gguf", str(exc)) from exc
+            with self._gguf_lock:
+                if len(self._gguf_cache) > 256:
+                    self._gguf_cache.clear()
+                self._gguf_cache[key] = cached
+        return {"gguf": cached}
 
     def authorize(self, headers: Any) -> None:
         if self.token:
@@ -116,7 +188,8 @@ class AgentApp:
                 raise ApiError(HTTPStatus.NOT_FOUND, "not_found", f"Ruta desconocida: {path}")
             if method != "GET":
                 raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "method", f"Método no permitido: {method}")
-            return HTTPStatus.OK, route()
+            query = {k: v[-1] for k, v in parse_qs(urlsplit(path).query).items()}
+            return HTTPStatus.OK, route(query)
         except ApiError as exc:
             return exc.status, {"error": {"code": exc.code, "message": exc.message}}
         except Exception as exc:
