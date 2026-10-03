@@ -8,8 +8,8 @@ set MODELS=
 if not "%~1"=="" set MODELS=--models-dir "%~1"
 start "Arena - agente" .venv\Scripts\python.exe -m agent --port 9100 %MODELS%
 start "Arena - agente simulado" .venv\Scripts\python.exe -m agent --port 9101 --simulate nvidia2
-timeout /t 2 /nobreak >nul
+ping -n 3 127.0.0.1 >nul
 start "Arena - servidor" .venv\Scripts\python.exe -m server --agent http://127.0.0.1:9100 --agent http://127.0.0.1:9101
-timeout /t 3 /nobreak >nul
-start "" http://127.0.0.1:8090/
+ping -n 4 127.0.0.1 >nul
+if not defined ARENA_NO_BROWSER start "" http://127.0.0.1:8090/
 echo Arena en http://127.0.0.1:8090 - cierra las tres ventanas para parar.
