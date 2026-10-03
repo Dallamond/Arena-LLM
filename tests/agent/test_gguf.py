@@ -172,3 +172,41 @@ def test_gguf_sin_carpetas_configuradas():
     app = AgentApp(HostInfo("h", "x", "linux"), Sampler([NullProvider()]))
     status, body = app.handle("GET", "/gguf?path=/x.gguf", {"Host": "localhost"})
     assert status == 403 and body["error"]["code"] == "no_model_dirs"
+
+
+def write_layered(path, tensors, *, data_bytes, split=None):
+    """GGUF con tensores `(nombre, offset)` de tipo F32 y `data_bytes` de datos alineados a 32."""
+    kvs = [_kv("general.architecture", 8, _s("llama")), _kv("llama.block_count", 4, struct.pack("<I", 2))]
+    if split:
+        kvs.append(_kv("split.count", 2, struct.pack("<H", split)))
+    infos = [_s(n) + struct.pack("<I", 1) + struct.pack("<Q", 4) + struct.pack("<IQ", 0, off) for n, off in tensors]
+    head = b"GGUF" + struct.pack("<I", 3) + struct.pack("<QQ", len(infos), len(kvs)) + b"".join(kvs) + b"".join(infos)
+    pad = (-len(head)) % 32
+    path.write_bytes(head + b"\0" * pad + b"\0" * data_bytes)
+
+
+def test_layout_por_capas(tmp_path):
+    f = tmp_path / "capas.gguf"
+    write_layered(
+        f,
+        [("token_embd.weight", 0), ("blk.0.attn_q.weight", 100), ("blk.0.ffn.weight", 160),
+         ("blk.1.attn_q.weight", 300), ("output_norm.weight", 520), ("output.weight", 540), ("rope_freqs", 900)],
+        data_bytes=1000,
+    )  # fmt: skip
+    lay = read_header(f).layout
+    assert lay == {"blocks": [200, 220], "token_embd": 100, "output": 380, "other": 100, "data_bytes": 1000}
+
+
+def test_layout_modelo_partido(tmp_path):
+    models = tmp_path / "m"
+    models.mkdir()
+    p1, p2 = models / "big-00001-of-00002.gguf", models / "big-00002-of-00002.gguf"
+    write_layered(p1, [("token_embd.weight", 0), ("blk.0.w", 64)], data_bytes=128, split=2)
+    write_layered(p2, [("blk.1.w", 0), ("output.weight", 96)], data_bytes=160)
+    app = AgentApp(HostInfo("h", "x", "linux"), Sampler([NullProvider()]), config=AgentConfig(model_dirs=[models]))
+    lay = app.gguf({"path": str(p1)})["gguf"].layout
+    assert lay["blocks"] == [64, 96] and lay["token_embd"] == 64 and lay["output"] == 64
+    assert lay["data_bytes"] == 288 and lay["split_missing"] == []
+    p2.unlink()
+    app._gguf_cache.clear()
+    assert app.gguf({"path": str(p1)})["gguf"].layout["split_missing"] == [p2.name]

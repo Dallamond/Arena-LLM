@@ -24,6 +24,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from agent import __version__, gguf
 from agent.config import AgentConfig
+from agent.gguf import GgufInfo
 from agent.model import AGENT_API, HostInfo, to_jsonable
 from agent.processes import ServerDetector
 from agent.sampler import Sampler
@@ -157,6 +158,8 @@ class AgentApp:
         if cached is None:
             try:
                 cached = gguf.read_header(path)
+                if (cached.split_count or 1) > 1:
+                    self._merge_split_parts(path, cached)
             except gguf.GgufError as exc:
                 raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "gguf", str(exc)) from exc
             with self._gguf_lock:
@@ -164,6 +167,26 @@ class AgentApp:
                     self._gguf_cache.clear()
                 self._gguf_cache[key] = cached
         return {"gguf": cached}
+
+    def _merge_split_parts(self, path: Path, info: GgufInfo) -> None:
+        """Modelo partido: suma el `layout` de las demás partes (si están todas y permitidas)."""
+        m = SPLIT_RE.search(path.name)
+        if not m:
+            return
+        total = int(m.group(2))
+        layouts, missing = [], []
+        for k in range(1, total + 1):
+            part = path.with_name(f"{path.name[: m.start()]}-{k:05d}-of-{total:05d}.gguf")
+            if part == path:
+                layouts.append(info.layout)
+                continue
+            allowed = self.config.allowed_model(str(part))
+            if allowed is None:
+                missing.append(part.name)
+                continue
+            layouts.append(gguf.read_header(allowed).layout)
+        info.layout = gguf.merge_layouts(layouts)
+        info.layout["split_missing"] = missing
 
     def authorize(self, headers: Any) -> None:
         if self.token:

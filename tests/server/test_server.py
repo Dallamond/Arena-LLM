@@ -17,13 +17,13 @@ from server.db import Database
 from server.settings import Settings
 
 
-def start_agent(profile: str, token: str | None = None):
+def start_agent(profile: str, token: str | None = None, config=None):
     host, providers, procs = build_profile(profile)
     sampler = Sampler(providers, interval_s=0.1)
     devices = sampler.refresh_devices()
     first = sampler.sample_once()
     app = AgentApp(enrich_host(host, devices, first.ram), sampler, token=token, simulated=profile,
-                   detector=ServerDetector(procs, providers))  # fmt: skip
+                   detector=ServerDetector(procs, providers), config=config)  # fmt: skip
     sampler.start()
     server = make_server(app, "127.0.0.1", 0)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -41,8 +41,8 @@ def start_agent(profile: str, token: str | None = None):
 def agents():
     stops = []
 
-    def make(profile="nvidia2", token=None):
-        url, stop = start_agent(profile, token)
+    def make(profile="nvidia2", token=None, config=None):
+        url, stop = start_agent(profile, token, config)
         stops.append(stop)
         return url
 
@@ -176,3 +176,23 @@ def test_colores_ciclicos_con_mas_gpu_que_paleta(tmp_path):
     assert [colors[f"nvidia:{i}"] for i in range(6)] == [0, 1, 2, 3, 4, 5]
     assert all(colors[f"nvidia:{i}"] is not None for i in (6, 7))
     db.close()
+
+
+def test_encaje_de_un_gguf_contra_el_equipo(tmp_path, agents):
+    from agent.config import AgentConfig
+    from tests.agent.test_gguf import write_gguf
+
+    models = tmp_path / "modelos"
+    models.mkdir()
+    f = models / "mini-Q4_K_M.gguf"
+    write_gguf(f)
+    url = agents("nvidia2", config=AgentConfig(model_dirs=[models]))
+    with TestClient(create_app(settings(tmp_path, url))) as c:
+        [h] = wait_for(c, lambda hs: hs and hs[0]["status"] == "online" and hs[0]["devices"])
+        wait_for(c, lambda hs: c.get(f"/api/hosts/{h['id']}/metrics").json()["snapshot"])
+        r = c.get(f"/api/hosts/{h['id']}/fit", params={"path": str(f), "ctx": 2048})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["estimated"] is True and body["estimate"]["kind"] == "unsupported"  # sin blk.N
+        assert c.get(f"/api/hosts/{h['id']}/fit", params={"path": str(f), "kv_type": "q3"}).status_code == 422
+        assert c.get(f"/api/hosts/{h['id']}/fit", params={"path": "/etc/passwd"}).status_code == 403

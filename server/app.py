@@ -17,6 +17,7 @@ from server import __version__
 from server.agents import AgentError, AgentMonitor
 from server.db import Database
 from server.detect import EndpointDetector
+from server.fit import FitError, FitParams, estimate, fit, gpus_from_state, ram_free_from_metrics
 from server.hub import EventHub, sse_format
 from server.runs.manager import RunError, RunManager, _run_public
 from server.runs.suites import SUITES
@@ -35,6 +36,10 @@ class RunIn(BaseModel):
 class AliasIn(BaseModel):
     alias: str | None = None
 
+
+#: Datos de la cabecera GGUF que acompañan al encaje (la lista de modelos los muestra).
+MODEL_SUMMARY_KEYS = ("name", "architecture", "general_type", "file_type", "size_label", "n_params",
+                      "context_length", "expert_count", "file_size")  # fmt: skip
 
 #: Claves de ajustes que acepta la API (el resto se rechaza).
 SETTINGS_KEYS = {"appearance", "thresholds"}
@@ -146,6 +151,31 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
     @app.get("/api/hosts/{host_id}/gguf")
     async def host_gguf(request: Request, host_id: int, path: str) -> dict[str, Any]:
         return await proxy(request, host_id, "/gguf", {"path": path})
+
+    @app.get("/api/hosts/{host_id}/fit")
+    async def host_fit(
+        request: Request,
+        host_id: int,
+        path: str,
+        ctx: int = 8192,
+        parallel: int = 1,
+        kv_type: str = "f16",
+        ubatch: int = 512,
+        reserve_mib: int = 512,
+    ) -> dict[str, Any]:
+        """Encaje ESTIMADO de un GGUF frente a la memoria libre del equipo ahora mismo."""
+        params = FitParams(ctx=ctx, parallel=parallel, kv_type=kv_type, ubatch=ubatch, reserve_mib=reserve_mib)
+        try:
+            params.validate()
+        except FitError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        g = (await proxy(request, host_id, "/gguf", {"path": path}))["gguf"]
+        state = state_or_404(request, host_id)
+        est = estimate(g, params)
+        verdict = fit(est, gpus_from_state(state.info, state.metrics), ram_free_from_metrics(state.metrics))
+        est.pop("layer_cost", None)
+        model = {k: g.get(k) for k in MODEL_SUMMARY_KEYS}
+        return {"path": path, "estimated": True, "model": model, "estimate": est, "fit": verdict}
 
     # --- ajustes -------------------------------------------------------------
 

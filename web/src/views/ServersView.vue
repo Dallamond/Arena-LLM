@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import { api, hostList, live, now } from "../api/live";
 import type { ConfigChange, Endpoint } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
+import GgufList from "../components/GgufList.vue";
 import Stamp from "../components/Stamp.vue";
 import { deviceColor, shortName } from "../lib/devices";
 import { NO_DATA, ago, fmt, fmtDate } from "../lib/format";
@@ -13,6 +14,16 @@ const detecting = ref(false);
 const showArgv = ref<Record<number, boolean>>({});
 const editing = ref<number | null>(null);
 const aliasText = ref("");
+const tab = ref<"running" | "disk">("running");
+const diskOpened = ref(false); // la lista de GGUF se monta al abrir la pestaña por primera vez
+const diskCount = ref<Record<number, { n: number; bytes: number }>>({});
+const diskTotals = computed(() => Object.values(diskCount.value).reduce((a, c) => ({ n: a.n + c.n, bytes: a.bytes + c.bytes }), { n: 0, bytes: 0 }));
+const runningCount = computed(() => groups.value.reduce((a, g) => a + g.endpoints.filter((e) => e.status !== "detenido").length, 0));
+
+function openTab(t: "running" | "disk") {
+  tab.value = t;
+  if (t === "disk") diskOpened.value = true;
+}
 
 onMounted(async () => {
   history.value = await api<ConfigChange[]>("/api/changes?limit=200").catch(() => []);
@@ -78,6 +89,24 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
       <button class="btn" type="button" :disabled="detecting" @click="detect">{{ detecting ? "Detectando…" : "Detectar ahora" }}</button>
     </div>
 
+    <div class="tabs" role="tablist">
+      <button role="tab" type="button" class="tab" :aria-selected="tab === 'running'" @click="openTab('running')">
+        En marcha <span class="count">{{ runningCount }}</span>
+      </button>
+      <button role="tab" type="button" class="tab" :aria-selected="tab === 'disk'" @click="openTab('disk')">
+        GGUF en disco <span class="count">{{ diskOpened ? diskTotals.n : "·" }}</span>
+        <span v-if="diskOpened && diskTotals.bytes" class="dim small">{{ fmt(diskTotals.bytes / 1024 ** 3, 1) }} GiB</span>
+      </button>
+    </div>
+
+    <div v-if="diskOpened" v-show="tab === 'disk'">
+      <template v-for="g in groups" :key="g.host.id">
+        <h3 class="label host">Equipo · {{ g.host.name }}</h3>
+        <GgufList :host-id="g.host.id" @count="(n, bytes) => (diskCount[g.host.id] = { n, bytes })" />
+      </template>
+    </div>
+
+    <div v-show="tab === 'running'">
     <template v-for="g in groups" :key="g.host.id">
       <h3 class="label host">Equipo · {{ g.host.name }}</h3>
       <div v-if="!g.endpoints.length" class="empty">
@@ -168,6 +197,7 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
         </div>
       </BlueprintCard>
     </template>
+    </div>
   </div>
 </template>
 
@@ -187,6 +217,40 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
 }
 .host {
   margin: 18px 0 10px;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.tab {
+  background: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: var(--ink-dim);
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.tab[aria-selected="true"] {
+  color: var(--ink);
+  border-color: var(--line);
+  background: var(--panel);
+  margin-bottom: -1px;
+  font-weight: 600;
+}
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border: 1px solid var(--line);
+  padding: 0 5px;
 }
 .dim {
   color: var(--ink-faint);

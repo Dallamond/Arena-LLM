@@ -6,6 +6,7 @@ ficheros con la misma cabecera y tamaño son, a efectos prácticos, el mismo.
 """
 
 import hashlib
+import re
 import struct
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -81,6 +82,8 @@ class GgufInfo:
     expert_used_count: int | None = None
     vocab_size: int | None = None
     split_count: int | None = None
+    #: Bytes de datos por grupo de tensores (ver `_layout`); base de la calculadora de encaje.
+    layout: dict[str, Any] = field(default_factory=dict)
     tensor_types: dict[str, int] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -156,6 +159,53 @@ def _int(v: Any) -> int | None:
     return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
 
 
+_BLK_RE = re.compile(r"^blk\.(\d+)\.")
+
+
+def _layout(offsets: list[tuple[int, str]], data_bytes: int) -> dict[str, Any]:
+    """Bytes por grupo deducidos de los offsets (el tamaño de un tensor es la distancia al siguiente).
+
+    - `blocks`: bytes por capa (`blk.N.*`), en orden de capa.
+    - `token_embd`: embeddings de entrada (llama.cpp los deja en CPU).
+    - `output`: `output.*` y `output_norm.*` (van a la GPU solo con todas las capas en GPU).
+    - `other`: el resto (p. ej. tensores de rope).
+    """
+    out: dict[str, Any] = {"blocks": [], "token_embd": 0, "output": 0, "other": 0, "data_bytes": data_bytes}
+    if not offsets or data_bytes <= 0:
+        return out
+    ordered = sorted(offsets)
+    blocks: dict[int, int] = {}
+    for i, (off, name) in enumerate(ordered):
+        end = ordered[i + 1][0] if i + 1 < len(ordered) else data_bytes
+        nbytes = max(end - off, 0)
+        m = _BLK_RE.match(name)
+        if m:
+            blocks[int(m.group(1))] = blocks.get(int(m.group(1)), 0) + nbytes
+        elif name.startswith("token_embd."):
+            out["token_embd"] += nbytes
+        elif name.startswith(("output.", "output_norm.")):
+            out["output"] += nbytes
+        else:
+            out["other"] += nbytes
+    if blocks:
+        out["blocks"] = [blocks.get(i, 0) for i in range(max(blocks) + 1)]
+    return out
+
+
+def merge_layouts(layouts: list[dict[str, Any]]) -> dict[str, Any]:
+    """Suma los `layout` de las partes de un modelo partido (`-0000k-of-0000n`)."""
+    out: dict[str, Any] = {"blocks": [], "token_embd": 0, "output": 0, "other": 0, "data_bytes": 0}
+    for lay in layouts:
+        for k in ("token_embd", "output", "other", "data_bytes"):
+            out[k] += lay.get(k, 0)
+        blocks = lay.get("blocks", [])
+        if len(blocks) > len(out["blocks"]):
+            out["blocks"] += [0] * (len(blocks) - len(out["blocks"]))
+        for i, b in enumerate(blocks):
+            out["blocks"][i] += b
+    return out
+
+
 def read_header(path: str | Path) -> GgufInfo:
     path = Path(path)
     size = path.stat().st_size
@@ -177,8 +227,9 @@ def read_header(path: str | Path) -> GgufInfo:
             meta[key] = _read_value(r, r.u32(), len64)
         n_params = 0
         types: dict[str, int] = {}
+        offsets: list[tuple[int, str]] = []
         for _ in range(n_tensors):
-            r.string(len64)
+            tensor_name = r.string(len64)
             n_dims = r.u32()
             if n_dims > 8:
                 raise GgufError(f"tensor con {n_dims} dimensiones: fichero corrupto")
@@ -186,7 +237,7 @@ def read_header(path: str | Path) -> GgufInfo:
             for _ in range(n_dims):
                 count *= r.u64() if len64 else r.u32()
             ttype = r.u32()
-            r.u64()  # offset
+            offsets.append((r.u64(), tensor_name))
             n_params += count
             tname = GGML_TYPES.get(ttype, f"type_{ttype}")
             types[tname] = types.get(tname, 0) + 1
@@ -197,6 +248,8 @@ def read_header(path: str | Path) -> GgufInfo:
     def a(suffix: str) -> Any:
         return meta.get(f"{arch}.{suffix}") if arch else None
 
+    align = _int(meta.get("general.alignment")) or 32
+    data_start = -(-r.pos // align) * align
     ftype = meta.get("general.file_type")
     tokens = meta.get("tokenizer.ggml.tokens")
     head_kv = a("attention.head_count_kv")
@@ -224,6 +277,7 @@ def read_header(path: str | Path) -> GgufInfo:
         expert_used_count=_int(a("expert_used_count")),
         vocab_size=tokens["len"] if isinstance(tokens, dict) else (len(tokens) if isinstance(tokens, list) else None),
         split_count=_int(meta.get("split.count")),
+        layout=_layout(offsets, size - data_start),
         tensor_types=dict(sorted(types.items(), key=lambda kv: -kv[1])),
         metadata={k: v for k, v in meta.items() if not k.startswith("tokenizer.ggml.")},
     )

@@ -322,3 +322,81 @@ export interface Appearance {
 }
 
 export type ThresholdOverrides = Record<string, { warn?: number; crit?: number }>;
+
+/** Fichero GGUF de las carpetas de modelos del agente. */
+export interface ModelFile {
+  path: string;
+  file: string;
+  dir: string;
+  size: number;
+  mtime: number;
+  split_part: number | null;
+  split_total: number | null;
+}
+
+export interface ModelsResponse {
+  model_dirs: string[];
+  files: ModelFile[];
+  errors: Record<string, string>;
+}
+
+export interface FitParams {
+  ctx: number;
+  parallel: number;
+  kv_type: string;
+}
+
+/** Desglose ESTIMADO (bytes). `kv`/`compute` son null si faltan datos en la cabecera. */
+export interface FitEstimate {
+  kind: "model" | "mmproj" | "unsupported";
+  notes: string[];
+  n_layers?: number;
+  weights?: number;
+  weights_layers?: number;
+  token_embd?: number;
+  output?: number;
+  kv?: number | null;
+  kv_layers?: number;
+  recurrent?: number;
+  compute?: number | null;
+  params?: FitParams & { ubatch: number; reserve_mib: number };
+}
+
+export interface FitGpu {
+  device_id: string;
+  name: string | null;
+  need: number;
+  free: number | null;
+  fits: boolean;
+  fits_if_empty: boolean;
+}
+
+export interface FitVerdict {
+  verdict: "gpu" | "split" | "ram" | "cpu" | "no" | "unknown" | "mmproj" | "unsupported";
+  label: string | null;
+  need_full_gpu?: number;
+  ngl?: number | null;
+  ram_need?: number | null;
+  gpus: FitGpu[];
+  hint?: string;
+}
+
+export interface FitResponse {
+  path: string;
+  estimated: true;
+  model: GgufHeader;
+  estimate: FitEstimate;
+  fit: FitVerdict;
+}
+
+export interface GgufHeader {
+  name: string | null;
+  architecture: string | null;
+  general_type: string | null;
+  file_type: string | null;
+  size_label: string | null;
+  n_params: number;
+  context_length: number | null;
+  expert_count: number | null;
+  file_size: number;
+}
