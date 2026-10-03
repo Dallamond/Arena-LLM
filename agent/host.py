@@ -7,7 +7,7 @@ import sys
 import uuid
 from pathlib import Path
 
-from agent.model import HostInfo
+from agent.model import DeviceInfo, HostInfo, RamSample
 
 
 def _raw_machine_id() -> str | None:
@@ -47,3 +47,15 @@ def host_info() -> HostInfo:
         os=sys.platform.replace("win32", "windows"),
         os_version=platform.platform() or None,
     )
+
+
+def enrich_host(host: HostInfo, devices: list[DeviceInfo], ram: RamSample | None) -> HostInfo:
+    """Completa la ficha del equipo con lo que detectan los proveedores (CPU y RAM)."""
+    cpu = next((d for d in devices if d.kind == "cpu"), None)
+    if cpu is not None:
+        host.cpu_model = host.cpu_model or cpu.name
+        host.cpu_cores = host.cpu_cores or cpu.cores
+        host.cpu_threads = host.cpu_threads or cpu.threads
+    if ram is not None and ram.total_mib is not None:
+        host.ram_total_mib = int(round(ram.total_mib))
+    return host

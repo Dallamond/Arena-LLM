@@ -5,10 +5,11 @@ Para añadir un fabricante: crear su módulo en este paquete y añadir la clase 
 """
 
 from agent.providers.base import TelemetryProvider
+from agent.providers.cpu_ram import CpuRamProvider
 from agent.providers.null import NullProvider
 
 GPU_PROVIDERS: list[type[TelemetryProvider]] = []
-SYSTEM_PROVIDERS: list[type[TelemetryProvider]] = []
+SYSTEM_PROVIDERS: list[type[TelemetryProvider]] = [CpuRamProvider]
 
 
 def detect_providers() -> list[TelemetryProvider]:

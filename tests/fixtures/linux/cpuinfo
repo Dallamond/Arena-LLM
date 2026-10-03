@@ -1,0 +1,36 @@
+processor	: 0
+vendor_id	: GenericVendor
+model name	: CPU de prueba 2 nucleos
+cpu MHz		: 2000.000
+physical id	: 0
+core id		: 0
+cpu cores	: 2
+flags		: fpu vme
+
+processor	: 1
+vendor_id	: GenericVendor
+model name	: CPU de prueba 2 nucleos
+cpu MHz		: 2100.000
+physical id	: 0
+core id		: 1
+cpu cores	: 2
+flags		: fpu vme
+
+processor	: 2
+vendor_id	: GenericVendor
+model name	: CPU de prueba 2 nucleos
+cpu MHz		: 2200.000
+physical id	: 0
+core id		: 0
+cpu cores	: 2
+flags		: fpu vme
+
+processor	: 3
+vendor_id	: GenericVendor
+model name	: CPU de prueba 2 nucleos
+cpu MHz		: 2300.000
+physical id	: 0
+core id		: 1
+cpu cores	: 2
+flags		: fpu vme
+

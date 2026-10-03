@@ -5,7 +5,7 @@ import sys
 
 from agent import __version__
 from agent.api import AgentApp, make_server
-from agent.host import host_info
+from agent.host import enrich_host, host_info
 from agent.providers import detect_providers
 from agent.sampler import Sampler
 
@@ -40,8 +40,9 @@ def main(argv: list[str] | None = None) -> int:
 
     token = args.token or os.environ.get("ARENA_AGENT_TOKEN") or None
     sampler = Sampler(detect_providers(), interval_s=args.interval)
-    sampler.refresh_devices()
-    app = AgentApp(host_info(), sampler, token=token)
+    devices = sampler.refresh_devices()
+    first = sampler.sample_once()
+    app = AgentApp(enrich_host(host_info(), devices, first.ram), sampler, token=token)
     try:
         server = make_server(app, args.host, args.port)
     except (ValueError, OSError) as exc:

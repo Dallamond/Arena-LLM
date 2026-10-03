@@ -40,6 +40,8 @@ class DeviceInfo:
     driver: str | None = None
     driver_model: str | None = None
     compute_capability: str | None = None
+    cores: int | None = None  # CPU: núcleos físicos
+    threads: int | None = None  # CPU: hilos lógicos
     fields_unavailable: list[str] = field(default_factory=list)
 
 
