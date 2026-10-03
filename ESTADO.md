@@ -125,6 +125,25 @@ Servidores → **＋ Añadir a mano**: equipo (de él sale la telemetría), URL,
 3. F6: `llama-bench` desde el agente, por componente. Servirá para investigar el procesado de prompt lento.
 4. F5: prueba real de 5 min y prueba de la M40 cuando llegue (driver R580).
 
+## README con capturas (03/10/2026)
+
+En `docs/img/` hay capturas y GIF hechos en modo simulado con Playwright: `panel.png`, `panel-telemetria.gif`, `deteccion-servidores.gif`, `calculadora-gguf.gif`, `estres-en-vivo.gif`, `resultado-run.png`, `prompt-libre-streaming.gif` y `ajustes-apariencia.png`.
+
+**Pendiente para mañana:**
+- Capturas estáticas de **Servidores** (`servidores.png`, con la cabecera de la página visible) e **Historial** (`historial.png`), y añadirlas al README en sus secciones. El primer intento salió mal: en Servidores el desplazamiento cortaba la cabecera, y en Historial a 1280 px se veía el fallo de abajo.
+- Repetir `panel.png` con la página abierta 2 min antes, para que las minigráficas "2 MIN" salgan llenas.
+- Herramientas ya instaladas en `D:\dev-tools\`: `readme-tools\` (venv con Playwright, Pillow y httpx) y `ms-playwright\` (Chromium; usar `PLAYWRIGHT_BROWSERS_PATH=D:\dev-tools\ms-playwright`). Los scripts de captura están en `D:\dev-tools\readme-tools\capturas\`: `e_static.py` hace justo lo pendiente. Esperan los datos en `D:\dev-tools\arena-readme-tmp\`, que se borró, así que hay que recrear esa carpeta. Usan el servidor en 8190, agentes simulados en 9201/9202 vía `sim_agent.py` (desplaza los llama simulados a 18181/18182) y GGUF falsos de `make_gguf.py` montados con `subst M:`.
+
+Detalles visuales vistos al capturar (sin arreglar):
+- Calculadora GGUF: los veredictos usan punto decimal ("Necesita 9.2 GiB de RAM") y el resto coma ("9,7 GiB"). El rótulo y el campo "Slots (-np)" quedan más altos que los de contexto y caché KV.
+- Resumen del run: "temperatura reposo → máx 52 → 52 °C (+-1)" muestra "+-1". En la columna de la GPU, las unidades (`W`, `(+30)`) bajan a otra línea.
+- Prompt libre en marcha: la fase marca "carga · 0 s" y "0 peticiones" aunque ya lleguen tokens. Estrés en marcha: "Peticiones (4)" en la tabla frente a "6 peticiones" en la tarjeta (cuenta las que están en curso).
+- Servidor sin respuesta: "sin datos por slot × sin datos slots (total sin datos)"; mejor un solo "sin datos". La tarjeta se mueve unos 12 px al cambiar de estado (aparece o desaparece "Probar").
+- Eje Y de velocidad: "0,0" y "5,0" frente a enteros en el resto de gráficas.
+- Minigráficas "2 MIN" del Panel: empiezan vacías al abrir la página (no cargan el histórico).
+- **A 1280 px de ancho**, la franja de dispositivos pasa a dos filas (RAM sola abajo) y ocupa media pantalla. La tabla del Historial se corta por la derecha (la columna de energía no se ve).
+- Si se elige un contexto mayor que el entrenado (p. ej. 131.072 en un modelo de 32.768), no aparece ningún aviso.
+
 ## Entorno y avisos
 
 - `.venv` usa Python 3.12. El comando `python` de Windows es el atajo de la Store.
