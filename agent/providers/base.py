@@ -7,7 +7,7 @@ fabricante no debe tocar nada fuera de `providers/`.
 
 from abc import ABC, abstractmethod
 
-from agent.model import DeviceInfo, DeviceSample, RamSample
+from agent.model import DeviceInfo, DeviceSample, ProcessGpuUse, RamSample
 
 
 class TelemetryProvider(ABC):
@@ -30,3 +30,7 @@ class TelemetryProvider(ABC):
     def ram(self) -> RamSample | None:
         """Memoria del sistema, si este proveedor la mide. Solo uno debería hacerlo."""
         return None
+
+    def processes(self) -> dict[int, list[ProcessGpuUse]]:
+        """Qué procesos (pid) usan qué dispositivos, si el proveedor lo sabe."""
+        return {}

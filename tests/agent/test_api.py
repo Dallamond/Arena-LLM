@@ -141,7 +141,10 @@ def test_fuera_de_localhost_exige_token():
     check_bind("127.0.0.1", None)
 
 
-def test_sin_proveedores_de_gpu_usa_el_nulo():
+def test_sin_proveedores_de_gpu_usa_el_nulo(monkeypatch):
+    import agent.providers as providers
+
+    monkeypatch.setattr(providers, "GPU_PROVIDERS", [])
     assert [p.name for p in detect_providers()][0] == "null"
 
 

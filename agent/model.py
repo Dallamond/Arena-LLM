@@ -80,6 +80,14 @@ DeviceSample = GpuSample | CpuSample
 
 
 @dataclass
+class ProcessGpuUse:
+    """Uso de un dispositivo por un proceso. `mem_used_mib` es null si el driver no lo da (WDDM)."""
+
+    device_id: str
+    mem_used_mib: float | None = None
+
+
+@dataclass
 class Snapshot:
     """Último muestreo del equipo. `t` en segundos epoch; `errors` por proveedor."""
 
