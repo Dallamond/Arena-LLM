@@ -217,20 +217,22 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
 **Entregable:** nota con driver, build, flags y resultados (primera ficha de referencia).
 
 ### F1 — Esqueleto y agente
-- [ ] Repo con `agent/`, `server/`, `web/`, `tests/`, `docs/`, `.gitignore`, `.stignore`, `README`, `ESTADO.md`, scripts `.bat`/`.sh`.
-- [ ] Agente (solo stdlib): `/health`, `/info`, `/metrics` (por GPU: temp, potencia, límite, util, VRAM, relojes, fan, pstate, throttle, PCIe; CPU y RAM), `/servers` (detección §5), `/gguf` (cabecera).
-- [ ] Campos no soportados → `null`; campo inválido en el driver → se descarta y se reintenta; decodificación de *throttle reasons* con tests.
-- [ ] **Capa de proveedores de telemetría** con una interfaz común; implementar NVIDIA y CPU/RAM; un proveedor "nulo" para equipos sin GPU. Añadir otro fabricante no debe tocar el resto del código.
-- [ ] `/info` devuelve una **ficha de equipo normalizada** (host + lista de dispositivos con proveedor, tipo, nombre, UUID, memoria, límites, driver).
-- [ ] Modo simulado con **tres perfiles de hardware falsos** (2 GPU NVIDIA, solo CPU, GPU con campos ausentes) para desarrollar sin hardware y probar que nada depende de este PC.
-**Criterio:** en el PC real devuelve datos de todas las GPUs presentes y detecta un `llama-server` en marcha con su línea de comandos; con cada perfil simulado la API devuelve datos coherentes y la suite de tests pasa.
+- [x] Repo con `agent/`, `server/`, `web/`, `tests/`, `docs/`, `.gitignore`, `.stignore`, `README`, `ESTADO.md`, scripts `.bat`/`.sh`.
+- [x] Agente (solo stdlib): `/health`, `/info`, `/metrics` (por GPU: temp, potencia, límite, util, VRAM, relojes, fan, pstate, throttle, PCIe; CPU y RAM), `/servers` (detección §5), `/gguf` (cabecera).
+- [x] Campos no soportados → `null`; campo inválido en el driver → se descarta y se reintenta; decodificación de *throttle reasons* con tests.
+- [x] **Capa de proveedores de telemetría** con una interfaz común; implementar NVIDIA y CPU/RAM; un proveedor "nulo" para equipos sin GPU. Añadir otro fabricante no debe tocar el resto del código.
+- [x] `/info` devuelve una **ficha de equipo normalizada** (host + lista de dispositivos con proveedor, tipo, nombre, UUID, memoria, límites, driver).
+- [x] Modo simulado con **tres perfiles de hardware falsos** (2 GPU NVIDIA, solo CPU, GPU con campos ausentes) para desarrollar sin hardware y probar que nada depende de este PC.
+**Criterio:** en el PC real devuelve datos de todas las GPUs presentes y detecta un `llama-server` en marcha con su línea de comandos; con cada perfil simulado la API devuelve datos coherentes y la suite de tests pasa.  
+  *Estado 03/10/2026: cumplido con la RTX 3060 y los tres perfiles simulados (108 tests). Pendiente: detectar un `llama-server` real (falta instalar llama.cpp).*
 
 ### F2 — GUI base y "plano del equipo"
-- [ ] Vue 3 + Vite + TS; tokens de diseño blueprint; fuentes vendorizadas.
-- [ ] Estructura de FreeToken como referencia: barra superior con chips de estado, menú lateral colapsable con el pie de VRAM/RAM, tarjetas, ajustes con subnavegación.
-- [ ] **Franja del equipo siempre visible**: una tarjeta por GPU (temp, W, VRAM con barra, reloj, aviso de throttling), CPU y RAM; actualización cada 1 s por SSE.
-- [ ] Página **Panel** (equivalente a la Console de FreeToken) con medidores radiales y estado de servidores detectados.
-**Criterio:** con el agente real, los medidores se mueven en vivo; con el agente caído, la GUI lo indica sin romperse.
+- [x] Vue 3 + Vite + TS; tokens de diseño blueprint; fuentes vendorizadas.
+- [ ] Estructura de FreeToken como referencia: barra superior con chips de estado, menú lateral colapsable con el pie de VRAM/RAM, tarjetas, ajustes con subnavegación. *(03/10/2026: hecho salvo Ajustes con subnavegación, que llega con F3)*
+- [x] **Franja del equipo siempre visible**: una tarjeta por GPU (temp, W, VRAM con barra, reloj, aviso de throttling), CPU y RAM; actualización cada 1 s por SSE.
+- [x] Página **Panel** (equivalente a la Console de FreeToken) con medidores radiales y estado de servidores detectados.
+**Criterio:** con el agente real, los medidores se mueven en vivo; con el agente caído, la GUI lo indica sin romperse.  
+  *Estado 03/10/2026: cumplido (agente real y simulado; agente caído → chip "sin respuesta", datos atenuados con sello SIN DATOS y último dato).*
 
 ### F3 — Servidores, modelos y detección
 - [ ] **Varios equipos (`hosts`)**: registrar agentes de distintas máquinas y cambiar de equipo en la GUI. Autodescubrimiento opcional en la red local.
