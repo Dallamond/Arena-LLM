@@ -25,6 +25,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--interval", type=float, default=1.0, help="intervalo de muestreo en segundos")
     p.add_argument("--config", help="fichero JSON de configuración del agente")
     p.add_argument("--models-dir", action="append", default=[], help="carpeta de modelos GGUF permitida (repetible)")
+    p.add_argument("--llama-bench", help="ruta de llama-bench (si no está en el fichero de configuración)")
     p.add_argument("--simulate", choices=PROFILES, help="usar un perfil de hardware simulado")
     p.add_argument("-v", "--verbose", action="store_true")
     p.add_argument("--version", action="version", version=f"Agente Arena {__version__}")
@@ -38,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     try:
-        config = load_config(args.config, args.models_dir)
+        config = load_config(args.config, args.models_dir, args.llama_bench)
     except (OSError, ValueError) as exc:
         print(f"Configuración inválida: {exc}", file=sys.stderr)
         return 2
@@ -60,9 +61,10 @@ def main(argv: list[str] | None = None) -> int:
         config=config,
     )
     logging.info(
-        "Configuración: %s · carpetas de modelos: %s",
+        "Configuración: %s · carpetas de modelos: %s · llama-bench: %s",
         config.source or "ninguna (valores por defecto)",
         ", ".join(map(str, config.model_dirs)) or "ninguna",
+        config.llama_bench or ("simulado" if args.simulate else "no configurado"),
     )
     try:
         server = make_server(app, args.host, args.port)
@@ -71,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     sampler.start()
+    app.bench.warm()
     host, port = server.server_address[:2]
     logging.info("Agente Arena %s en http://%s:%s (token: %s)", __version__, host, port, "sí" if token else "no")
     try:

@@ -259,12 +259,18 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
   *Estado 03/10/2026: estrés real de 60 s en la 3060 con curvas de t/s, °C, W y reloj; aborto probado con umbral bajo en el laboratorio simulado. Falta la prueba de 5 min real (y la M40).*
 
 ### F6 — Rendimiento por componente (`llama-bench`)
-- [ ] El agente ejecuta `llama-bench` con lista cerrada de flags y rutas; devuelve JSON; el servidor lo guarda en `bench_rows` con telemetría.
-- [ ] Pruebas: **solo un dispositivo** (cualquier GPU detectada), **solo CPU/RAM** (barrido de hilos), **híbrido** (barrido de `-ngl`), **reparto** entre GPUs (`-ts`). El selector lista los dispositivos **detectados**, no una lista fija.
-- [ ] **Perfil estándar de benchmark** (mismos tamaños de prompt/generación, repeticiones y semilla en cualquier equipo) con versión y hash.
-- [ ] Comprobación previa de VRAM libre; negarse a lanzar si hay un servidor ocupando la tarjeta (o avisar).
-- [ ] Métricas derivadas: ancho de banda efectivo y % de capas en GPU.
+- [x] El agente ejecuta `llama-bench` con lista cerrada de flags y rutas; devuelve JSON; el servidor lo guarda en `bench_rows` con telemetría.
+- [x] Pruebas: **solo un dispositivo** (cualquier GPU detectada), **solo CPU/RAM** (barrido de hilos), **híbrido** (barrido de `-ngl`), **reparto** entre GPUs (`-ts`). El selector lista los dispositivos **detectados**, no una lista fija.
+- [x] **Perfil estándar de benchmark** (mismos tamaños de prompt/generación, repeticiones y semilla en cualquier equipo) con versión y hash.
+- [x] Comprobación previa de VRAM libre; negarse a lanzar si hay un servidor ocupando la tarjeta (o avisar).
+- [x] Métricas derivadas: ancho de banda efectivo y % de capas en GPU.
 **Criterio:** la curva t/s frente a capas en GPU de un mismo modelo se dibuja y se puede guardar.
+  *Cumplido 03/10/2026: RTX 3060 · Qwen2.5-Coder 7B Q8 · b11379 → tg 3,2 / 3,6 / 4,4 / 8,8 / 38,7 t/s con 0 / 7 / 14 / 22 / 29 capas (run guardado). El reparto `-ts` solo se ha probado con el agente simulado (falta la M40).*
+
+### Ideas de Lucas (03/10/2026) — para después de F6
+- [ ] **Biblioteca de prompts predefinidos** en Prompt libre: problemas de lógica, acertijos tipo test de CI, matemáticas, código, redacción… elegibles con un clic (encaja con los datasets de F7).
+- [ ] **Comando copiable de `llama-server`** para cada GGUF desde la calculadora de encaje (ruta del binario detectada, `-m`, `-ngl` sugerido, `-c`, `-ts`, `--port` libre, `-fa`). Es también el paso 2 del modo guiado de F8.
+- [ ] **Recomendaciones de modelos según el hardware**: qué tamaño y cuantización caben en cada equipo (por VRAM + RAM y ancho de banda medido en F6), con un catálogo editable de modelos conocidos (fichero de datos, no código).
 
 ### F7 — Pruebas de calidad
 - [ ] `qa` (12 preguntas), `contexto` (aguja en pajar + VRAM vs contexto), `concurrencia`, `codigo` (10 problemas con ejecución aislada), todas con opciones editables y semillas fijas.

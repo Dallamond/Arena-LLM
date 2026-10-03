@@ -19,7 +19,8 @@ from server.db import Database
 from server.detect import EndpointDetector, normalize_base_url
 from server.fit import FitError, FitParams, estimate, fit, gpus_from_state, ram_free_from_metrics
 from server.hub import EventHub, sse_format
-from server.runs.manager import RunError, RunManager, _run_public
+from server.runs.bench import BENCH_SUITES
+from server.runs.manager import BENCH_DEVICES_TIMEOUT_S, GGUF_TIMEOUT_S, RunError, RunManager, _run_public
 from server.runs.suites import SUITES
 from server.settings import Settings
 
@@ -30,6 +31,14 @@ class RunIn(BaseModel):
     suite: str
     endpoint_id: int
     label: str | None = None
+    params: dict[str, Any] = {}
+
+
+class BenchIn(BaseModel):
+    suite: str
+    host_id: int
+    label: str | None = None
+    force: bool = False
     params: dict[str, Any] = {}
 
 
@@ -147,10 +156,12 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
         state = state_or_404(request, host_id)
         return {"host": host_id, "status": state.status, "snapshot": state.metrics}
 
-    async def proxy(request: Request, host_id: int, path: str, params: dict | None = None) -> dict[str, Any]:
+    async def proxy(
+        request: Request, host_id: int, path: str, params: dict | None = None, timeout: float | None = None
+    ) -> dict[str, Any]:
         state = state_or_404(request, host_id)
         try:
-            return await monitor(request).agent.get(state, path, params)
+            return await monitor(request).agent.get(state, path, params, timeout=timeout)
         except AgentError as exc:
             code = 403 if exc.status == "unauthorized" else 502
             raise HTTPException(code, exc.message) from exc
@@ -165,7 +176,11 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
 
     @app.get("/api/hosts/{host_id}/gguf")
     async def host_gguf(request: Request, host_id: int, path: str) -> dict[str, Any]:
-        return await proxy(request, host_id, "/gguf", {"path": path})
+        return await proxy(request, host_id, "/gguf", {"path": path}, timeout=GGUF_TIMEOUT_S)
+
+    @app.get("/api/hosts/{host_id}/bench/devices")
+    async def host_bench_devices(request: Request, host_id: int) -> dict[str, Any]:
+        return await proxy(request, host_id, "/bench/devices", timeout=BENCH_DEVICES_TIMEOUT_S)
 
     @app.get("/api/hosts/{host_id}/fit")
     async def host_fit(
@@ -184,7 +199,7 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
             params.validate()
         except FitError as exc:
             raise HTTPException(422, str(exc)) from exc
-        g = (await proxy(request, host_id, "/gguf", {"path": path}))["gguf"]
+        g = (await proxy(request, host_id, "/gguf", {"path": path}, timeout=GGUF_TIMEOUT_S))["gguf"]
         state = state_or_404(request, host_id)
         est = estimate(g, params)
         verdict = fit(est, gpus_from_state(state.info, state.metrics), ram_free_from_metrics(state.metrics))
@@ -273,7 +288,7 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
             raise HTTPException(404, "Servidor no registrado")
         if not ep["manual"] and ep["status"] != "detenido":
             raise HTTPException(409, "Está en marcha y detectado: volvería a aparecer. Páralo antes de borrarlo.")
-        if any(a.endpoint["id"] == endpoint_id for a in request.app.state.runs.active.values()):
+        if any(a.endpoint and a.endpoint["id"] == endpoint_id for a in request.app.state.runs.active.values()):
             raise HTTPException(409, "Hay una prueba en marcha en este servidor")
         db.delete_endpoint(endpoint_id)
         publish_endpoints(request, ep["host_pk"])
@@ -286,7 +301,7 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
 
     @app.get("/api/suites")
     def suites() -> list[dict[str, Any]]:
-        return [s.public() for s in SUITES.values()]
+        return [s.public() for s in (*SUITES.values(), *BENCH_SUITES.values())]
 
     @app.get("/api/runs")
     def list_runs(request: Request, limit: int = 200) -> list[dict[str, Any]]:
@@ -296,6 +311,16 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
     async def start_run(request: Request, body: RunIn) -> dict[str, Any]:
         try:
             run = await request.app.state.runs.start(body.suite, body.endpoint_id, body.params, body.label)
+        except RunError as exc:
+            raise HTTPException(exc.status, exc.message) from exc
+        return _run_public(run)
+
+    @app.post("/api/bench", status_code=201)
+    async def start_bench(request: Request, body: BenchIn) -> dict[str, Any]:
+        try:
+            run = await request.app.state.runs.start_bench(
+                body.suite, body.host_id, body.params, body.label, body.force
+            )
         except RunError as exc:
             raise HTTPException(exc.status, exc.message) from exc
         return _run_public(run)
@@ -311,6 +336,7 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
             "items": db.list_items(run_id),
             "tps": db.list_tps(run_id),
             "samples": db.list_samples(run_id),
+            "bench_rows": [{k: v for k, v in r.items() if k != "raw"} for r in db.list_bench_rows(run_id)],
         }
 
     @app.post("/api/runs/{run_id}/cancel", status_code=202)

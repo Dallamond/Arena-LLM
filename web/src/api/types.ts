@@ -184,10 +184,13 @@ export interface Suite {
   id: string;
   name: string;
   version: string;
-  mode: "items" | "duration";
+  mode: "items" | "duration" | "bench";
   description: string;
   defaults: Record<string, unknown>;
   prompts: string[];
+  sweep?: string | null;
+  sweep_label?: string | null;
+  min_gpus?: number;
 }
 
 export type RunStatus = "pending" | "running" | "done" | "error" | "aborted" | "cancelled";
@@ -242,6 +245,69 @@ export interface RunSummary {
   devices: Record<string, DeviceRunSummary>;
   thresholds: Record<string, { name: string | null; warn: number; crit: number; source: string }>;
   phases: { load_start: number | null; load_end: number | null };
+  bench?: BenchSummary;
+}
+
+// --- Rendimiento por componente (F6) ---------------------------------------------
+
+export interface BenchRow {
+  id: number;
+  idx: number;
+  test: "pp" | "tg" | "pg";
+  n_prompt: number | null;
+  n_gen: number | null;
+  n_depth: number | null;
+  params: Record<string, unknown>;
+  t_s_mean: number | null;
+  t_s_std: number | null;
+  reps: number | null;
+  samples: number[] | null;
+  t: number | null;
+  derived: { layers_pct: number | null; bandwidth_gbs: number | null; sweep: number | string | null };
+}
+
+export interface BenchCurvePoint {
+  x: number | string | null;
+  t_s: number | null;
+  std: number | null;
+  layers_pct: number | null;
+  bandwidth_gbs: number | null;
+}
+
+export interface BenchBest {
+  t_s: number;
+  std: number | null;
+  sweep: number | string | null;
+  params: Record<string, unknown>;
+  bandwidth_gbs: number | null;
+}
+
+export interface BenchSummary {
+  rows: number;
+  best_pp: BenchBest | null;
+  best_tg: BenchBest | null;
+  sweep: string | null;
+  sweep_label: string | null;
+  curve: Record<string, BenchCurvePoint[]>;
+  build: Record<string, unknown>;
+  model_type: string | null;
+  model_size: number | null;
+  model_n_params: number | null;
+}
+
+export interface BenchDevice {
+  name: string;
+  description: string;
+  total_mib: number;
+  free_mib: number;
+  device_id: string | null;
+}
+
+export interface BenchDevicesResponse {
+  devices: BenchDevice[];
+  version: string | null;
+  exe: string | null;
+  simulated: boolean;
 }
 
 export interface Run {
@@ -297,6 +363,7 @@ export interface RunDetail extends Run {
   items: RunItem[];
   tps: TpsPoint[];
   samples: Sample[];
+  bench_rows: BenchRow[];
 }
 
 export interface RunLive {
@@ -312,6 +379,7 @@ export interface RunLive {
   abort_reason: string | null;
   tps?: number;
   text?: string;
+  bench_rows?: number | null;
 }
 
 // --- Ajustes -------------------------------------------------------------------

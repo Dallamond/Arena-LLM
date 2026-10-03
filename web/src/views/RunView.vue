@@ -3,12 +3,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { api, live, onEvent, serverNow } from "../api/live";
-import type { DeviceInfo, RunDetail, Sample, Snapshot, TpsPoint } from "../api/types";
+import type { BenchRow, DeviceInfo, RunDetail, Sample, Snapshot, TpsPoint } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import LineChart, { type ChartBand, type ChartLine, type ChartMarker, type ChartSeries } from "../components/LineChart.vue";
 import Stamp from "../components/Stamp.vue";
 import { deviceColor, shortName } from "../lib/devices";
-import { NO_DATA, RUN_STATUS, fmt, fmtDate, fmtDuration, gib, isNum } from "../lib/format";
+import { NO_DATA, RUN_STATUS, fmt, fmtDate, fmtDuration, gib, isNum, suiteLabel } from "../lib/format";
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
@@ -18,6 +18,7 @@ const detail = ref<RunDetail | null>(null);
 const loadError = ref<string | null>(null);
 const liveTps = ref<TpsPoint[]>([]);
 const liveSamples = ref<Sample[]>([]);
+const liveRows = ref<BenchRow[]>([]);
 const busy = ref(false);
 const expanded = ref<Record<number, boolean>>({});
 
@@ -26,6 +27,7 @@ async function load() {
     detail.value = await api<RunDetail>(`/api/runs/${runId.value}`);
     liveTps.value = [];
     liveSamples.value = [];
+    liveRows.value = [];
     loadError.value = null;
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : String(e);
@@ -53,6 +55,9 @@ onMounted(() => {
       for (const [device_id, data] of Object.entries(d.snapshot.devices)) {
         liveSamples.value.push({ t, phase, device_id, data: data as unknown as Record<string, unknown> });
       }
+    }),
+    onEvent("bench_row", (r: BenchRow & { run: number }) => {
+      if (r.run === runId.value && !(detail.value?.bench_rows ?? []).some((x) => x.idx === r.idx)) liveRows.value.push(r);
     }),
     onEvent("run", (r: { id: number; status: string }) => {
       if (r.id === runId.value && r.status !== "running" && r.status !== "pending") load();
@@ -148,6 +153,67 @@ const xMax = computed(() => {
   return undefined;
 });
 
+// --- llama-bench -----------------------------------------------------------
+interface BenchSnapshot {
+  engine: string;
+  exe: string | null;
+  version: string | null;
+  simulated: boolean | null;
+  model: Record<string, unknown>;
+  model_file: string;
+  devices: { device_id: string; bench_name: string }[];
+  cpu_only: boolean;
+  spec: Record<string, unknown>;
+}
+const SWEEP_OF: Record<string, string> = { "bench-cpu": "threads", "bench-ngl": "n_gpu_layers", "bench-ts": "tensor_split" };
+const SWEEP_UNIT: Record<string, { unit: string; name: string; label: string }> = {
+  threads: { unit: "hilos", name: "hilos", label: "hilos" },
+  n_gpu_layers: { unit: "capas", name: "-ngl", label: "capas en GPU" },
+  tensor_split: { unit: "", name: "-ts", label: "reparto -ts" },
+};
+const isBench = computed(() => run.value?.kind === "bench");
+const benchRows = computed<BenchRow[]>(() => [...(detail.value?.bench_rows ?? []), ...liveRows.value]);
+const benchSnap = computed(() => (isBench.value ? (detail.value?.servers_snapshot as unknown as BenchSnapshot | null) : null));
+const sweepKey = computed<string | null>(() => run.value?.summary?.bench?.sweep ?? SWEEP_OF[run.value?.suite ?? ""] ?? null);
+const sweepInfo = computed(() => (sweepKey.value ? SWEEP_UNIT[sweepKey.value] : null));
+const numericSweep = computed(() => sweepKey.value === "threads" || sweepKey.value === "n_gpu_layers");
+
+function benchSeries(test: string, color: string, label: string): ChartSeries {
+  return {
+    id: test,
+    label,
+    color,
+    points: benchRows.value
+      .filter((r) => r.test === test && isNum(r.derived.sweep))
+      .map((r) => ({ x: r.derived.sweep as number, y: r.t_s_mean })),
+  };
+}
+const tgCurve = computed(() => [benchSeries("tg", "var(--accent)", "generación")]);
+const ppCurve = computed(() => [benchSeries("pp", "var(--dev-ram)", "prompt")]);
+const sweepRange = computed(() => {
+  const xs = benchRows.value.map((r) => r.derived.sweep).filter(isNum);
+  return xs.length ? { min: Math.min(...xs), max: Math.max(...xs) } : { min: 0, max: 1 };
+});
+/** Barras para barridos no numéricos (reparto -ts) o sin barrido. */
+const benchBars = computed(() =>
+  benchRows.value.map((r) => ({
+    test: r.test,
+    key: `${r.test}-${r.idx}`,
+    label: `${r.test}${r.test === "tg" ? r.n_gen : r.n_prompt}${r.derived.sweep !== null && r.derived.sweep !== undefined ? " · " + r.derived.sweep : ""}`,
+    t_s: r.t_s_mean,
+    std: r.t_s_std,
+  })),
+);
+function barMax(test: string): number {
+  return Math.max(1, ...benchRows.value.filter((r) => r.test === test).map((r) => r.t_s_mean ?? 0));
+}
+function maxOf(test: string): number | null {
+  const v = benchRows.value.filter((r) => r.test === test).map((r) => r.t_s_mean).filter(isNum);
+  return v.length ? Math.max(...v) : null;
+}
+const bestTg = computed(() => run.value?.summary?.bench?.best_tg?.t_s ?? maxOf("tg"));
+const bestPp = computed(() => run.value?.summary?.bench?.best_pp?.t_s ?? maxOf("pp"));
+
 // --- cifras ---------------------------------------------------------------
 const elapsed = computed(() => {
   const r = run.value;
@@ -174,13 +240,19 @@ async function stop() {
 
 async function repeat() {
   const r = detail.value;
-  if (!r || r.endpoint_id === null) return;
+  if (!r || (r.endpoint_id === null && r.kind !== "bench")) return;
   busy.value = true;
   try {
-    const created = await api<{ id: number }>("/api/runs", {
-      method: "POST",
-      body: JSON.stringify({ suite: r.suite, endpoint_id: r.endpoint_id, label: r.label, params: r.params }),
-    });
+    const created =
+      r.kind === "bench"
+        ? await api<{ id: number }>("/api/bench", {
+            method: "POST",
+            body: JSON.stringify({ suite: r.suite, host_id: r.host_pk, label: r.label, params: r.params }),
+          })
+        : await api<{ id: number }>("/api/runs", {
+            method: "POST",
+            body: JSON.stringify({ suite: r.suite, endpoint_id: r.endpoint_id, label: r.label, params: r.params }),
+          });
     router.push(`/pruebas/${created.id}`);
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : String(e);
@@ -225,12 +297,13 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
       <div class="head">
         <div>
           <h2 class="title">
-            Run #{{ run.id }} · {{ run.suite === "estres" ? "Estrés" : "Prompt libre" }}
+            Run #{{ run.id }} · {{ suiteLabel(run.suite) }}
             <span v-if="run.label" class="dim">— {{ run.label }}</span>
           </h2>
           <p class="dim small">
             {{ fmtDate(run.started_at, true) }} · {{ snap?.model_file ?? "modelo sin identificar" }} ·
-            {{ snap?.base_url }} · suite v{{ run.suite_version }} ({{ run.suite_hash }})
+            {{ isBench ? (benchSnap?.simulated ? "llama-bench simulado" : "llama-bench") : snap?.base_url }} ·
+            suite v{{ run.suite_version }} ({{ run.suite_hash }})
           </p>
         </div>
         <div class="actions">
@@ -255,11 +328,21 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
             <div :style="{ width: progress * 100 + '%' }" />
           </div>
         </BlueprintCard>
-        <BlueprintCard dense title="Velocidad (t/s)">
+        <template v-if="isBench">
+          <BlueprintCard dense title="Generación (tg)">
+            <div class="big mono">{{ fmt(bestTg, 1, "t/s") }}</div>
+            <div class="dim small">la mejor del barrido</div>
+          </BlueprintCard>
+          <BlueprintCard dense title="Procesado de prompt (pp)">
+            <div class="big mono">{{ fmt(bestPp, 0, "t/s") }}</div>
+            <div class="dim small">{{ fmt(running ? lv?.bench_rows : benchRows.length, 0) }} filas de llama-bench</div>
+          </BlueprintCard>
+        </template>
+        <BlueprintCard v-else dense title="Velocidad (t/s)">
           <div class="big mono">{{ running ? fmt(lastTps, 1) : fmt(sum?.tps_aggregate.median ?? sum?.tps_client.median, 1) }}</div>
           <div class="dim small">{{ running ? "agregado, último segundo" : "mediana (agregado)" }}</div>
         </BlueprintCard>
-        <BlueprintCard dense title="Tokens">
+        <BlueprintCard v-if="!isBench" dense title="Tokens">
           <div class="big mono">{{ fmt(running ? lv?.tokens : sum?.completion_tokens, 0) }}</div>
           <div class="dim small">
             {{ fmt(running ? lv?.requests_done : sum?.requests, 0) }} peticiones
@@ -280,7 +363,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
       <!-- Gráficas -->
       <BlueprintCard title="Telemetría del run" class="gap">
         <div class="charts">
-          <LineChart title="Velocidad" unit="t/s" :digits="1" :series="tpsSeries" :bands="bands" :markers="markers" :x-max="xMax" :y-min="0" />
+          <LineChart v-if="!isBench" title="Velocidad" unit="t/s" :digits="1" :series="tpsSeries" :bands="bands" :markers="markers" :x-max="xMax" :y-min="0" />
           <LineChart title="Temperatura" unit="°C" :series="tempSeries" :bands="bands" :lines="tempLines" :markers="markers" :x-max="xMax" />
           <LineChart title="Potencia de placa" unit="W" :series="powerSeries" :bands="bands" :markers="markers" :x-max="xMax" :y-min="0" />
           <LineChart title="Reloj SM" unit="MHz" :series="clockSeries" :bands="bands" :markers="markers" :x-max="xMax" :y-min="0" />
@@ -288,15 +371,87 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
         <p class="mono dim small note">La potencia es la de placa que reporta el driver, no la del enchufe.</p>
       </BlueprintCard>
 
+      <!-- llama-bench: curva y filas -->
+      <BlueprintCard v-if="isBench" :title="numericSweep && sweepInfo ? `t/s frente a ${sweepInfo.label}` : 'Resultados de llama-bench'" class="gap">
+        <div v-if="!benchRows.length" class="dim">{{ running ? "Esperando la primera fila (llama-bench carga el modelo)…" : NO_DATA }}</div>
+        <div v-else-if="numericSweep && sweepInfo" class="charts">
+          <LineChart
+            title="Generación (tg)"
+            unit="t/s"
+            :digits="1"
+            :series="tgCurve"
+            :y-min="0"
+            :x-min="sweepRange.min"
+            :x-max="sweepRange.max"
+            :x-unit="sweepInfo.unit"
+            :x-name="sweepInfo.name"
+            dots
+          />
+          <LineChart
+            title="Procesado de prompt (pp)"
+            unit="t/s"
+            :series="ppCurve"
+            :y-min="0"
+            :x-min="sweepRange.min"
+            :x-max="sweepRange.max"
+            :x-unit="sweepInfo.unit"
+            :x-name="sweepInfo.name"
+            dots
+          />
+        </div>
+        <div v-else class="bars mono">
+          <div v-for="b in benchBars" :key="b.key" class="bar">
+            <span class="bar__label">{{ b.label }}</span>
+            <span class="bar__track">
+              <span class="bar__fill" :class="`bar__fill--${b.test}`" :style="{ width: ((b.t_s ?? 0) / barMax(b.test)) * 100 + '%' }" />
+            </span>
+            <span class="bar__val">{{ fmt(b.t_s, b.test === "tg" ? 1 : 0) }} ± {{ fmt(b.std, 1) }} t/s</span>
+          </div>
+        </div>
+        <div v-if="benchRows.length" class="scroll gap"><table class="items mono">
+          <thead>
+            <tr>
+              <th>prueba</th>
+              <th v-if="sweepInfo">{{ sweepInfo.label }}</th>
+              <th>t/s</th>
+              <th>± desv.</th>
+              <th>rep.</th>
+              <th>% capas en GPU</th>
+              <th>ancho de banda ef.</th>
+              <th>dispositivos</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in benchRows" :key="r.idx">
+              <td>{{ r.test }}{{ r.test === "tg" ? r.n_gen : r.test === "pp" ? r.n_prompt : `${r.n_prompt}+${r.n_gen}` }}</td>
+              <td v-if="sweepInfo">{{ r.derived.sweep ?? NO_DATA }}</td>
+              <td>{{ fmt(r.t_s_mean, r.test === "tg" ? 2 : 1) }}</td>
+              <td>{{ fmt(r.t_s_std, 2) }}</td>
+              <td>{{ fmt(r.reps) }}</td>
+              <td>{{ fmt(r.derived.layers_pct, 0, "%") }}</td>
+              <td>
+                <template v-if="isNum(r.derived.bandwidth_gbs)">{{ fmt(r.derived.bandwidth_gbs, 0, "GB/s") }} <span class="dim">ESTIMADO</span></template>
+                <template v-else>{{ r.test === "tg" ? NO_DATA : "—" }}</template>
+              </td>
+              <td>{{ r.params.devices ?? "—" }}</td>
+            </tr>
+          </tbody>
+        </table></div>
+        <p class="mono dim small note">
+          Ancho de banda efectivo ≈ tamaño del modelo × t/s de generación: aproximación para modelos densos (no se calcula en MoE).
+          llama.cpp cuenta la capa de salida como una más en -ngl.
+        </p>
+      </BlueprintCard>
+
       <!-- Respuesta en vivo -->
-      <BlueprintCard v-if="running" title="Respuesta en streaming" class="gap">
+      <BlueprintCard v-if="running && !isBench" title="Respuesta en streaming" class="gap">
         <pre class="stream mono" aria-live="off">{{ lv?.text || "…" }}</pre>
       </BlueprintCard>
 
       <!-- Resumen -->
       <BlueprintCard v-if="sum && !running" title="Resumen" class="gap">
         <div class="summary">
-          <section>
+          <section v-if="!isBench">
             <h3 class="label">Velocidad</h3>
             <dl class="mono">
               <div><dt>t/s cliente (mediana)</dt><dd>{{ fmt(sum.tps_client.median, 1) }}</dd></div>
@@ -311,7 +466,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
               </div>
             </dl>
           </section>
-          <section>
+          <section v-if="!isBench">
             <h3 class="label">Energía <Stamp text="potencia de placa" tone="dim" :tilt="0" /></h3>
             <dl class="mono">
               <div><dt>energía (carga)</dt><dd>{{ fmt(sum.energy_wh, 2, "Wh") }}</dd></div>
@@ -351,7 +506,20 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
       <!-- Configuración guardada con el run -->
       <BlueprintCard title="Configuración guardada con el run" class="gap">
         <div class="config mono">
-          <div>
+          <div v-if="isBench && benchSnap">
+            <h3 class="label">llama-bench</h3>
+            <p>{{ benchSnap.simulated ? "simulado" : benchSnap.exe }}</p>
+            <p class="dim">versión {{ benchSnap.version ?? NO_DATA }} · {{ sum?.bench?.build?.backends ?? "" }}</p>
+            <p>{{ benchSnap.model.path }}</p>
+            <p class="dim">
+              {{ benchSnap.model.architecture ?? "?" }} · {{ benchSnap.model.file_type ?? "?" }} · {{ benchSnap.model.block_count ?? "?" }} capas ·
+              cabecera {{ String(benchSnap.model.header_sha256 ?? "").slice(0, 12) }}
+            </p>
+            <p class="flags">
+              <span v-for="(v, k) in benchSnap.spec" v-show="k !== 'model'" :key="k" class="flag">{{ k }}={{ Array.isArray(v) ? v.join(",") : v }}</span>
+            </p>
+          </div>
+          <div v-else>
             <h3 class="label">Servidor</h3>
             <p>{{ snap?.derived?.model_path ?? snap?.model_path ?? NO_DATA }}</p>
             <p class="dim">
@@ -578,6 +746,36 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
   font-size: 12px;
   max-height: 300px;
   overflow: auto;
+}
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.bar {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) 1fr 150px;
+  gap: 10px;
+  align-items: center;
+}
+.bar__track {
+  height: 10px;
+  border: 1px solid var(--line);
+}
+.bar__fill {
+  display: block;
+  height: 100%;
+}
+.bar__fill--tg {
+  background: var(--accent);
+}
+.bar__fill--pp,
+.bar__fill--pg {
+  background: var(--dev-ram);
+}
+.bar__val {
+  text-align: right;
 }
 .btn.tiny {
   padding: 1px 8px;

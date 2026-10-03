@@ -31,7 +31,9 @@ def run_uvicorn(app):
     return f"http://127.0.0.1:{port}", stop
 
 
-def start_agent(profile: str, token: str | None = None, servers: list[tuple[int, int]] | None = None, interval=0.1):
+def start_agent(
+    profile: str, token: str | None = None, servers: list[tuple[int, int]] | None = None, interval=0.1, config=None
+):
     """Agente simulado. `servers`: [(pid, puerto)] para apuntar a llama-servers simulados."""
     host, providers, procs = build_profile(profile)
     if servers is not None:
@@ -63,6 +65,7 @@ def start_agent(profile: str, token: str | None = None, servers: list[tuple[int,
         token=token,
         simulated=profile,
         detector=ServerDetector(procs, providers, ttl_s=0),
+        config=config,
     )
     sampler.start()
     server = make_server(app, "127.0.0.1", 0)

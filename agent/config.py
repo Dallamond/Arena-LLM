@@ -48,7 +48,9 @@ def default_config_path() -> Path:
     return base / "agent.json"
 
 
-def load_config(path: str | Path | None = None, extra_model_dirs: list[str] | None = None) -> AgentConfig:
+def load_config(
+    path: str | Path | None = None, extra_model_dirs: list[str] | None = None, llama_bench: str | None = None
+) -> AgentConfig:
     explicit = path or os.environ.get("ARENA_AGENT_CONFIG")
     cfg_path = Path(explicit) if explicit else default_config_path()
     data: dict = {}
@@ -59,7 +61,7 @@ def load_config(path: str | Path | None = None, extra_model_dirs: list[str] | No
     elif explicit:
         raise FileNotFoundError(f"No existe el fichero de configuración {cfg_path}")
     dirs = [Path(d).expanduser() for d in [*data.get("model_dirs", []), *(extra_model_dirs or [])]]
-    bench = data.get("llama_bench")
+    bench = llama_bench or data.get("llama_bench")
     return AgentConfig(
         model_dirs=dirs,
         llama_bench=Path(bench).expanduser() if bench else None,

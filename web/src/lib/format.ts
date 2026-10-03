@@ -66,6 +66,20 @@ export function fmtDuration(s: number | null | undefined): string {
   return `${Math.floor(t / 3600)} h ${String(Math.floor((t % 3600) / 60)).padStart(2, "0")} min`;
 }
 
+/** Nombre corto de cada suite (las de rendimiento llevan prefijo). */
+export const SUITE_LABEL: Record<string, string> = {
+  libre: "Prompt libre",
+  estres: "Estrés",
+  "bench-dispositivo": "Bench · un dispositivo",
+  "bench-cpu": "Bench · solo CPU/RAM",
+  "bench-ngl": "Bench · curva -ngl",
+  "bench-ts": "Bench · reparto -ts",
+};
+
+export function suiteLabel(id: string): string {
+  return SUITE_LABEL[id] ?? id;
+}
+
 export const RUN_STATUS: Record<string, { text: string; tone: "info" | "warn" | "crit" | "dim"; icon: string }> = {
   pending: { text: "en cola", tone: "dim", icon: "◌" },
   running: { text: "en marcha", tone: "info", icon: "▶" },

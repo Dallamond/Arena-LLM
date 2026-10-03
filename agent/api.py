@@ -23,6 +23,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from agent import __version__, gguf
+from agent.bench import BenchError, BenchRunner, SimBenchRunner, parse_spec
 from agent.config import AgentConfig
 from agent.gguf import GgufInfo
 from agent.model import AGENT_API, HostInfo, to_jsonable
@@ -33,6 +34,7 @@ log = logging.getLogger(__name__)
 
 LOOPBACK_NAMES = {"localhost"}
 MAX_MODEL_DEPTH = 4
+MAX_BODY = 64 * 1024
 SPLIT_RE = re.compile(r"-(\d{5})-of-(\d{5})\.gguf$", re.IGNORECASE)
 
 
@@ -69,6 +71,7 @@ class AgentApp:
         simulated: str | None = None,
         detector: ServerDetector | None = None,
         config: AgentConfig | None = None,
+        bench: BenchRunner | None = None,
     ):
         self.host = host
         self.config = config or AgentConfig()
@@ -86,7 +89,26 @@ class AgentApp:
             "/servers": self.servers,
             "/models": self.models,
             "/gguf": self.gguf,
+            "/bench": self.bench_status,
+            "/bench/devices": self.bench_devices,
         }
+        self.post_routes: dict[str, Callable[[dict[str, str], Any], dict[str, Any]]] = {
+            "/bench": self.bench_start,
+            "/bench/cancel": self.bench_cancel,
+        }
+        if bench is None:
+            if simulated and self.config.llama_bench is None:
+                gpus, _ = sampler.devices()
+                bench = SimBenchRunner(
+                    [
+                        {"name": f"CUDA{d.index}", "description": d.name, "total_mib": d.memory_total_mib or 0}
+                        for d in gpus
+                        if d.kind == "gpu" and d.index is not None
+                    ]
+                )
+            else:
+                bench = BenchRunner(self.config.llama_bench)
+        self.bench = bench
 
     def health(self, query: dict[str, str] | None = None) -> dict[str, Any]:
         return {"status": "ok", "uptime_s": round(time.time() - self.started, 3), "simulated": self.simulated}
@@ -99,6 +121,7 @@ class AgentApp:
             "devices": devices,
             "providers": [p.name for p in self.sampler.providers],
             "errors": errors,
+            "capabilities": {"bench": self.bench.available},
         }
 
     def metrics(self, query: dict[str, str] | None = None) -> dict[str, Any]:
@@ -188,6 +211,48 @@ class AgentApp:
         info.layout = gguf.merge_layouts(layouts)
         info.layout["split_missing"] = missing
 
+    # --- llama-bench ---------------------------------------------------------
+
+    def bench_status(self, query: dict[str, str] | None = None) -> dict[str, Any]:
+        try:
+            since = max(0, int((query or {}).get("since", "0")))
+        except ValueError:
+            since = 0
+        return self.bench.status(since)
+
+    def bench_devices(self, query: dict[str, str] | None = None) -> dict[str, Any]:
+        """Dispositivos que ve llama-bench, enlazados con los del agente (por nombre y orden PCI)."""
+        try:
+            listed = self.bench.list_devices()
+        except BenchError as exc:
+            raise ApiError(HTTPStatus(exc.status), exc.code, exc.message) from exc
+        gpus, _ = self.sampler.devices()
+        pool = sorted((d for d in gpus if d.kind == "gpu"), key=lambda d: (d.index is None, d.index or 0))
+        out = []
+        for b in listed:
+            match = next((d for d in pool if d.name and d.name in b["description"]), None)
+            if match is None and pool:
+                match = pool[0]
+            if match is not None:
+                pool.remove(match)
+            out.append({**b, "device_id": match.device_id if match else None})
+        exe = self.bench.exe
+        return {"devices": out, "version": self.bench.version(), "exe": str(exe) if exe else None,
+                "simulated": isinstance(self.bench, SimBenchRunner)}  # fmt: skip
+
+    def bench_start(self, query: dict[str, str], body: Any) -> dict[str, Any]:
+        try:
+            spec = parse_spec(body, self.config.allowed_model)
+            return {"job": self.bench.start(spec)}
+        except BenchError as exc:
+            raise ApiError(HTTPStatus(exc.status), exc.code, exc.message) from exc
+
+    def bench_cancel(self, query: dict[str, str], body: Any) -> dict[str, Any]:
+        try:
+            return {"job": self.bench.cancel()}
+        except BenchError as exc:
+            raise ApiError(HTTPStatus(exc.status), exc.code, exc.message) from exc
+
     def authorize(self, headers: Any) -> None:
         if self.token:
             given = headers.get("X-Token") or ""
@@ -199,15 +264,28 @@ class AgentApp:
         if not is_loopback(hostname):
             raise ApiError(HTTPStatus.FORBIDDEN, "host", "Sin token solo se aceptan peticiones a localhost")
 
-    def handle(self, method: str, path: str, headers: Any) -> tuple[HTTPStatus, dict[str, Any]]:
+    def handle(
+        self, method: str, path: str, headers: Any, body: bytes = b""
+    ) -> tuple[HTTPStatus, dict[str, Any]]:
         try:
             self.authorize(headers)
-            route = self.routes.get(urlsplit(path).path.rstrip("/") or "/")
+            route_path = urlsplit(path).path.rstrip("/") or "/"
+            query = {k: v[-1] for k, v in parse_qs(urlsplit(path).query).items()}
+            if method == "POST" and route_path in self.post_routes:
+                if headers.get("Origin"):  # una web no debe poder lanzar procesos a través del navegador
+                    raise ApiError(HTTPStatus.FORBIDDEN, "origin", "Peticiones desde navegador no permitidas")
+                try:
+                    data = json.loads(body.decode("utf-8")) if body else {}
+                except (ValueError, UnicodeDecodeError) as exc:
+                    raise ApiError(HTTPStatus.BAD_REQUEST, "json", "Cuerpo JSON inválido") from exc
+                return HTTPStatus.OK, self.post_routes[route_path](query, data)
+            route = self.routes.get(route_path)
             if route is None:
+                if route_path in self.post_routes:
+                    raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "method", f"Método no permitido: {method}")
                 raise ApiError(HTTPStatus.NOT_FOUND, "not_found", f"Ruta desconocida: {path}")
             if method != "GET":
                 raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "method", f"Método no permitido: {method}")
-            query = {k: v[-1] for k, v in parse_qs(urlsplit(path).query).items()}
             return HTTPStatus.OK, route(query)
         except ApiError as exc:
             return exc.status, {"error": {"code": exc.code, "message": exc.message}}
@@ -229,7 +307,14 @@ def make_handler(app: AgentApp) -> type[BaseHTTPRequestHandler]:
         sys_version = ""
 
         def _respond(self) -> None:
-            status, payload = app.handle(self.command, self.path, self.headers)
+            body = b""
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = 0
+            if 0 < length <= MAX_BODY:
+                body = self.rfile.read(length)
+            status, payload = app.handle(self.command, self.path, self.headers, body)
             body = envelope(payload)
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
+import BenchView from "./views/BenchView.vue";
 import HistoryView from "./views/HistoryView.vue";
 import PanelView from "./views/PanelView.vue";
 import PlaceholderView from "./views/PlaceholderView.vue";
@@ -19,13 +20,7 @@ export const NAV: NavItem[] = [
   { path: "/", label: "Panel", icon: "panel" },
   { path: "/servidores", label: "Servidores", icon: "servers" },
   { path: "/calidad", label: "Calidad", icon: "quality" },
-  {
-    path: "/rendimiento",
-    label: "Rendimiento",
-    icon: "perf",
-    phase: "F6",
-    summary: "llama-bench por componente: solo GPU, solo CPU/RAM, híbrido (curva de la RAM) y reparto entre GPUs.",
-  },
+  { path: "/rendimiento", label: "Rendimiento", icon: "perf" },
   {
     path: "/batalla",
     label: "Batalla",
@@ -57,6 +52,7 @@ export const router = createRouter({
     { path: "/", component: PanelView, meta: { title: "Panel" } },
     { path: "/servidores", component: ServersView, meta: { title: "Servidores" } },
     { path: "/calidad", component: QualityView, meta: { title: "Calidad" } },
+    { path: "/rendimiento", component: BenchView, meta: { title: "Rendimiento" } },
     { path: "/historial", component: HistoryView, meta: { title: "Historial" } },
     { path: "/pruebas/:id", component: RunView, props: true, meta: { title: "Prueba" } },
     { path: "/ajustes/:section?", component: SettingsView, meta: { title: "Ajustes" } },

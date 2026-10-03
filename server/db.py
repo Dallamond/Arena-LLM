@@ -136,6 +136,27 @@ MIGRATIONS: list[str] = [
     ALTER TABLE endpoints ADD COLUMN manual INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE endpoints ADD COLUMN device_ids TEXT;
     """,
+    # 5 — filas de llama-bench (rendimiento por componente)
+    """
+    CREATE TABLE bench_rows (
+        id INTEGER PRIMARY KEY,
+        run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+        idx INTEGER NOT NULL,
+        test TEXT NOT NULL,
+        n_prompt INTEGER,
+        n_gen INTEGER,
+        n_depth INTEGER,
+        params TEXT,
+        t_s_mean REAL,
+        t_s_std REAL,
+        reps INTEGER,
+        samples TEXT,
+        t REAL,
+        derived TEXT,
+        raw TEXT
+    );
+    CREATE INDEX bench_rows_run ON bench_rows(run_id, idx);
+    """,
 ]
 
 #: Tamaño de la paleta de dispositivos de la GUI (--dev-1 … --dev-N).
@@ -482,6 +503,25 @@ class Database:
                 "SELECT t, tokens, tps FROM tps_series WHERE run_id=? ORDER BY t", (run_id,)
             ).fetchall()
         return [dict(r) for r in rows]
+
+
+    # --- filas de llama-bench ---------------------------------------------
+
+    BENCH_JSON = ("params", "samples", "derived", "raw")
+
+    def add_bench_row(self, run_id: int, idx: int, row: dict[str, Any]) -> None:
+        fields = {k: (json.dumps(v) if k in self.BENCH_JSON else v) for k, v in row.items()}
+        cols = ", ".join(["run_id", "idx", *fields])
+        marks = ", ".join("?" for _ in range(len(fields) + 2))
+        with self.lock:
+            self.conn.execute(f"INSERT INTO bench_rows({cols}) VALUES ({marks})", (run_id, idx, *fields.values()))
+
+    def list_bench_rows(self, run_id: int) -> list[dict[str, Any]]:
+        with self.lock:
+            rows = self.conn.execute(
+                "SELECT * FROM bench_rows WHERE run_id=? ORDER BY idx", (run_id,)
+            ).fetchall()
+        return [_json_cols(r, *self.BENCH_JSON) for r in rows]
 
 
 def _json_cols(row: sqlite3.Row, *cols: str) -> dict[str, Any]:

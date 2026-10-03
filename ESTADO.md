@@ -10,7 +10,7 @@ relacionado: ["Arena LLM"]
 ---
 # Arena LLM — Estado
 
-> Leer al retomar. Última actualización: 03/10/2026 (noche, 2.ª sesión).
+> Leer al retomar. Última actualización: 03/10/2026 (noche, 3.ª sesión: F6).
 
 ## Resumen
 
@@ -22,7 +22,30 @@ relacionado: ["Arena LLM"]
 | F3 — Servidores y detección | Casi: ✅ calculadora y alta manual; falta comprobar el criterio relanzando un llama-server real con otro `-c` |
 | F4 — Runner | ✅ Criterio cumplido: 33,6 t/s Arena frente a 34,5 t/s llama-bench (−2,7 %) |
 | F5 — Telemetría, resumen y estrés | ✅ salvo la prueba real de 5 min (hecha de 60 s) |
-| Siguiente | Lucas revisa la GUI (pulido, GGUF, alta manual) y relanza su llama-server con otro `-c` (criterio F3) → F6 (llama-bench por componente) |
+| F6 — Rendimiento por componente | ✅ Criterio cumplido con la 3060 real (curva `-ngl`). Reparto `-ts` solo probado en simulado (falta la M40) |
+| Siguiente | Las 3 ideas de Lucas (biblioteca de prompts, comando copiable de llama-server, recomendaciones por hardware) → F7 (calidad) → F8 → F9 → F10 |
+
+## F6 · llama-bench desde el agente (03/10/2026, 22:55)
+
+Página **Rendimiento**: 4 pruebas (un dispositivo · solo CPU/RAM con barrido de hilos · curva `-ngl` · reparto `-ts`), perfil estándar v1 (pp512, tg128, 3 repeticiones) con versión y hash, barridos por defecto derivados del modelo y del equipo, aviso previo (servidor ocupando la tarjeta, modelo que no cabe; "Lanzar igualmente"), telemetría y aborto térmico durante el bench. El run muestra la curva t/s frente a la variable, tabla con % de capas en GPU y ancho de banda efectivo (ESTIMADO).
+
+- Agente: `agent/bench.py`. Solo ejecuta el `llama_bench` de su configuración, con lista cerrada de flags validados uno a uno, sin shell, modelos dentro de `model_dirs`, un trabajo cada vez, rechaza POST con cabecera `Origin` (navegador). `CUDA_DEVICE_ORDER=PCI_BUS_ID` para que `CUDA0…` = índice de `nvidia-smi`. En `--simulate` hay un llama-bench simulado.
+- Configuración creada en este PC: `%APPDATA%\ArenaLLM\agent.json` con `model_dirs: D:/ollama/models` y `llama_bench: D:/dev-tools/llama.cpp/b11379/llama-bench.exe` (también vale `--llama-bench`).
+- BD: migración 5 (`bench_rows`).
+
+**Curva real** (3060 · Qwen2.5-Coder 7B Q8_0 · b11379 · 2 repeticiones):
+
+| `-ngl` (de 29) | 0 | 7 | 14 | 22 | 29 |
+|---|---|---|---|---|---|
+| tg128 (t/s) | 3,2 | 3,6 | 4,4 | 8,8 | **38,7** |
+| pp512 (t/s) | 117 | 192 | 657 | 1151 | **2282** |
+| Ancho de banda ef. (ESTIMADO) | 26 GB/s | | | | **313 GB/s** |
+
+- El **pp lento de la primera prueba (162 t/s) no era la GPU**: con la tarjeta libre da 2282 t/s. Era el llama-server cargado a la vez.
+- La RAM rinde unos 26 GB/s efectivos: cuadra con DDR4 sin XMP. Activar el XMP debería subir la parte de CPU.
+- Pico de 75 °C y 169 W (límite 170 W).
+
+Detalles encontrados y corregidos: `--list-devices` tarda unos segundos (carga CUDA): el agente lo precalienta y lo cachea. La primera lectura de una cabecera GGUF de 8 GB tarda más de 3 s en `D:`: más margen de espera. Un proceso en el puerto 9931 (`LlamaApp`) responde como llama-server **sin modelo**; ya no bloquea el bench.
 
 ## Primera prueba real (03/10/2026, 21:01)
 
@@ -75,7 +98,8 @@ Después: **Calidad** → elegir servidor → Lanzar estrés o prompt libre.
   - Vista de run en vivo con gráficas y resultado completo.
   - Historial básico.
   - Ajustes: apariencia (acento, contraste, tamaño, rejilla, croquis), equipos, umbrales y datos.
-- **Tests:** 155 de Python (incluye un laboratorio completo sin GPU y la calculadora de encaje) y 10 de la web.
+- **Rendimiento (F6):** llama-bench por componente, ver arriba.
+- **Tests:** 182 de Python (laboratorio completo sin GPU, calculadora de encaje y llama-bench real con un ejecutable falso y simulado) y 10 de la web.
 
 ## Calculadora de encaje (03/10/2026)
 
@@ -90,6 +114,9 @@ Limitaciones: ventana deslizante (cota superior), MoE sin `--cpu-moe` y búfer d
 Servidores → **＋ Añadir a mano**: equipo (de él sale la telemetría), URL, alias y GPU opcionales. La URL se normaliza (`localhost` → `127.0.0.1`, sin `/v1`) para que coincida con la detectada. Se sondea cada 5 s aunque el agente no vea el proceso y no se borra al parar: queda "sin respuesta". Si además se detecta como proceso, se fusiona (conserva pid y flags). Cualquier servidor admite **GPU a mano** (mandan sobre la detección y cuentan como cambio de configuración). Se pueden quitar los manuales y los detenidos. BD: migración 4 (`manual`, `device_ids`).
 
 ## Pendiente (orden propuesto)
+
+0. **Ideas de Lucas (03/10/2026)**, ver la hoja de ruta: biblioteca de prompts predefinidos (lógica, tipo test de CI, código…) en Prompt libre · comando copiable de `llama-server` por GGUF desde la calculadora · recomendaciones de modelos según el hardware. Después F7 → F8 → F9 → F10.
+0. README con capturas y GIFs: lo preparó un subagente en una rama aparte (ver `git log`/ramas); si no está en `main`, integrarlo.
 
 1. Lucas revisa el pulido visual (sin `FIG.`, títulos y rótulos en Inter seminegrita, datos vivos en mono más clara) y la pestaña GGUF. No se pudo revisar con capturas: la extensión de Chrome no estaba conectada.
 2. F3:

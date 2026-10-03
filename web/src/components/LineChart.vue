@@ -44,8 +44,12 @@ const props = withDefaults(
     xMax?: number;
     digits?: number;
     height?: number;
+    xUnit?: string; // unidad del eje X (por defecto segundos)
+    xName?: string; // nombre de la variable X en la lectura
+    xMin?: number;
+    dots?: boolean; // marcar cada punto (series cortas, p. ej. barridos)
   }>(),
-  { bands: () => [], lines: () => [], markers: () => [], digits: 0, height: 150 },
+  { bands: () => [], lines: () => [], markers: () => [], digits: 0, height: 150, xUnit: "s", xName: "t", xMin: 0, dots: false },
 );
 
 // Ancho real en píxeles (ResizeObserver): el SVG se dibuja 1:1 y el texto no se deforma.
@@ -75,7 +79,7 @@ const yRange = computed(() => {
 });
 
 const H = computed(() => props.height);
-const px = (x: number) => PAD.l + (x / xMaxV.value) * (W.value - PAD.l - PAD.r);
+const px = (x: number) => PAD.l + ((x - props.xMin) / (xMaxV.value - props.xMin || 1)) * (W.value - PAD.l - PAD.r);
 const py = (y: number) => {
   const { lo, hi } = yRange.value;
   return PAD.t + (1 - (y - lo) / (hi - lo)) * (H.value - PAD.t - PAD.b);
@@ -96,9 +100,9 @@ const yTicks = computed(() => {
   return out;
 });
 const xTicks = computed(() => {
-  const step = niceStep(xMaxV.value, 6);
+  const step = niceStep(xMaxV.value - props.xMin || 1, 6);
   const out: number[] = [];
-  for (let v = 0; v <= xMaxV.value + 1e-9; v += step) out.push(v);
+  for (let v = Math.ceil(props.xMin / step) * step; v <= xMaxV.value + 1e-9; v += step) out.push(v);
   return out;
 });
 
@@ -132,8 +136,8 @@ function onMove(e: MouseEvent) {
   if (!el) return;
   const rect = el.getBoundingClientRect();
   const sx = ((e.clientX - rect.left) / rect.width) * W.value;
-  const x = ((sx - PAD.l) / (W.value - PAD.l - PAD.r)) * xMaxV.value;
-  hoverX.value = x >= 0 && x <= xMaxV.value ? x : null;
+  const x = props.xMin + ((sx - PAD.l) / (W.value - PAD.l - PAD.r)) * (xMaxV.value - props.xMin);
+  hoverX.value = x >= props.xMin && x <= xMaxV.value ? x : null;
 }
 const hoverValues = computed(() => {
   const x = hoverX.value;
@@ -141,7 +145,8 @@ const hoverValues = computed(() => {
   return props.series.map((s) => {
     let best: ChartPoint | null = null;
     for (const p of s.points) if (!best || Math.abs(p.x - x) < Math.abs(best.x - x)) best = p;
-    return { label: s.label, color: s.color, y: best && Math.abs(best.x - x) < xMaxV.value / 40 ? best.y : null };
+    const tol = props.dots ? (xMaxV.value - props.xMin) / 10 : (xMaxV.value - props.xMin) / 40;
+    return { label: s.label, color: s.color, y: best && Math.abs(best.x - x) < tol ? best.y : null };
   });
 });
 </script>
@@ -188,7 +193,7 @@ const hoverValues = computed(() => {
       <text v-for="v in yTicks" :key="'yt' + v" :x="PAD.l - 6" :y="py(v) + 3" class="tick tick--y">
         {{ fmt(v, digits > 0 && v < 10 ? 1 : 0) }}
       </text>
-      <text v-for="v in xTicks" :key="'xt' + v" :x="px(v)" :y="H - 6" class="tick tick--x">{{ fmt(v, 0) }} s</text>
+      <text v-for="v in xTicks" :key="'xt' + v" :x="px(v)" :y="H - 6" class="tick tick--x">{{ fmt(v, 0) }}{{ xUnit ? " " + xUnit : "" }}</text>
       <!-- umbrales -->
       <g v-for="l in lines" :key="'l' + l.label">
         <line :x1="PAD.l" :x2="W - PAD.r" :y1="py(l.y)" :y2="py(l.y)" :stroke="l.color" class="hline" />
@@ -197,6 +202,16 @@ const hoverValues = computed(() => {
       <!-- series -->
       <g v-for="s in paths" :key="s.id">
         <path v-for="(d, i) in s.segs" :key="i" :d="d" :stroke="s.color" class="line" :class="{ 'line--dash': s.dash }" />
+        <template v-if="dots">
+          <circle
+            v-for="(p, i) in s.points.filter((q) => q.y !== null)"
+            :key="'c' + i"
+            :cx="px(p.x)"
+            :cy="py(p.y as number)"
+            r="3"
+            :fill="s.color"
+          />
+        </template>
       </g>
       <!-- anotaciones -->
       <g v-for="m in markers" :key="'m' + m.x + m.label">
@@ -206,7 +221,7 @@ const hoverValues = computed(() => {
       <line v-if="hoverX !== null" :x1="px(hoverX)" :x2="px(hoverX)" :y1="PAD.t" :y2="H - PAD.b" class="cursor" />
     </svg>
     <div v-if="hoverValues" class="readout mono" aria-hidden="true">
-      t = {{ fmt(hoverX, 0) }} s
+      {{ xName }} = {{ fmt(hoverX, 0) }}{{ xUnit ? " " + xUnit : "" }}
       <span v-for="v in hoverValues" :key="v.label" :style="{ color: v.color }">· {{ v.label }} {{ fmt(v.y, digits, unit) }}</span>
     </div>
   </figure>

@@ -68,10 +68,29 @@ class AgentClient:
     def __init__(self, client: httpx.AsyncClient):
         self.client = client
 
-    async def get(self, state: HostState, path: str, params: dict | None = None) -> dict[str, Any]:
+    async def get(
+        self, state: HostState, path: str, params: dict | None = None, timeout: float | None = None
+    ) -> dict[str, Any]:
+        return await self.request(state, "GET", path, params=params, timeout=timeout)
+
+    async def post(self, state: HostState, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+        return await self.request(state, "POST", path, json=body or {})
+
+    async def request(
+        self,
+        state: HostState,
+        method: str,
+        path: str,
+        params: dict | None = None,
+        json: Any = None,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
         headers = {"X-Token": state.token} if state.token else {}
+        extra = {"timeout": timeout} if timeout is not None else {}
         try:
-            r = await self.client.get(state.agent_url.rstrip("/") + path, headers=headers, params=params)
+            r = await self.client.request(
+                method, state.agent_url.rstrip("/") + path, headers=headers, params=params, json=json, **extra
+            )
         except httpx.TimeoutException as exc:
             raise AgentError("offline", "El agente no responde (tiempo agotado)") from exc
         except httpx.HTTPError as exc:
