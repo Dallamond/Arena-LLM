@@ -41,7 +41,7 @@ const rows = computed(() => {
       <Stamp text="comparar y exportar: F9" tone="dim" />
     </div>
     <BlueprintCard>
-      <p v-if="!rows.length" class="mono dim">Sin runs todavía. Lanza uno desde <RouterLink to="/calidad">Calidad</RouterLink>.</p>
+      <p v-if="!rows.length" class="dim">Sin runs todavía. Lanza uno desde <RouterLink to="/calidad">Calidad</RouterLink>.</p>
       <div v-else class="scroll"><table class="runs mono">
         <thead>
           <tr>
@@ -90,7 +90,7 @@ const rows = computed(() => {
   margin-bottom: 14px;
 }
 .title {
-  font-size: 18px;
+  font-size: 20px;
 }
 .search {
   flex: 1;

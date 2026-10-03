@@ -85,7 +85,7 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
   <div class="page">
     <div class="head">
       <h2 class="title">Servidores</h2>
-      <span class="mono dim small">Arena detecta los <code>llama-server</code> que lanzas; no los arranca ni los para.</span>
+      <span class="dim small">Arena detecta los <code>llama-server</code> que lanzas; no los arranca ni los para.</span>
       <button class="btn" type="button" :disabled="detecting" @click="detect">{{ detecting ? "Detectando…" : "Detectar ahora" }}</button>
     </div>
 
@@ -111,13 +111,12 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
       <h3 class="label host">Equipo · {{ g.host.name }}</h3>
       <div v-if="!g.endpoints.length" class="empty">
         <p>Ningún servidor detectado en este equipo.</p>
-        <p class="mono dim">Lanza <code>llama-server</code>; aparece aquí en unos 5 segundos con su configuración.</p>
+        <p class="dim">Lanza <code>llama-server</code>; aparece aquí en unos 5 segundos con su configuración.</p>
       </div>
       <BlueprintCard
         v-for="ep in g.endpoints"
         :key="ep.id"
-        :fig="`:${ep.base_url.split(':').pop()}`"
-        :title="ep.alias || ep.snapshot?.model_file || ep.base_url"
+        :title="`:${ep.base_url.split(':').pop()} · ${ep.alias || ep.snapshot?.model_file || ep.base_url}`"
         class="ep"
         :class="{ 'ep--off': ep.status === 'detenido' }"
       >
@@ -213,7 +212,7 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
   margin-left: auto;
 }
 .title {
-  font-size: 18px;
+  font-size: 20px;
 }
 .host {
   margin: 18px 0 10px;

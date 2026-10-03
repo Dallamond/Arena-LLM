@@ -2,7 +2,7 @@
 // Franja del equipo: siempre visible, una tarjeta por dispositivo detectado.
 import { computed, ref, watch } from "vue";
 import { cpu, cpuSample, currentHost, currentSnapshot, gpus, gpuSample, historyKey, live, staleness } from "../api/live";
-import { ago, fig } from "../lib/format";
+import { ago } from "../lib/format";
 import GpuCard from "./GpuCard.vue";
 import Stamp from "./Stamp.vue";
 import SystemCards from "./SystemCards.vue";
@@ -65,18 +65,17 @@ const statusText = computed(() => {
       </button>
     </header>
 
-    <p v-if="!host" class="empty mono">
+    <p v-if="!host" class="empty">
       No hay ningún equipo registrado. Arranca el servidor con <code>--agent http://127.0.0.1:9100</code>.
     </p>
 
     <div v-else class="strip__cards">
       <GpuCard
-        v-for="(d, i) in gpuList"
+        v-for="d in gpuList"
         :key="d.device_id"
         :device="d"
         :sample="gpuSample(snap, d.device_id)"
         :history="hist(d.device_id)"
-        :fig="fig(i + 1)"
         :stale="stale"
         :folded="folded"
       />
@@ -86,12 +85,10 @@ const statusText = computed(() => {
         :cpu-history="cpuDev ? hist(cpuDev.device_id) : []"
         :ram="snap?.ram"
         :ram-history="hist('ram')"
-        :fig-cpu="fig(gpuList.length + 1)"
-        :fig-ram="fig(gpuList.length + (cpuDev ? 2 : 1))"
         :stale="stale"
         :folded="folded"
       />
-      <p v-if="!gpuList.length && host.status === 'online'" class="nogpu mono">
+      <p v-if="!gpuList.length && host.status === 'online'" class="nogpu">
         Sin GPU detectada en este equipo: solo CPU y RAM.
       </p>
     </div>

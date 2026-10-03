@@ -1,7 +1,6 @@
 <script setup lang="ts">
-// Lámina de plano: borde de 1 px, marcas de registro en las esquinas y rótulo FIG.
+// Lámina de plano: borde de 1 px, marcas de registro en las esquinas y título destacado.
 defineProps<{
-  fig?: string;
   title?: string;
   color?: string; // color del dispositivo (var CSS)
   level?: "ok" | "warn" | "crit" | "unknown";
@@ -19,10 +18,9 @@ defineProps<{
     <span class="reg reg--tr" aria-hidden="true" />
     <span class="reg reg--bl" aria-hidden="true" />
     <span class="reg reg--br" aria-hidden="true" />
-    <header v-if="fig || title || $slots.actions" class="card__head">
-      <h3 class="label card__title">
-        <span v-if="fig" class="card__fig">{{ fig }}</span>
-        <span v-if="fig && title" aria-hidden="true"> · </span>
+    <header v-if="title || $slots.actions" class="card__head">
+      <h3 class="card__title">
+        <span v-if="color" class="card__swatch" aria-hidden="true" />
         <span v-if="title" class="card__name">{{ title }}</span>
       </h3>
       <div class="card__actions"><slot name="actions" /></div>
@@ -101,13 +99,25 @@ defineProps<{
   margin-bottom: 10px;
 }
 .card__title {
-  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.card__name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.card__fig {
-  color: var(--card-color);
+.card__swatch {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  background: var(--card-color);
 }
 .card__name {
   color: var(--ink);

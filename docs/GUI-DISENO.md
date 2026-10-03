@@ -48,13 +48,13 @@ relacionado: ["Arena LLM", "Homelab"]
 Un **plano técnico del equipo**: lo que miras es una máquina dibujada con sus medidas, y los datos circulan por ella.
 
 1. **Fondo de plano.** Rejilla fina (16 px) y rejilla mayor (80 px) en azul muy tenue sobre azul tinta.
-2. **Tarjetas como láminas.** Borde de 1 px, **marcas de registro** en las cuatro esquinas (pequeñas "L") en lugar de esquinas redondeadas, rótulo en mono mayúsculas con numeración de figura (`FIG.02 · RTX 3060`).
+2. **Tarjetas como láminas.** Borde de 1 px, **marcas de registro** en las cuatro esquinas (pequeñas "L") en lugar de esquinas redondeadas, título en sans seminegrita con una muestra del color del dispositivo (`■ RTX 3060`). *(03/10/2026: se quitan los rótulos `FIG.` a petición de Lucas: ensuciaban.)*
 3. **Líneas de cota.** Cada barra de memoria lleva su cota (`├──── 12.0 GiB ────┤`). Lo ocupado va **sólido**; lo que se desborda a RAM va **rayado diagonal**. Es el lenguaje visual de toda la app.
 4. **Flujo.** Conectores discontinuos con flecha que unen prompt → lado A/B → servidor:puerto → GPU → métricas. Los guiones **avanzan solo mientras hay tokens**. Con `prefers-reduced-motion` quedan estáticos.
 5. **Efecto croquis (sketch).** Un filtro SVG (`feTurbulence` + `feDisplacementMap`, desplazamiento ≈ 1 px) da un trazo ligeramente irregular a los bordes destacados y a los ejes de las gráficas. **Nunca** al texto ni a las líneas de datos. Se apaga con reducción de movimiento y con una opción en Ajustes.
 6. **Anotaciones.** Sobre las gráficas aparecen notas pequeñas con flecha curva generadas por los eventos reales (`← empieza el throttling`, `← VRAM llena`, `← aborto a 85 °C`).
 7. **Sellos.** Etiquetas con borde discontinuo y ligera inclinación (±1°) para estados: `ESTIMADO`, `ABORTADO`, `SIN DATOS`, `CONFIG CAMBIADA`.
-8. **Tipografía.** Texto en sans (Inter), rótulos y cifras en mono (JetBrains Mono), ambas **autoalojadas** (sin CDN). Una fuente manuscrita opcional solo para anotaciones.
+8. **Tipografía.** Texto fijo (títulos, rótulos, nombres de campo, botones y frases) en sans (Inter); **solo los datos que cambian** (cifras, rutas, flags) en mono (JetBrains Mono, cifras tabulares) y un tono más claro, para que se distingan de un vistazo. Ambas **autoalojadas** (sin CDN). Una fuente manuscrita opcional solo para anotaciones.
 
 ### Tokens (propuesta inicial; ajustar al verlo)
 
@@ -84,7 +84,7 @@ Reglas: **color estable por dispositivo en todas las pantallas** (no por lado A/
 ┌ [agente ● :9100] [servidor ● :8080] ─────── ARENA LLM ───── [⚠ 1 aviso] [Modo vídeo] ┐
 ├──────────┬───────────────────────────────────────────────────────────────────────────┤
 │ ▢ Panel  │ ┌ FRANJA DEL EQUIPO (siempre visible, plegable a una línea) ──────────────┐│
-│ ▢ Servi- │ │ FIG.01 RTX 3060   FIG.02 M40        FIG.03 CPU      FIG.04 RAM         ││
+│ ▢ Servi- │ │ ■ RTX 3060        ■ M40             ■ CPU           ■ RAM              ││
 │   dores  │ │ 62°C 118W         71°C 205W ▲       12% 3.6GHz      11.8/15.9 GiB      ││
 │ ▢ Rendi- │ │ ▓▓▓▓▓░ 8.1/12 GiB ▓▓▓▓▓▓▓▓▓░ 19/24  ▁▂▃▅▃▂▁         ▓▓▓▓▓▓▓░░░         ││
 │   miento │ └────────────────────────────────────────────────────────────────────────┘│
@@ -172,7 +172,7 @@ Oculta menú y chips, agranda cifras y fuentes, fija 16:9, mantiene la franja de
 
 ## 6. Componentes (biblioteca propia, en SVG/CSS)
 
-`BlueprintCard` (esquinas de registro, rótulo FIG) · `GpuCard` · `RadialGauge` · `BarWithOverflow` (sólido + rayado + cota) · `DimensionLine` · `Sparkline` · `LineChart` (varias series, ejes con trazo croquis, marcadores de eventos, selección de rango) · `StatCard` · `StatusChip` · `Stamp` (sello) · `FlowConnector` (guiones animados) · `ParamField` (control + lectura de unidad + ayuda) · `StreamPane` (respuesta en streaming) · `ConfigDiff` · `VerdictCard` · `FitBadge`.
+`BlueprintCard` (esquinas de registro, título destacado) · `GpuCard` · `RadialGauge` · `BarWithOverflow` (sólido + rayado + cota) · `DimensionLine` · `Sparkline` · `LineChart` (varias series, ejes con trazo croquis, marcadores de eventos, selección de rango) · `StatCard` · `StatusChip` · `Stamp` (sello) · `FlowConnector` (guiones animados) · `ParamField` (control + lectura de unidad + ayuda) · `StreamPane` (respuesta en streaming) · `ConfigDiff` · `VerdictCard` · `FitBadge`.
 
 Las gráficas se dibujan **con SVG propio** (los volúmenes son pequeños: 1 punto por segundo). Si el rendimiento lo exigiera con series muy largas, valorar `uPlot` solo para eso.
 

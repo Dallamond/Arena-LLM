@@ -86,12 +86,12 @@ const expanded = ref<Record<number, boolean>>({});
 
     <div v-if="!host" class="empty">
       <p>Ningún equipo registrado.</p>
-      <p class="mono dim">Arranca el agente y el servidor con <code>scripts\start-server.bat --agent http://127.0.0.1:9100</code></p>
+      <p class="dim">Arranca el agente y el servidor con <code>scripts\start-server.bat --agent http://127.0.0.1:9100</code></p>
     </div>
 
     <template v-else>
       <!-- Ficha del equipo -->
-      <BlueprintCard fig="FIG.00" :title="host.host?.hostname ?? host.name">
+      <BlueprintCard :title="host.host?.hostname ?? host.name">
         <template #actions>
           <Stamp v-if="host.simulated" :text="`simulado · ${host.simulated}`" />
         </template>
@@ -119,7 +119,7 @@ const expanded = ref<Record<number, boolean>>({});
       </BlueprintCard>
 
       <!-- Medidores -->
-      <BlueprintCard fig="FIG.10" title="Medidores" class="gap">
+      <BlueprintCard title="Medidores" class="gap">
         <div class="gauges">
           <template v-for="d in gpuList" :key="d.device_id">
             <div class="gauge-group" :style="{ '--g': deviceColor(d) }">
@@ -180,9 +180,9 @@ const expanded = ref<Record<number, boolean>>({});
       </BlueprintCard>
 
       <!-- Servidores detectados -->
-      <BlueprintCard fig="FIG.20" title="Servidores detectados" class="gap">
+      <BlueprintCard title="Servidores detectados" class="gap">
         <template #actions>
-          <span v-if="serversAt" class="mono dim small">{{ ago(Date.now() / 1000 - serversAt) }}</span>
+          <span v-if="serversAt" class="dim small">{{ ago(Date.now() / 1000 - serversAt) }}</span>
           <button class="btn" type="button" :disabled="loading || host.status !== 'online'" @click="loadServers(true)">
             {{ loading ? "Detectando…" : "Detectar ahora" }}
           </button>
@@ -192,11 +192,11 @@ const expanded = ref<Record<number, boolean>>({});
 
         <div v-if="host.status !== 'online'" class="empty">
           <p>El agente no responde: no se pueden detectar servidores.</p>
-          <p class="mono dim">Último dato {{ staleness === null ? "nunca" : ago(staleness) }}.</p>
+          <p class="dim">Último dato {{ staleness === null ? "nunca" : ago(staleness) }}.</p>
         </div>
         <div v-else-if="servers && !servers.length" class="empty">
           <p>Ningún servidor detectado.</p>
-          <p class="mono dim">Lanza <code>llama-server</code> como siempre; Arena lo detecta solo en unos segundos.</p>
+          <p class="dim">Lanza <code>llama-server</code> como siempre; Arena lo detecta solo en unos segundos.</p>
           <button class="btn btn--primary" type="button" @click="loadServers(true)">Detectar ahora</button>
         </div>
         <ul v-else-if="servers" class="servers">
@@ -223,12 +223,12 @@ const expanded = ref<Record<number, boolean>>({});
               {{ expanded[s.pid] ? "Ocultar línea de comandos" : "Ver línea de comandos" }}
             </button>
             <pre v-if="expanded[s.pid]" class="argv mono">{{ s.argv.join(" ") }}</pre>
-            <p v-if="Object.keys(s.unknown).length" class="mono dim small">
+            <p v-if="Object.keys(s.unknown).length" class="dim small">
               Flags no reconocidos (guardados tal cual): {{ Object.keys(s.unknown).join(", ") }}
             </p>
           </li>
         </ul>
-        <p v-else class="mono dim">Detectando…</p>
+        <p v-else class="dim">Detectando…</p>
       </BlueprintCard>
     </template>
   </div>
@@ -242,7 +242,7 @@ const expanded = ref<Record<number, boolean>>({});
   margin-bottom: 14px;
 }
 .page__title {
-  font-size: 18px;
+  font-size: 20px;
 }
 .gap {
   margin-top: 18px;

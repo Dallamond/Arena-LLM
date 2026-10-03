@@ -14,7 +14,6 @@ const props = defineProps<{
   device: DeviceInfo;
   sample: GpuSample | undefined;
   history: Point[];
-  fig: string;
   stale: boolean;
   folded?: boolean;
 }>();
@@ -33,7 +32,6 @@ const levelIcon = computed(() => (health.value.level === "crit" ? "✕" : health
 <template>
   <BlueprintCard
     :class="{ 'is-stale': stale }"
-    :fig="fig"
     :title="shortName(device.name)"
     :color="color"
     :level="stale ? 'unknown' : health.level === 'unknown' ? undefined : health.level"

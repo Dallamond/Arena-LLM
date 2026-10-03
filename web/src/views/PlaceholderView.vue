@@ -13,7 +13,7 @@ defineProps<{ item: NavItem }>();
       <div class="todo">
         <Stamp :text="`llega en ${item.phase}`" tone="dim" :tilt="-2" />
         <p>{{ item.summary }}</p>
-        <p class="mono dim">Ver docs/HOJA-DE-RUTA.md §8 y docs/GUI-DISENO.md §5.</p>
+        <p class="dim">Ver docs/HOJA-DE-RUTA.md §8 y docs/GUI-DISENO.md §5.</p>
       </div>
     </BlueprintCard>
   </div>

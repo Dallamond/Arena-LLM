@@ -228,7 +228,7 @@ function resetThreshold(id: string) {
             Si la GPU no la reporta, se usan valores del fabricante. Aquí puedes fijarlos a mano; vacío = automático.
             Al llegar al <b>aborto</b> durante una prueba, la prueba se detiene sola.
           </p>
-          <p v-if="!gpus.length" class="mono dim">No hay GPU detectadas.</p>
+          <p v-if="!gpus.length" class="dim">No hay GPU detectadas.</p>
           <table v-else class="tbl mono">
             <thead><tr><th>dispositivo</th><th>equipo</th><th>slowdown</th><th>automático</th><th>aviso °C</th><th>aborto °C</th><th></th></tr></thead>
             <tbody>
@@ -265,7 +265,7 @@ function resetThreshold(id: string) {
 
 <style scoped>
 .title {
-  font-size: 18px;
+  font-size: 20px;
   margin-bottom: 14px;
 }
 .layout {

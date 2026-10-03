@@ -10,7 +10,7 @@ relacionado: ["Arena LLM"]
 ---
 # Arena LLM — Estado
 
-> Leer al retomar. Última actualización: 03/10/2026 (noche).
+> Leer al retomar. Última actualización: 03/10/2026 (noche, 2.ª sesión).
 
 ## Resumen
 
@@ -18,11 +18,11 @@ relacionado: ["Arena LLM"]
 |---|---|
 | F0 — Preparación del PC | Parcial: falta XMP y la M40 (llega la semana del 05/10) |
 | F1 — Esqueleto y agente | ✅ Cerrada (detecta el llama-server real) |
-| F2 — GUI base | ✅ (Ajustes con subnavegación hecho en esta sesión) |
-| F3 — Servidores y detección | Casi: falta alta manual de endpoints y la **calculadora de encaje de GGUF** |
+| F2 — GUI base | ✅ + pulido visual tras la opinión de Lucas (sin `FIG.`, títulos destacados, datos en mono) |
+| F3 — Servidores y detección | Casi: ✅ calculadora de encaje; falta alta manual de endpoints |
 | F4 — Runner | ✅ Criterio cumplido: 33,6 t/s Arena frente a 34,5 t/s llama-bench (−2,7 %) |
 | F5 — Telemetría, resumen y estrés | ✅ salvo la prueba real de 5 min (hecha de 60 s) |
-| Siguiente | Opinión de Lucas tras probar → F3 (calculadora) → F6 (llama-bench por componente) |
+| Siguiente | Lucas revisa el pulido visual y la pestaña GGUF → alta manual de endpoints (F3) → F6 (llama-bench por componente) |
 
 ## Primera prueba real (03/10/2026, 21:01)
 
@@ -75,13 +75,20 @@ Después: **Calidad** → elegir servidor → Lanzar estrés o prompt libre.
   - Vista de run en vivo con gráficas y resultado completo.
   - Historial básico.
   - Ajustes: apariencia (acento, contraste, tamaño, rejilla, croquis), equipos, umbrales y datos.
-- **Tests:** 129 de Python (incluye un laboratorio completo sin GPU: llama-server simulado + agente simulado + servidor) y 10 de la web.
+- **Tests:** 144 de Python (incluye un laboratorio completo sin GPU y la calculadora de encaje) y 10 de la web.
+
+## Calculadora de encaje (03/10/2026)
+
+Servidores → pestaña **GGUF en disco**. Para cada GGUF: pesos reales por capa (offsets de los tensores), KV de las capas de atención (en `qwen35` solo 8 de 32), estado recurrente F32 por slot, búfer de cómputo y reserva de 512 MiB por GPU. Veredicto frente a la VRAM y RAM **libres ahora**: cabe en X · cabe repartido · necesita X GiB de RAM (con `-ngl` sugerido) · solo CPU · no cabe. Todo con el sello ESTIMADO.
+
+Con c=8192 en la 3060 (11,6 GiB libres) caben los tres modelos. El 7B Q8 estima 8,3 GiB frente a 9,2 GiB de pico medido (que incluye el escritorio). El 14B Q4_K_M a 32K necesitaría unos 4,2 GiB de RAM con `-ngl 38`.
+
+Limitaciones: ventana deslizante (cota superior), MoE sin `--cpu-moe` y búfer de cómputo aproximado (supone flash attention).
 
 ## Pendiente (orden propuesto)
 
-1. Opinión de Lucas sobre la GUI de pruebas.
+1. Lucas revisa el pulido visual (sin `FIG.`, títulos y rótulos en Inter seminegrita, datos vivos en mono más clara) y la pestaña GGUF. No se pudo revisar con capturas: la extensión de Chrome no estaba conectada.
 2. F3:
-   - Calculadora de encaje de GGUF. Atención a los modelos híbridos (`qwen35`) y a los arrays de cabezas KV por capa.
    - Alta manual de endpoints.
    - Asociar GPU por aumento de VRAM cuando `compute-apps` no la dé.
 3. F6: `llama-bench` desde el agente, por componente. Servirá para investigar el procesado de prompt lento.

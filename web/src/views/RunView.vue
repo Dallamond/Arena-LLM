@@ -218,7 +218,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
 <template>
   <div class="page">
     <p v-if="loadError" class="error mono" role="alert">▲ {{ loadError }}</p>
-    <p v-if="!run && !loadError" class="mono dim">Cargando…</p>
+    <p v-if="!run && !loadError" class="dim">Cargando…</p>
 
     <template v-if="run">
       <!-- Cabecera -->
@@ -228,7 +228,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
             Run #{{ run.id }} · {{ run.suite === "estres" ? "Estrés" : "Prompt libre" }}
             <span v-if="run.label" class="dim">— {{ run.label }}</span>
           </h2>
-          <p class="mono dim small">
+          <p class="dim small">
             {{ fmtDate(run.started_at, true) }} · {{ snap?.model_file ?? "modelo sin identificar" }} ·
             {{ snap?.base_url }} · suite v{{ run.suite_version }} ({{ run.suite_hash }})
           </p>
@@ -248,20 +248,20 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
 
       <!-- Cifras grandes -->
       <div class="stats">
-        <BlueprintCard dense fig="FASE">
+        <BlueprintCard dense title="Fase">
           <div class="big mono">{{ running ? (lv?.phase ?? "preparando") : status.text }}</div>
-          <div class="mono dim small">{{ fmtDuration(elapsed) }}<span v-if="xMax"> de {{ fmtDuration(xMax) }}</span></div>
+          <div class="dim small">{{ fmtDuration(elapsed) }}<span v-if="xMax"> de {{ fmtDuration(xMax) }}</span></div>
           <div v-if="progress !== null" class="progress" role="progressbar" :aria-valuenow="Math.round(progress * 100)" aria-valuemin="0" aria-valuemax="100">
             <div :style="{ width: progress * 100 + '%' }" />
           </div>
         </BlueprintCard>
-        <BlueprintCard dense fig="T/S">
+        <BlueprintCard dense title="Velocidad (t/s)">
           <div class="big mono">{{ running ? fmt(lastTps, 1) : fmt(sum?.tps_aggregate.median ?? sum?.tps_client.median, 1) }}</div>
-          <div class="mono dim small">{{ running ? "agregado, último segundo" : "mediana (agregado)" }}</div>
+          <div class="dim small">{{ running ? "agregado, último segundo" : "mediana (agregado)" }}</div>
         </BlueprintCard>
-        <BlueprintCard dense fig="TOKENS">
+        <BlueprintCard dense title="Tokens">
           <div class="big mono">{{ fmt(running ? lv?.tokens : sum?.completion_tokens, 0) }}</div>
-          <div class="mono dim small">
+          <div class="dim small">
             {{ fmt(running ? lv?.requests_done : sum?.requests, 0) }} peticiones
             <span v-if="(running ? lv?.requests_error : sum?.requests_error)" class="warn">
               · ▲ {{ running ? lv?.requests_error : sum?.requests_error }} con error
@@ -269,16 +269,16 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
             <span v-if="!running && sum?.requests_cut" class="dim"> · {{ sum.requests_cut }} cortada al terminar</span>
           </div>
         </BlueprintCard>
-        <BlueprintCard v-for="id in gpuIds" :key="id" dense :fig="devLabel(id)" :color="devColor(id)">
+        <BlueprintCard v-for="id in gpuIds" :key="id" dense :title="devLabel(id)" :color="devColor(id)">
           <div class="big mono">
             {{ fmt(running ? lv?.max_temp?.[id] : sum?.devices[id]?.temp_max_c, 0, "°C") }}
           </div>
-          <div class="mono dim small">máx · aborto a {{ watched[id].crit }} °C ({{ watched[id].source }})</div>
+          <div class="dim small">máx · aborto a {{ watched[id].crit }} °C ({{ watched[id].source }})</div>
         </BlueprintCard>
       </div>
 
       <!-- Gráficas -->
-      <BlueprintCard fig="FIG.30" title="Telemetría del run" class="gap">
+      <BlueprintCard title="Telemetría del run" class="gap">
         <div class="charts">
           <LineChart title="Velocidad" unit="t/s" :digits="1" :series="tpsSeries" :bands="bands" :markers="markers" :x-max="xMax" :y-min="0" />
           <LineChart title="Temperatura" unit="°C" :series="tempSeries" :bands="bands" :lines="tempLines" :markers="markers" :x-max="xMax" />
@@ -289,12 +289,12 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
       </BlueprintCard>
 
       <!-- Respuesta en vivo -->
-      <BlueprintCard v-if="running" fig="FIG.31" title="Respuesta en streaming" class="gap">
+      <BlueprintCard v-if="running" title="Respuesta en streaming" class="gap">
         <pre class="stream mono" aria-live="off">{{ lv?.text || "…" }}</pre>
       </BlueprintCard>
 
       <!-- Resumen -->
-      <BlueprintCard v-if="sum && !running" fig="FIG.32" title="Resumen" class="gap">
+      <BlueprintCard v-if="sum && !running" title="Resumen" class="gap">
         <div class="summary">
           <section>
             <h3 class="label">Velocidad</h3>
@@ -343,13 +343,13 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
                 <dd :class="{ warn: (sum.devices[id].throttle_pct ?? 0) > 0 }">{{ fmt(sum.devices[id].throttle_pct, 0, "%") }}</dd>
               </div>
             </dl>
-            <p v-else class="mono dim">{{ NO_DATA }}</p>
+            <p v-else class="dim">{{ NO_DATA }}</p>
           </section>
         </div>
       </BlueprintCard>
 
       <!-- Configuración guardada con el run -->
-      <BlueprintCard fig="FIG.33" title="Configuración guardada con el run" class="gap">
+      <BlueprintCard title="Configuración guardada con el run" class="gap">
         <div class="config mono">
           <div>
             <h3 class="label">Servidor</h3>
@@ -374,7 +374,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
       </BlueprintCard>
 
       <!-- Peticiones -->
-      <BlueprintCard v-if="detail?.items.length" fig="FIG.34" :title="`Peticiones (${detail.items.length})`" class="gap">
+      <BlueprintCard v-if="detail?.items.length" :title="`Peticiones (${detail.items.length})`" class="gap">
         <div class="scroll"><table class="items mono">
           <thead>
             <tr>
@@ -435,7 +435,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
   margin-bottom: 12px;
 }
 .title {
-  font-size: 18px;
+  font-size: 20px;
 }
 .actions {
   display: flex;

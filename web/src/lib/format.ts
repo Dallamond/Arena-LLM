@@ -35,11 +35,6 @@ export function ago(seconds: number | null): string {
   return `hace ${Math.round(seconds / 3600)} h`;
 }
 
-/** Número de figura con dos cifras: FIG.01 */
-export function fig(n: number): string {
-  return `FIG.${String(n).padStart(2, "0")}`;
-}
-
 const THROTTLE_LABELS: Record<string, string> = {
   sw_power_cap: "límite de potencia",
   hw_slowdown: "freno HW",

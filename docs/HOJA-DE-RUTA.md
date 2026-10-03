@@ -238,7 +238,7 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
 - [x] **Varios equipos (`hosts`)**: registrar agentes de distintas máquinas y cambiar de equipo en la GUI. Autodescubrimiento opcional en la red local. *(03/10/2026: registro de agentes y selector de equipo; sin autodescubrimiento en red)*
 - [ ] CRUD de endpoints (URL del `llama-server`, URL del agente, dispositivo asociado, alias). Botón **Detectar** (§5). *(03/10/2026: detección automática + alias; falta añadir un endpoint a mano)*
 - [x] Página **Modelos/Servidores**: tarjeta por servidor detectado con modelo, cuantización, contexto, `-ngl`, `-ts`, slots, KV, flags, GPU y VRAM que ocupa.
-- [ ] Carpeta de modelos configurable: lista de GGUF con **calculadora de encaje**. *(pendiente: la calculadora necesita tener en cuenta modelos híbridos, ver ESTADO.md)*
+- [x] Carpeta de modelos configurable: lista de GGUF con **calculadora de encaje**. *(03/10/2026: pestaña GGUF en disco en Servidores; pesos reales por capa, KV solo en capas de atención en híbridos, estado recurrente, `-ngl` sugerido; verificada con los 4 GGUF de Lucas)*
 - [x] Cada cambio de configuración detectado queda registrado con fecha.
 **Criterio:** relanzar un servidor con otro `-c` o `-ngl` se refleja en la GUI en menos de 10 s sin tocar nada.  
   *Estado 03/10/2026: detección cada 5 s; un cambio de contexto se registra con su diff (probado con llama-server simulado). Falta probarlo relanzando el real.*

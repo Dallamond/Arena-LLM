@@ -111,10 +111,10 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
     <h2 class="title">Calidad y estrés</h2>
 
     <!-- Servidor objetivo -->
-    <BlueprintCard fig="FIG.40" title="Servidor a probar">
+    <BlueprintCard title="Servidor a probar">
       <div v-if="!endpoints.length" class="empty">
         <p>Ningún servidor detectado.</p>
-        <p class="mono dim">Lanza <code>llama-server</code> como siempre; aparecerá aquí en unos segundos.</p>
+        <p class="dim">Lanza <code>llama-server</code> como siempre; aparecerá aquí en unos segundos.</p>
       </div>
       <div v-else class="targets">
         <label v-for="e in endpoints" :key="e.id" class="target" :class="{ 'target--off': e.status !== 'listo', 'target--on': e.id === endpointId }">
@@ -130,7 +130,7 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
           <Stamp :text="e.status" :tone="e.status === 'listo' ? 'info' : e.status === 'cargando' ? 'warn' : 'dim'" />
         </label>
       </div>
-      <p v-if="busyEndpoint" class="warn mono small">
+      <p v-if="busyEndpoint" class="warn small">
         ▲ Ya hay una prueba en marcha en este servidor:
         <RouterLink :to="`/pruebas/${busyEndpoint.id}`">run #{{ busyEndpoint.id }}</RouterLink>
       </p>
@@ -140,7 +140,7 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
 
     <div class="cards">
       <!-- Estrés -->
-      <BlueprintCard fig="FIG.41" title="Estrés GPU/VRAM">
+      <BlueprintCard title="Estrés GPU/VRAM">
         <p class="desc">Peticiones largas en bucle durante el tiempo elegido. Mide t/s a lo largo del tiempo, temperatura, potencia, reloj, throttling, degradación y energía. Aborta solo si una GPU llega a su umbral crítico.</p>
         <div class="form">
           <label><span class="label">duración (s)</span><input v-model.number="stress.duration_s" type="number" min="5" max="7200" /></label>
@@ -150,7 +150,7 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
           <label><span class="label">enfriamiento (s)</span><input v-model.number="stress.cooldown_s" type="number" min="0" max="1800" /></label>
           <label class="wide"><span class="label">etiqueta (opcional)</span><input v-model="stress.label" type="text" maxlength="80" placeholder="p. ej. 3060 · Qwen 7B · ventilador al 100 %" /></label>
         </div>
-        <p class="mono dim small">
+        <p class="dim small">
           Total ≈ {{ fmtDuration(stressTotal) }}.
           <span v-if="selected && stress.parallel > (selected.snapshot?.derived?.total_slots ?? 1)" class="warn">
             ▲ El servidor tiene {{ selected.snapshot?.derived?.total_slots }} slots: con más peticiones en paralelo, las demás esperan en cola.
@@ -162,7 +162,7 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
       </BlueprintCard>
 
       <!-- Libre -->
-      <BlueprintCard fig="FIG.42" title="Prompt libre">
+      <BlueprintCard title="Prompt libre">
         <p class="desc">Uno o varios prompts propios, separados por una línea con <code>---</code>. Mide TTFT, t/s y tokens, y guarda prompt y respuesta.</p>
         <div class="form">
           <label class="wide"><span class="label">prompts</span><textarea v-model="free.prompts" rows="6" /></label>
@@ -178,11 +178,11 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
     </div>
 
     <!-- Parámetros comunes -->
-    <BlueprintCard fig="FIG.43" title="Parámetros de generación (comunes)" class="gap">
+    <BlueprintCard title="Parámetros de generación (comunes)" class="gap">
       <template #actions>
         <button class="btn" type="button" :aria-expanded="showAdv" @click="showAdv = !showAdv">{{ showAdv ? "Ocultar" : "Mostrar" }}</button>
       </template>
-      <p class="mono dim small">
+      <p class="dim small">
         Perfil estándar: temperatura {{ adv.temperature }}, semilla {{ adv.seed }}, caché de prompt {{ adv.cache_prompt ? "activada" : "desactivada" }}.
         Cambiarlos hace que el run no sea comparable con otros del perfil estándar.
       </p>
@@ -199,10 +199,10 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
     </BlueprintCard>
 
     <!-- Próximas -->
-    <BlueprintCard fig="FIG.44" title="Próximas pruebas" class="gap">
+    <BlueprintCard title="Próximas pruebas" class="gap">
       <div class="todo">
         <Stamp text="llega en F7" tone="dim" />
-        <p class="mono dim">Razonamiento (12 preguntas) · Código con ejecución aislada · Contexto largo (aguja en pajar) · Concurrencia</p>
+        <p class="dim">Razonamiento (12 preguntas) · Código con ejecución aislada · Contexto largo (aguja en pajar) · Concurrencia</p>
       </div>
     </BlueprintCard>
   </div>
@@ -210,7 +210,7 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
 
 <style scoped>
 .title {
-  font-size: 18px;
+  font-size: 20px;
   margin-bottom: 14px;
 }
 .dim {

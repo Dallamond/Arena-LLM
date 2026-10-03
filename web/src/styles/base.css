@@ -40,6 +40,13 @@ h2,
 h3 {
   margin: 0;
   font-weight: 600;
+  letter-spacing: 0.005em;
+}
+
+/* Títulos de página */
+h2.title {
+  font-size: 20px;
+  color: var(--ink);
 }
 
 a {
@@ -63,17 +70,42 @@ input[type="checkbox"] {
   outline-offset: 2px;
 }
 
-.mono {
-  font-family: var(--font-mono);
+/*
+ * Jerarquía de texto:
+ * - Texto fijo (títulos, rótulos, nombres de campo, botones): Inter.
+ * - Datos que cambian (cifras, rutas, flags): JetBrains Mono con cifras tabulares (`.mono` / `.data`).
+ */
+.mono,
+.data {
+  font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
 }
 
+.data {
+  color: var(--data-ink);
+}
+
+/* Los nombres de campo son texto fijo aunque estén dentro de un bloque de datos */
+dt,
+.mono dt,
+.mono .label {
+  font-family: var(--font-sans);
+}
+
 .label {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
-  letter-spacing: 0.08em;
+  font-weight: 600;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--ink-dim);
+}
+
+/* Rótulo de sección dentro de una página (encima de un grupo de tarjetas) */
+h3.label,
+h4.label {
+  font-size: 12px;
+  color: var(--ink);
 }
 
 .btn {
@@ -84,8 +116,9 @@ input[type="checkbox"] {
   border: 1px solid var(--line-strong);
   background: transparent;
   color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -132,4 +165,14 @@ input[type="checkbox"] {
 /* Datos de un agente caído: se ven (último valor conocido) pero atenuados */
 .is-stale > :not(header):not(.reg) {
   opacity: 0.45;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+/* Las cifras en vivo destacan sobre el texto fijo */
+.mono {
+  color: var(--data-ink);
 }

@@ -16,8 +16,6 @@ const props = defineProps<{
   cpuHistory: Point[];
   ram: RamSample | null | undefined;
   ramHistory: Point[];
-  figCpu: string;
-  figRam: string;
   stale: boolean;
   folded?: boolean;
 }>();
@@ -33,7 +31,7 @@ const cpuSub = computed(() => {
 </script>
 
 <template>
-  <BlueprintCard v-if="cpu" :class="{ 'is-stale': stale }" :fig="figCpu" :title="shortName(cpu.name) || 'CPU'" color="var(--dev-cpu)" dense>
+  <BlueprintCard v-if="cpu" :class="{ 'is-stale': stale }" :title="shortName(cpu.name) || 'CPU'" color="var(--dev-cpu)" dense>
     <template #actions><Stamp v-if="stale" text="sin datos" tone="dim" /></template>
     <div v-if="folded" class="line mono">
       <span>{{ fmt(cpuSample?.util_pct, 0, "%") }}</span>
@@ -50,7 +48,7 @@ const cpuSub = computed(() => {
     </template>
   </BlueprintCard>
 
-  <BlueprintCard :class="{ 'is-stale': stale }" :fig="figRam" title="RAM" color="var(--dev-ram)" dense>
+  <BlueprintCard :class="{ 'is-stale': stale }" title="RAM" color="var(--dev-ram)" dense>
     <template #actions><Stamp v-if="stale" text="sin datos" tone="dim" /></template>
     <div v-if="folded" class="line mono">
       <span>{{ gibPair(ram?.used_mib, ram?.total_mib) }}</span>
