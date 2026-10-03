@@ -11,6 +11,7 @@ import pytest
 from agent.api import AgentApp
 from agent.host import enrich_host, host_info
 from agent.model import AGENT_API, CpuSample, GpuSample
+from agent.processes import ServerDetector, default_process_source
 from agent.providers import detect_providers
 from agent.sampler import Sampler
 from agent.simulate import PROFILES, build_profile, load_at
@@ -30,14 +31,17 @@ class FakeClock:
 
 def make_app(profile: str, clock=None):
     if profile == "real":
-        host, providers = host_info(), detect_providers()
+        host, providers, procs = host_info(), detect_providers(), default_process_source()
     else:
-        host, providers = build_profile(profile, clock=clock or FakeClock())
+        host, providers, procs = build_profile(profile, clock=clock or FakeClock())
     sampler = Sampler(providers)
     devices = sampler.refresh_devices()
     first = sampler.sample_once()
     return AgentApp(
-        enrich_host(host, devices, first.ram), sampler, simulated=None if profile == "real" else profile
+        enrich_host(host, devices, first.ram),
+        sampler,
+        simulated=None if profile == "real" else profile,
+        detector=ServerDetector(procs, providers),
     )
 
 
@@ -141,6 +145,27 @@ def test_simulacion_determinista():
 def test_perfil_desconocido():
     with pytest.raises(ValueError):
         build_profile("amd9")
+
+
+@pytest.mark.parametrize("profile", TARGETS)
+def test_contrato_servers(profile):
+    app = make_app(profile)
+    body = call(app, "/servers")
+    assert not body["errors"], body["errors"]
+    gpu_ids = {d.device_id for d in call(app, "/info")["devices"] if d.kind == "gpu"}
+    for s in body["servers"]:
+        assert s.pid > 0 and s.engine == "llama.cpp"
+        assert s.port is None or 0 < s.port < 65536
+        assert "x" not in s.argv  # secretos ocultos
+        for use in s.devices:
+            assert use.device_id in gpu_ids
+    if profile == "nvidia2":
+        assert [(s.port, s.model_file, s.flags["ngl"]) for s in body["servers"]] == [
+            (8081, "sim-8b-Q4_K_M.gguf", 99),
+            (8082, "sim-32b-Q4_K_M.gguf", 99),
+        ]
+        assert all(s.gpu_link == "compute-apps" for s in body["servers"])
+        assert len({s.devices[0].device_id for s in body["servers"]}) == 2
 
 
 def test_version_del_contrato_en_respuestas():

@@ -6,6 +6,7 @@ import sys
 from agent import __version__
 from agent.api import AgentApp, make_server
 from agent.host import enrich_host, host_info
+from agent.processes import ServerDetector, default_process_source
 from agent.providers import detect_providers
 from agent.sampler import Sampler
 from agent.simulate import PROFILES, build_profile
@@ -35,14 +36,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     token = args.token or os.environ.get("ARENA_AGENT_TOKEN") or None
     if args.simulate:
-        host, providers = build_profile(args.simulate)
+        host, providers, procs = build_profile(args.simulate)
         logging.info("Modo simulado: perfil %s", args.simulate)
     else:
-        host, providers = host_info(), detect_providers()
+        host, providers, procs = host_info(), detect_providers(), default_process_source()
     sampler = Sampler(providers, interval_s=args.interval)
     devices = sampler.refresh_devices()
     first = sampler.sample_once()
-    app = AgentApp(enrich_host(host, devices, first.ram), sampler, token=token, simulated=args.simulate)
+    app = AgentApp(
+        enrich_host(host, devices, first.ram),
+        sampler,
+        token=token,
+        simulated=args.simulate,
+        detector=ServerDetector(procs, providers),
+    )
     try:
         server = make_server(app, args.host, args.port)
     except (ValueError, OSError) as exc:

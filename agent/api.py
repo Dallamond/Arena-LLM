@@ -20,6 +20,7 @@ from urllib.parse import urlsplit
 
 from agent import __version__
 from agent.model import AGENT_API, HostInfo, to_jsonable
+from agent.processes import ServerDetector
 from agent.sampler import Sampler
 
 log = logging.getLogger(__name__)
@@ -55,9 +56,15 @@ def check_bind(host: str, token: str | None) -> None:
 
 class AgentApp:
     def __init__(
-        self, host: HostInfo, sampler: Sampler, token: str | None = None, simulated: str | None = None
+        self,
+        host: HostInfo,
+        sampler: Sampler,
+        token: str | None = None,
+        simulated: str | None = None,
+        detector: ServerDetector | None = None,
     ):
         self.host = host
+        self.detector = detector
         self.simulated = simulated
         self.sampler = sampler
         self.token = token or None
@@ -66,6 +73,7 @@ class AgentApp:
             "/health": self.health,
             "/info": self.info,
             "/metrics": self.metrics,
+            "/servers": self.servers,
         }
 
     def health(self) -> dict[str, Any]:
@@ -83,6 +91,11 @@ class AgentApp:
 
     def metrics(self) -> dict[str, Any]:
         return {"snapshot": self.sampler.latest()}
+
+    def servers(self) -> dict[str, Any]:
+        if self.detector is None:
+            raise ApiError(HTTPStatus.NOT_IMPLEMENTED, "no_detector", "Detección de servidores no disponible")
+        return self.detector.detect()
 
     def authorize(self, headers: Any) -> None:
         if self.token:

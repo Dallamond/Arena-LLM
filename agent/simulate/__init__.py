@@ -16,7 +16,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from agent import throttle
-from agent.model import CpuSample, DeviceInfo, DeviceSample, GpuSample, HostInfo, RamSample
+from agent.model import CpuSample, DeviceInfo, DeviceSample, GpuSample, HostInfo, ProcessGpuUse, RamSample
+from agent.processes import ProcessSource, RawProcess
 from agent.providers.base import TelemetryProvider
 from agent.providers.null import NullProvider
 
@@ -61,6 +62,7 @@ class SimGpuSpec:
     driver_model: str | None = None
     phase: float = 0.0
     model_vram_mib: float = 0.0  # VRAM ocupada por el "modelo" cargado
+    server_pid: int | None = None  # pid del llama-server simulado que la usa
     missing: list[str] = field(default_factory=list)
 
 
@@ -144,6 +146,26 @@ class SimGpuProvider(TelemetryProvider):
             )
         return out
 
+    def processes(self) -> dict[int, list[ProcessGpuUse]]:
+        return {
+            s.server_pid: [ProcessGpuUse(device_id=f"nvidia:{s.uuid}", mem_used_mib=s.model_vram_mib)]
+            for s in self.specs
+            if s.server_pid is not None
+        }
+
+
+class SimProcessSource(ProcessSource):
+    def __init__(self, processes: list[RawProcess]):
+        self.processes = processes
+
+    def list(self) -> list[RawProcess]:
+        return list(self.processes)
+
+
+def _server(pid: int, port: int, model: str, *extra: str) -> RawProcess:
+    argv = ["/opt/llama.cpp/build/bin/llama-server", "-m", f"/modelos/{model}", "--port", str(port), *extra]
+    return RawProcess(pid=pid, exe=argv[0], argv=argv, started_at="2026-10-03T10:00:00+00:00")
+
 
 class SimCpuRamProvider(TelemetryProvider):
     name = "cpu"
@@ -192,7 +214,9 @@ def _gpu(i: int, **kw) -> SimGpuSpec:
     return SimGpuSpec(**{**base, **kw})
 
 
-def build_profile(profile: str, clock: Clock = time.time) -> tuple[HostInfo, list[TelemetryProvider]]:
+def build_profile(
+    profile: str, clock: Clock = time.time
+) -> tuple[HostInfo, list[TelemetryProvider], SimProcessSource]:
     if profile not in PROFILES:
         raise ValueError(f"Perfil desconocido: {profile} (válidos: {', '.join(PROFILES)})")
     host = HostInfo(
@@ -203,7 +227,8 @@ def build_profile(profile: str, clock: Clock = time.time) -> tuple[HostInfo, lis
     )
     cpu = SimCpuRamProvider(host.host_id, total_mib=32768.0, clock=clock)
     if profile == "cpu-only":
-        return host, [NullProvider(), cpu]
+        procs = [_server(4100, 8081, "sim-3b-Q4_K_M.gguf", "-ngl", "0", "-c", "4096", "-t", "8")]
+        return host, [NullProvider(), cpu], SimProcessSource(procs)
     if profile == "nvidia2":
         gpus = [
             _gpu(
@@ -218,6 +243,7 @@ def build_profile(profile: str, clock: Clock = time.time) -> tuple[HostInfo, lis
                 clock_max_mhz=1800,
                 model_vram_mib=6200,
                 driver_model="WDDM",
+                server_pid=4201,
             ),
             _gpu(
                 1,
@@ -233,6 +259,23 @@ def build_profile(profile: str, clock: Clock = time.time) -> tuple[HostInfo, lis
                 model_vram_mib=17500,
                 driver_model="TCC",
                 phase=7.0,
+                server_pid=4202,
+            ),
+        ]
+        procs = [
+            _server(4201, 8081, "sim-8b-Q4_K_M.gguf", "-ngl", "99", "-c", "8192", "-fa", "on", "-np", "2"),
+            _server(
+                4202,
+                8082,
+                "sim-32b-Q4_K_M.gguf",
+                "-ngl",
+                "99",
+                "-c",
+                "16384",
+                "-ctk",
+                "q8_0",
+                "--api-key",
+                "x",
             ),
         ]
     else:  # partial
@@ -253,6 +296,10 @@ def build_profile(profile: str, clock: Clock = time.time) -> tuple[HostInfo, lis
                 has_power=False,
                 has_throttle=False,
                 model_vram_mib=4000,
+                server_pid=4301,
             )
         ]
-    return host, [SimGpuProvider(gpus, clock=clock), cpu]
+        procs = [
+            _server(4301, 8081, "sim-7b-Q5_K_M.gguf", "-ngl", "24", "-c", "4096", "--jinja", "--rara", "1")
+        ]
+    return host, [SimGpuProvider(gpus, clock=clock), cpu], SimProcessSource(procs)
