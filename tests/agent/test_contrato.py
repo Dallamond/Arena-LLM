@@ -161,8 +161,8 @@ def test_contrato_servers(profile):
             assert use.device_id in gpu_ids
     if profile == "nvidia2":
         assert [(s.port, s.model_file, s.flags["ngl"]) for s in body["servers"]] == [
-            (8081, "sim-8b-Q4_K_M.gguf", 99),
-            (8082, "sim-32b-Q4_K_M.gguf", 99),
+            (18081, "sim-8b-Q4_K_M.gguf", 99),
+            (18082, "sim-32b-Q4_K_M.gguf", 99),
         ]
         assert all(s.gpu_link == "compute-apps" for s in body["servers"])
         assert len({s.devices[0].device_id for s in body["servers"]}) == 2

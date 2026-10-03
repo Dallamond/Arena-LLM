@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { Point } from "../api/live";
+import { live, type Point } from "../api/live";
 import type { DeviceInfo, GpuSample } from "../api/types";
 import { deviceColor, shortName } from "../lib/devices";
 import { fmt, gibPair, throttleReasons } from "../lib/format";
@@ -20,8 +20,8 @@ const props = defineProps<{
 }>();
 
 const color = computed(() => deviceColor(props.device));
-const health = computed(() => gpuHealth(props.device, props.sample));
-const limits = computed(() => thresholdsFor(props.device));
+const health = computed(() => gpuHealth(props.device, props.sample, live.thresholds));
+const limits = computed(() => thresholdsFor(props.device, live.thresholds));
 const s = computed(() => props.sample);
 const memTotal = computed(() => s.value?.mem_total_mib ?? props.device.memory_total_mib);
 const throttling = computed(() => throttleReasons(s.value?.throttle));

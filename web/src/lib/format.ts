@@ -53,3 +53,29 @@ export function throttleReasons(list: string[] | null | undefined): string[] {
   if (!list) return [];
   return list.filter((r) => r in THROTTLE_LABELS).map((r) => THROTTLE_LABELS[r]);
 }
+
+/** "03/10 20:31" (o con segundos). */
+export function fmtDate(epoch: number | null | undefined, seconds = false): string {
+  if (!isNum(epoch)) return NO_DATA;
+  const d = new Date(epoch * 1000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}${seconds ? ":" + p(d.getSeconds()) : ""}`;
+}
+
+/** "2 min 05 s", "45 s", "1 h 02 min". */
+export function fmtDuration(s: number | null | undefined): string {
+  if (!isNum(s)) return NO_DATA;
+  const t = Math.max(0, Math.round(s));
+  if (t < 60) return `${t} s`;
+  if (t < 3600) return `${Math.floor(t / 60)} min ${String(t % 60).padStart(2, "0")} s`;
+  return `${Math.floor(t / 3600)} h ${String(Math.floor((t % 3600) / 60)).padStart(2, "0")} min`;
+}
+
+export const RUN_STATUS: Record<string, { text: string; tone: "info" | "warn" | "crit" | "dim"; icon: string }> = {
+  pending: { text: "en cola", tone: "dim", icon: "◌" },
+  running: { text: "en marcha", tone: "info", icon: "▶" },
+  done: { text: "terminado", tone: "info", icon: "●" },
+  error: { text: "error", tone: "crit", icon: "✕" },
+  aborted: { text: "abortado", tone: "crit", icon: "✕" },
+  cancelled: { text: "detenido", tone: "warn", icon: "■" },
+};

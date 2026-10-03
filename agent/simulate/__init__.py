@@ -225,7 +225,7 @@ def build_profile(profile: str, clock: Clock = time.time) -> tuple[HostInfo, lis
     )
     cpu = SimCpuRamProvider(host.host_id, total_mib=32768.0, clock=clock)
     if profile == "cpu-only":
-        procs = [_server(4100, 8081, "sim-3b-Q4_K_M.gguf", "-ngl", "0", "-c", "4096", "-t", "8")]
+        procs = [_server(4100, 18081, "sim-3b-Q4_K_M.gguf", "-ngl", "0", "-c", "4096", "-t", "8")]
         return host, [NullProvider(), cpu], SimProcessSource(procs)
     if profile == "nvidia2":
         gpus = [
@@ -263,10 +263,10 @@ def build_profile(profile: str, clock: Clock = time.time) -> tuple[HostInfo, lis
             ),
         ]
         procs = [
-            _server(4201, 8081, "sim-8b-Q4_K_M.gguf", "-ngl", "99", "-c", "8192", "-fa", "on", "-np", "2"),
+            _server(4201, 18081, "sim-8b-Q4_K_M.gguf", "-ngl", "99", "-c", "8192", "-fa", "on", "-np", "2"),
             _server(
                 4202,
-                8082,
+                18082,
                 "sim-32b-Q4_K_M.gguf",
                 "-ngl",
                 "99",
@@ -300,5 +300,5 @@ def build_profile(profile: str, clock: Clock = time.time) -> tuple[HostInfo, lis
                 server_pid=4301,
             )
         ]
-        procs = [_server(4301, 8081, "sim-7b-Q5_K_M.gguf", "-ngl", "24", "-c", "4096", "--jinja", "--rara", "1")]
+        procs = [_server(4301, 18081, "sim-7b-Q5_K_M.gguf", "-ngl", "24", "-c", "4096", "--jinja", "--rara", "1")]
     return host, [SimGpuProvider(gpus, clock=clock), cpu], SimProcessSource(procs)

@@ -7,7 +7,9 @@ import "./styles/tokens.css";
 import "./styles/base.css";
 import App from "./App.vue";
 import { connect } from "./api/live";
+import { initAppearance } from "./lib/appearance";
 import { router } from "./router";
 
+initAppearance();
 connect();
 createApp(App).use(router).mount("#app");

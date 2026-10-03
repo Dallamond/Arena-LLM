@@ -90,6 +90,9 @@ def test_servidor_cargando(lab):
     r = c.post("/api/runs", json={"suite": "libre", "endpoint_id": ep["id"], "params": {}})
     assert r.status_code == 409 and "no está listo" in r.json()["detail"]
     endpoint_ready(c)
+    time.sleep(0.6)
+    # Detectado mientras cargaba: al quedar listo se registra "listo", no un cambio falso
+    assert [ch["kind"] for ch in reversed(c.get("/api/changes").json())] == ["nuevo", "listo"]
 
 
 def test_run_libre_guarda_todo(lab):

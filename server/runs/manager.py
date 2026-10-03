@@ -18,6 +18,7 @@ from server.db import Database
 from server.hub import EventHub
 from server.runs import stats
 from server.runs.llm import ChatResult, stream_chat
+from server.runs.stats import CUT_MSG
 from server.runs.suites import SUITES, Suite, payload_for
 from server.thresholds import thresholds_for
 
@@ -173,7 +174,8 @@ class RunManager:
 
     async def _sleep_phase(self, ar: ActiveRun, phase: str, seconds: float) -> None:
         ar.phase = phase
-        self._boundary_sample(ar)
+        if phase == "reposo":
+            self._boundary_sample(ar)  # lectura inicial en reposo
         self._publish_live(ar)
         if seconds > 0 and not ar.stop.is_set():
             try:
@@ -188,7 +190,6 @@ class RunManager:
             await self._sleep_phase(ar, "reposo", float(ar.params.get("baseline_s") or 0))
             if not ar.stop.is_set():
                 ar.phase = "carga"
-                self._boundary_sample(ar)
                 ar.load_start = time.time()
                 ticker = asyncio.create_task(self._ticker(ar))
                 if ar.suite.mode == "items":
@@ -292,7 +293,7 @@ class RunManager:
                 self.client, ar.endpoint["base_url"], payload, on_text, float(ar.params["timeout_s"])
             )
         except asyncio.CancelledError:
-            self._save_item(ar, idx, name, prompt, None, started, "Cortada al terminar o abortar la prueba")
+            self._save_item(ar, idx, name, prompt, None, started, CUT_MSG)
             raise
         self._save_item(ar, idx, name, prompt, result, started, result.error)
 
@@ -308,7 +309,7 @@ class RunManager:
     ) -> None:
         metrics = res.metrics() if res else {}
         ar.requests_done += 1
-        if error:
+        if error and error != CUT_MSG:
             ar.requests_error += 1
         self.db.add_item(
             ar.id,

@@ -31,7 +31,7 @@ const warnings = computed(() => {
   if (host.value?.status !== "online") return 0; // con datos viejos no se avisa de nada
   const snap = currentSnapshot.value;
   return gpus(host.value).filter((d) => {
-    const lvl = gpuHealth(d, gpuSample(snap, d.device_id)).level;
+    const lvl = gpuHealth(d, gpuSample(snap, d.device_id), live.thresholds).level;
     return lvl === "warn" || lvl === "crit";
   }).length;
 });

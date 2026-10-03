@@ -13,6 +13,9 @@ from typing import Any
 #: (potencia y térmico; no reposo ni ajustes de aplicación). Igual que agent/throttle.py.
 THROTTLING_BITS = 0x004 | 0x008 | 0x020 | 0x040 | 0x080
 DEGRADATION_MIN_S = 30.0
+#: Error con el que se guarda una petición cortada al acabar el tiempo o al abortar.
+#: No cuenta como error ni entra en las estadísticas de velocidad.
+CUT_MSG = "Cortada al terminar o abortar la prueba"
 DEGRADATION_FRACTION = 0.2
 
 
@@ -106,6 +109,7 @@ def device_summary(samples: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "clock_sm_min_mhz": min(clocks) if clocks else None,
         "throttle_pct": throttle_pct(s["data"].get("throttle_mask") for s in load),
         "cpu_util_mean_pct": statistics.fmean(vals(load, "util_pct")) if vals(load, "util_pct") else None,
+        "ram_used_peak_mib": max(vals(load + base, "used_mib")) if vals(load + base, "used_mib") else None,
         "n_samples": len(load),
     }
 
@@ -117,6 +121,7 @@ def run_summary(
     load_window: tuple[float | None, float | None],
 ) -> dict[str, Any]:
     ok = [i for i in items if not i.get("error")]
+    cut = [i for i in items if i.get("error") == CUT_MSG]
     m = [i.get("metrics") or {} for i in ok]
     tokens = sum(int(x.get("completion_tokens") or 0) for x in m)
     by_dev: dict[str, list[dict[str, Any]]] = {}
@@ -131,7 +136,8 @@ def run_summary(
     return {
         "requests": len(items),
         "requests_ok": len(ok),
-        "requests_error": len(items) - len(ok),
+        "requests_error": len(items) - len(ok) - len(cut),
+        "requests_cut": len(cut),
         "completion_tokens": tokens,
         "prompt_tokens": sum(int(x.get("prompt_tokens") or 0) for x in m),
         "duration_s": (t1 - t0) if t0 is not None and t1 is not None else None,

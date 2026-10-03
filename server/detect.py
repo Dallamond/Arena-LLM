@@ -212,19 +212,33 @@ class EndpointDetector:
                 "detected_at": time.time(),
             }
             prev = next((e for e in self.db.list_endpoints(state.pk) if e["base_url"] == base), None)
-            # Mientras carga, /props no está: no se compara para no registrar cambios falsos
-            fp = fingerprint(snapshot) if probe["status"] == "listo" or prev is None else prev["fingerprint"]
-            ep, change = self.db.upsert_endpoint(state.pk, base, "llama.cpp", probe["status"], fp, snapshot)
+            prev_snap = (prev["snapshot"] if prev else None) or {}
+            ready = probe["status"] == "listo"
+            # Solo una configuración completa (servidor listo, con /props) cuenta: mientras carga
+            # se conserva la última configuración lista para no registrar cambios falsos.
+            last_ready = prev_snap.get("last_ready")
+            if ready:
+                snapshot["last_ready"] = config_view(snapshot)
+                fp = fingerprint(snapshot)
+            else:
+                snapshot["last_ready"] = last_ready
+                fp = prev["fingerprint"] if prev else None
+            ep, change = self.db.upsert_endpoint(state.pk, base, "llama.cpp", probe["status"], fp or "", snapshot)
             seen.add(ep["id"])
-            prev_snap = prev["snapshot"] if prev else None
             if change == "nuevo":
                 self._change(ep, "nuevo", None, snapshot)
-            elif change == "cambio" and probe["status"] == "listo":
-                self._change(ep, "cambio", diff_config(prev_snap, snapshot), snapshot)
             elif prev_snap and prev_snap.get("pid") != snapshot["pid"]:
                 self._change(ep, "reinicio", {"pid": [prev_snap.get("pid"), snapshot["pid"]]}, snapshot)
             elif prev and prev["status"] == "detenido":
                 self._change(ep, "vuelve", None, snapshot)
+            if ready and change != "nuevo":
+                if last_ready is None and prev and prev["status"] != "listo":
+                    self._change(ep, "listo", None, snapshot)  # terminó de cargar por primera vez
+                elif last_ready is not None:
+                    a, b = last_ready, snapshot["last_ready"]
+                    diff = {k: [a.get(k), b.get(k)] for k in sorted(set(a) | set(b)) if a.get(k) != b.get(k)}
+                    if diff:
+                        self._change(ep, "cambio", diff, snapshot)
             out.append(ep)
         for ep in self.db.list_endpoints(state.pk):
             if ep["id"] not in seen and ep["status"] != "detenido":

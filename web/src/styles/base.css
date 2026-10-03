@@ -10,6 +10,10 @@ body {
   min-height: 100%;
 }
 
+#app {
+  zoom: var(--zoom);
+}
+
 body {
   background-color: var(--bg);
   /* Rejilla de plano: menor 16 px, mayor 80 px */
@@ -47,6 +51,11 @@ select,
 input {
   font: inherit;
   color: inherit;
+}
+
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: var(--accent);
 }
 
 :focus-visible {
@@ -103,7 +112,8 @@ input {
   filter: url(#sketch);
 }
 
-:root[data-sketch="off"] .sketch {
+:root[data-sketch="off"] .sketch,
+:root[data-contrast="alto"] .sketch {
   filter: none;
 }
 

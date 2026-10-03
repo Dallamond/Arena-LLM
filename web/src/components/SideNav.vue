@@ -95,7 +95,7 @@ const snap = currentSnapshot;
   background: var(--panel);
   position: sticky;
   top: var(--topbar-h);
-  height: calc(100vh - var(--topbar-h));
+  height: calc(100vh / var(--zoom) - var(--topbar-h));
 }
 .nav--collapsed {
   width: var(--nav-w-collapsed);

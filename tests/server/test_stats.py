@@ -96,3 +96,18 @@ def test_resumen_de_run():
 def test_resumen_sin_telemetria_no_inventa_energia():
     s = stats.run_summary([{"metrics": {"completion_tokens": 10}}], [], [], (None, None))
     assert s["energy_wh"] is None and s["tokens_per_wh"] is None and s["duration_s"] is None
+
+
+def test_peticion_cortada_no_es_error():
+    items = [
+        {"metrics": {"completion_tokens": 50, "tps_client": 30.0}},
+        {"metrics": {}, "error": stats.CUT_MSG},
+    ]
+    s = stats.run_summary(items, [], [], (0.0, 10.0))
+    assert (s["requests_ok"], s["requests_error"], s["requests_cut"]) == (1, 0, 1)
+    assert s["tps_client"]["n"] == 1
+
+
+def test_pico_de_ram():
+    rows = [{"t": float(t), "phase": "carga", "data": {"used_mib": 1000 + t}} for t in range(5)]
+    assert stats.device_summary(rows)["ram_used_peak_mib"] == 1004

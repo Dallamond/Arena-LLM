@@ -117,3 +117,208 @@ export interface ServersResponse {
   errors: Record<string, string>;
   detected_at: number;
 }
+
+// --- Servidores detectados (F3) ---------------------------------------------
+
+export interface EndpointSnapshot {
+  engine: string | null;
+  base_url: string;
+  pid: number | null;
+  started_at: string | null;
+  exe: string | null;
+  argv: string[] | null;
+  flags: Record<string, unknown>;
+  unknown: Record<string, unknown>;
+  model_path: string | null;
+  model_file: string | null;
+  port_source: string | null;
+  devices: ProcessGpuUse[];
+  gpu_link: string | null;
+  status: string;
+  props: Record<string, unknown> | null;
+  slots: unknown;
+  models: unknown;
+  derived: {
+    model_path: string | null;
+    model_alias: string | null;
+    model_ftype: string | null;
+    build_info: string | null;
+    n_ctx_slot: number | null;
+    total_slots: number | null;
+    n_ctx_total: number | null;
+    slots_busy: number | null;
+    chat_template_sha: string | null;
+    modalities: Record<string, boolean> | null;
+  };
+  detected_at: number;
+}
+
+export interface Endpoint {
+  id: number;
+  host_pk: number;
+  base_url: string;
+  alias: string | null;
+  engine: string | null;
+  status: "listo" | "cargando" | "sin respuesta" | "detenido" | string;
+  fingerprint: string | null;
+  snapshot: EndpointSnapshot | null;
+  first_seen_at: number;
+  last_seen_at: number;
+}
+
+export interface ConfigChange {
+  id: number;
+  endpoint_id: number;
+  t: number;
+  kind: "nuevo" | "cambio" | "reinicio" | "detenido" | "vuelve" | string;
+  diff: Record<string, [unknown, unknown]> | null;
+  base_url?: string;
+}
+
+// --- Pruebas (F4–F5) ----------------------------------------------------------
+
+export interface Suite {
+  id: string;
+  name: string;
+  version: string;
+  mode: "items" | "duration";
+  description: string;
+  defaults: Record<string, unknown>;
+  prompts: string[];
+}
+
+export type RunStatus = "pending" | "running" | "done" | "error" | "aborted" | "cancelled";
+
+export interface Stat {
+  n: number;
+  mean: number | null;
+  median: number | null;
+  p10: number | null;
+  min: number | null;
+  max: number | null;
+  std: number | null;
+}
+
+export interface DeviceRunSummary {
+  temp_idle_c: number | null;
+  temp_mean_c: number | null;
+  temp_max_c: number | null;
+  temp_rise_c: number | null;
+  power_idle_w: number | null;
+  power_mean_w: number | null;
+  power_max_w: number | null;
+  energy_wh: number | null;
+  util_mean_pct: number | null;
+  vram_peak_mib: number | null;
+  clock_sm_mean_mhz: number | null;
+  clock_sm_min_mhz: number | null;
+  throttle_pct: number | null;
+  cpu_util_mean_pct: number | null;
+  ram_used_peak_mib?: number | null;
+  n_samples: number;
+}
+
+export interface RunSummary {
+  requests: number;
+  requests_ok: number;
+  requests_error: number;
+  requests_cut: number;
+  completion_tokens: number;
+  prompt_tokens: number;
+  duration_s: number | null;
+  tps_client: Stat;
+  tps_server: Stat;
+  pp_server: Stat;
+  ttft_s: Stat;
+  latency_s: Stat;
+  tps_aggregate: Stat;
+  degradation_pct: number | null;
+  energy_wh: number | null;
+  tokens_per_wh: number | null;
+  wh_per_1000_tokens: number | null;
+  devices: Record<string, DeviceRunSummary>;
+  thresholds: Record<string, { name: string | null; warn: number; crit: number; source: string }>;
+  phases: { load_start: number | null; load_end: number | null };
+}
+
+export interface Run {
+  id: number;
+  kind: string;
+  suite: string;
+  suite_version: string | null;
+  suite_hash?: string | null;
+  label: string | null;
+  status: RunStatus;
+  host_pk: number | null;
+  endpoint_id: number | null;
+  params: Record<string, unknown> | null;
+  created_at: number;
+  started_at: number | null;
+  finished_at: number | null;
+  summary: RunSummary | null;
+  error: string | null;
+  abort_reason: string | null;
+  notes?: string | null;
+  tags?: string[] | null;
+}
+
+export interface RunItem {
+  id: number;
+  idx: number;
+  name: string | null;
+  prompt: string | null;
+  response: string | null;
+  reasoning: string | null;
+  metrics: Record<string, number | string | null> | null;
+  error: string | null;
+  started_at: number | null;
+  finished_at: number | null;
+}
+
+export interface Sample {
+  t: number;
+  phase: "reposo" | "carga" | "enfriamiento" | string;
+  device_id: string;
+  data: Record<string, unknown>;
+}
+
+export interface TpsPoint {
+  t: number;
+  tokens: number;
+  tps: number;
+}
+
+export interface RunDetail extends Run {
+  servers_snapshot: EndpointSnapshot | null;
+  host_snapshot: (HostState & { thresholds: RunSummary["thresholds"] }) | null;
+  items: RunItem[];
+  tps: TpsPoint[];
+  samples: Sample[];
+}
+
+export interface RunLive {
+  run: number;
+  phase: string;
+  t: number;
+  elapsed_s: number;
+  load_elapsed_s: number | null;
+  tokens: number;
+  requests_done: number;
+  requests_error: number;
+  max_temp: Record<string, number>;
+  abort_reason: string | null;
+  tps?: number;
+  text?: string;
+}
+
+// --- Ajustes -------------------------------------------------------------------
+
+export interface Appearance {
+  accent: string;
+  contrast: "normal" | "alto";
+  scale: number;
+  sketch: boolean;
+  grid: "normal" | "tenue" | "off";
+}
+
+export type ThresholdOverrides = Record<string, { warn?: number; crit?: number }>;

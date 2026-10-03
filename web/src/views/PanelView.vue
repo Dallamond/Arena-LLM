@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { cpu, cpuSample, currentHost, currentSnapshot, gpus, gpuSample, staleness } from "../api/live";
+import { cpu, cpuSample, currentHost, currentSnapshot, gpus, gpuSample, live, staleness } from "../api/live";
 import type { DetectedServer, ServersResponse } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import RadialGauge from "../components/RadialGauge.vue";
@@ -137,14 +137,14 @@ const expanded = ref<Record<number, boolean>>({});
                   label="Temperatura"
                   :value="
                     isNum(gpuSample(snap, d.device_id)?.temp_c)
-                      ? (gpuSample(snap, d.device_id)!.temp_c as number) / thresholdsFor(d).crit
+                      ? (gpuSample(snap, d.device_id)!.temp_c as number) / thresholdsFor(d, live.thresholds).crit
                       : null
                   "
                   :readout="fmt(gpuSample(snap, d.device_id)?.temp_c, 0, '°C')"
                   :sub="fmt(gpuSample(snap, d.device_id)?.power_w, 0, 'W')"
-                  :tag="`crítico ${thresholdsFor(d).crit} °C`"
+                  :tag="`crítico ${thresholdsFor(d, live.thresholds).crit} °C`"
                   :color="deviceColor(d)"
-                  :level="gpuHealth(d, gpuSample(snap, d.device_id)).level"
+                  :level="gpuHealth(d, gpuSample(snap, d.device_id), live.thresholds).level"
                 />
                 <RadialGauge
                   label="Uso GPU"

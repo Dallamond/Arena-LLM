@@ -77,7 +77,7 @@ def test_agente_simulado_en_linea_con_colores_estables(tmp_path, agents):
         m = c.get(f"/api/hosts/{h['id']}/metrics").json()
         assert set(m["snapshot"]["devices"]) == {d["device_id"] for d in h["devices"]}
         servers = c.get(f"/api/hosts/{h['id']}/servers").json()["servers"]
-        assert [s["port"] for s in servers] == [8081, 8082]
+        assert [s["port"] for s in servers] == [18081, 18082]
         before = {d["device_id"]: d["color_index"] for d in gpus}
 
     # Reinicio con la misma base de datos y un segundo equipo: los colores no cambian

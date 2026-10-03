@@ -28,7 +28,7 @@ import TopBar from "./components/TopBar.vue";
 <style scoped>
 .layout {
   display: flex;
-  min-height: calc(100vh - var(--topbar-h));
+  min-height: calc(100vh / var(--zoom) - var(--topbar-h));
 }
 .content {
   flex: 1;

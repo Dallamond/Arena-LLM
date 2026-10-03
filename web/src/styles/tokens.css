@@ -35,3 +35,31 @@
   --nav-w-collapsed: 56px;
   --topbar-h: 48px;
 }
+
+/* --- Apariencia configurable (Ajustes → Apariencia) --- */
+:root {
+  --zoom: 1;
+  --accent-soft: #2b4d6e;
+}
+
+/* Contraste alto: textos secundarios y líneas más claros, bordes más visibles */
+:root[data-contrast="alto"] {
+  --ink: #ffffff;
+  --ink-dim: #c9d7ee;
+  --ink-faint: #a9bcd9;
+  --line: #4672ad;
+  --line-strong: #8cb6f0;
+  --panel: #0c1524;
+  --grid-minor: rgba(110, 160, 255, 0.04);
+  --grid-major: rgba(110, 160, 255, 0.08);
+}
+
+:root[data-grid="tenue"] {
+  --grid-minor: rgba(110, 160, 255, 0.025);
+  --grid-major: rgba(110, 160, 255, 0.06);
+}
+
+:root[data-grid="off"] {
+  --grid-minor: transparent;
+  --grid-major: transparent;
+}

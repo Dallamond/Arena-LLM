@@ -1,24 +1,24 @@
 import { createRouter, createWebHistory } from "vue-router";
+import HistoryView from "./views/HistoryView.vue";
 import PanelView from "./views/PanelView.vue";
 import PlaceholderView from "./views/PlaceholderView.vue";
+import QualityView from "./views/QualityView.vue";
+import RunView from "./views/RunView.vue";
+import ServersView from "./views/ServersView.vue";
+import SettingsView from "./views/SettingsView.vue";
 
 export interface NavItem {
   path: string;
   label: string;
   icon: string;
-  phase?: string; // fase de la hoja de ruta en la que llega la pantalla
+  phase?: string; // fase de la hoja de ruta en la que llega la pantalla (si aún no está)
   summary?: string;
 }
 
 export const NAV: NavItem[] = [
   { path: "/", label: "Panel", icon: "panel" },
-  {
-    path: "/servidores",
-    label: "Servidores",
-    icon: "servers",
-    phase: "F3",
-    summary: "Servidores llama-server detectados con todos sus flags, GGUF en disco y calculadora de encaje.",
-  },
+  { path: "/servidores", label: "Servidores", icon: "servers" },
+  { path: "/calidad", label: "Calidad", icon: "quality" },
   {
     path: "/rendimiento",
     label: "Rendimiento",
@@ -27,26 +27,13 @@ export const NAV: NavItem[] = [
     summary: "llama-bench por componente: solo GPU, solo CPU/RAM, híbrido (curva de la RAM) y reparto entre GPUs.",
   },
   {
-    path: "/calidad",
-    label: "Calidad",
-    icon: "quality",
-    phase: "F7",
-    summary: "Razonamiento, código con ejecución aislada, contexto largo, concurrencia y estrés.",
-  },
-  {
     path: "/batalla",
     label: "Batalla",
     icon: "battle",
     phase: "F8",
     summary: "El mismo prompt en dos o más lados con parámetros editables y telemetría por GPU.",
   },
-  {
-    path: "/historial",
-    label: "Historial",
-    icon: "history",
-    phase: "F9",
-    summary: "Todos los runs guardados, filtrables, con etiquetas, notas y paquetes de resultados.",
-  },
+  { path: "/historial", label: "Historial", icon: "history" },
   {
     path: "/comparar",
     label: "Comparar",
@@ -54,32 +41,26 @@ export const NAV: NavItem[] = [
     phase: "F9",
     summary: "Veredictos, gráficas superpuestas, diff de configuración e insignia de comparabilidad.",
   },
-  {
-    path: "/registros",
-    label: "Registros",
-    icon: "logs",
-    phase: "F4",
-    summary: "Eventos del agente y del servidor: cambios de configuración, errores y abortos.",
-  },
-  {
-    path: "/ajustes",
-    label: "Ajustes",
-    icon: "settings",
-    phase: "F3",
-    summary: "Equipos, servidores, umbrales por dispositivo, carpeta de modelos, apariencia y datos.",
-  },
+  { path: "/ajustes", label: "Ajustes", icon: "settings" },
 ];
+
+const placeholders = NAV.filter((n) => n.phase).map((n) => ({
+  path: n.path,
+  component: PlaceholderView,
+  props: { item: n },
+  meta: { title: n.label },
+}));
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/", component: PanelView, meta: { title: "Panel" } },
-    ...NAV.filter((n) => n.path !== "/").map((n) => ({
-      path: n.path,
-      component: PlaceholderView,
-      props: { item: n },
-      meta: { title: n.label },
-    })),
+    { path: "/servidores", component: ServersView, meta: { title: "Servidores" } },
+    { path: "/calidad", component: QualityView, meta: { title: "Calidad" } },
+    { path: "/historial", component: HistoryView, meta: { title: "Historial" } },
+    { path: "/pruebas/:id", component: RunView, props: true, meta: { title: "Prueba" } },
+    { path: "/ajustes/:section?", component: SettingsView, meta: { title: "Ajustes" } },
+    ...placeholders,
     { path: "/:pathMatch(.*)*", redirect: "/" },
   ],
 });

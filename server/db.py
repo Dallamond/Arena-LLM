@@ -112,6 +112,25 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX tps_run ON tps_series(run_id, t);
     """,
+    # 3 — un servidor se identifica por equipo + URL (dos equipos pueden usar el mismo puerto local)
+    """
+    CREATE TABLE endpoints_v3 (
+        id INTEGER PRIMARY KEY,
+        host_pk INTEGER NOT NULL,
+        base_url TEXT NOT NULL,
+        alias TEXT,
+        engine TEXT,
+        status TEXT,
+        fingerprint TEXT,
+        snapshot TEXT,
+        first_seen_at REAL NOT NULL,
+        last_seen_at REAL NOT NULL,
+        UNIQUE(host_pk, base_url)
+    );
+    INSERT INTO endpoints_v3 SELECT * FROM endpoints;
+    DROP TABLE endpoints;
+    ALTER TABLE endpoints_v3 RENAME TO endpoints;
+    """,
 ]
 
 #: Tamaño de la paleta de dispositivos de la GUI (--dev-1 … --dev-N).
@@ -266,7 +285,9 @@ class Database:
         """Guarda la detección. Devuelve (endpoint, tipo de cambio: 'nuevo' | 'cambio' | None)."""
         now = time.time()
         with self.lock:
-            row = self.conn.execute("SELECT * FROM endpoints WHERE base_url=?", (base_url,)).fetchone()
+            row = self.conn.execute(
+                "SELECT * FROM endpoints WHERE host_pk=? AND base_url=?", (host_pk, base_url)
+            ).fetchone()
             if row is None:
                 cur = self.conn.execute(
                     "INSERT INTO endpoints(host_pk, base_url, engine, status, fingerprint, snapshot,"
