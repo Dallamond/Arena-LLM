@@ -216,12 +216,17 @@ def fit(est: dict[str, Any], gpus: list[dict[str, Any]], ram_free_mib: float | N
     elif not ram_ok:
         out.update(verdict="no", label="No cabe")
     elif k == 0:
-        out.update(verdict="cpu", label=f"Solo CPU · necesita {ram_need / 1024**3:.1f} GiB de RAM")
+        out.update(verdict="cpu", label=f"Solo CPU · necesita {_gib(ram_need)} GiB de RAM")
     else:
-        out.update(verdict="ram", label=f"Necesita {ram_need / 1024**3:.1f} GiB de RAM")
+        out.update(verdict="ram", label=f"Necesita {_gib(ram_need)} GiB de RAM")
     if out["verdict"] != "gpu" and any(g["fits_if_empty"] for g in per_gpu):
         out["hint"] = "Cabría en una GPU vacía: ahora hay memoria ocupada (¿otro servidor cargado?)."
     return out
+
+
+def _gib(n: float) -> str:
+    """GiB con coma decimal, como el resto de la interfaz."""
+    return f"{n / 1024**3:.1f}".replace(".", ",")
 
 
 def gpus_from_state(info: dict[str, Any] | None, metrics: dict[str, Any] | None) -> list[dict[str, Any]]:
