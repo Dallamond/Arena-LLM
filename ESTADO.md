@@ -75,7 +75,7 @@ Después: **Calidad** → elegir servidor → Lanzar estrés o prompt libre.
   - Vista de run en vivo con gráficas y resultado completo.
   - Historial básico.
   - Ajustes: apariencia (acento, contraste, tamaño, rejilla, croquis), equipos, umbrales y datos.
-- **Tests:** 132 de Python (incluye un laboratorio completo sin GPU: llama-server simulado + agente simulado + servidor) y 10 de la web.
+- **Tests:** 129 de Python (incluye un laboratorio completo sin GPU: llama-server simulado + agente simulado + servidor) y 10 de la web.
 
 ## Pendiente (orden propuesto)
 
