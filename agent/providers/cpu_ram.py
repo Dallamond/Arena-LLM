@@ -177,9 +177,7 @@ class _WindowsBackend:
         rel_off = ptr
         count = 0
         for off in range(0, length.value - entry + 1, entry):
-            if (
-                int.from_bytes(buf.raw[off + rel_off : off + rel_off + 4], "little") == 0
-            ):  # RelationProcessorCore
+            if int.from_bytes(buf.raw[off + rel_off : off + rel_off + 4], "little") == 0:  # RelationProcessorCore
                 count += 1
         return count or None
 

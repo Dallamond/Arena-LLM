@@ -34,9 +34,7 @@ def main(argv: list[str] | None = None) -> int:
         poll_interval_s=args.poll,
     )
     if not (settings.web_dist / "index.html").exists():
-        logging.warning(
-            "No hay web compilada en %s: solo API (usa `npm run dev --prefix web`)", settings.web_dist
-        )
+        logging.warning("No hay web compilada en %s: solo API (usa `npm run dev --prefix web`)", settings.web_dist)
     logging.info("Arena LLM en http://%s:%s · datos en %s", settings.host, settings.port, settings.data_dir)
     uvicorn.run(create_app(settings), host=settings.host, port=settings.port, log_level="warning")
     return 0

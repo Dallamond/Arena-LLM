@@ -8,6 +8,7 @@ con su color estable y publica los cambios en el `EventHub`.
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -96,15 +97,15 @@ class AgentMonitor:
         self.info_s = info_s
         self.states: dict[int, HostState] = {}
         self.tasks: dict[int, asyncio.Task] = {}
+        #: Funciones llamadas con cada muestra buena (p. ej. el gestor de runs)
+        self.listeners: list[Callable[[HostState, dict[str, Any]], None]] = []
 
     def start_all(self) -> None:
         for h in self.db.list_hosts():
             self.start(h)
 
     def start(self, host: dict[str, Any]) -> HostState:
-        state = HostState(
-            pk=host["id"], agent_url=host["agent_url"], name=host.get("name"), token=host.get("token")
-        )
+        state = HostState(pk=host["id"], agent_url=host["agent_url"], name=host.get("name"), token=host.get("token"))
         if host.get("info"):  # última ficha conocida: la GUI muestra algo mientras conecta
             state.info = host["info"]
             state.colors = self.db.upsert_devices(
@@ -154,6 +155,11 @@ class AgentMonitor:
         state.last_ok = time.time()
         self._set_status(state, "online", None)
         self.hub.publish("metrics", {"host": state.pk, "snapshot": snap})
+        for listener in self.listeners:
+            try:
+                listener(state, snap)
+            except Exception:
+                log.exception("Listener de métricas falló")
 
     async def _loop(self, state: HostState) -> None:
         while True:

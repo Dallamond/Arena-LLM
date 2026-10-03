@@ -24,9 +24,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p.add_argument("--interval", type=float, default=1.0, help="intervalo de muestreo en segundos")
     p.add_argument("--config", help="fichero JSON de configuración del agente")
-    p.add_argument(
-        "--models-dir", action="append", default=[], help="carpeta de modelos GGUF permitida (repetible)"
-    )
+    p.add_argument("--models-dir", action="append", default=[], help="carpeta de modelos GGUF permitida (repetible)")
     p.add_argument("--simulate", choices=PROFILES, help="usar un perfil de hardware simulado")
     p.add_argument("-v", "--verbose", action="store_true")
     p.add_argument("--version", action="version", version=f"Agente Arena {__version__}")
@@ -74,9 +72,7 @@ def main(argv: list[str] | None = None) -> int:
 
     sampler.start()
     host, port = server.server_address[:2]
-    logging.info(
-        "Agente Arena %s en http://%s:%s (token: %s)", __version__, host, port, "sí" if token else "no"
-    )
+    logging.info("Agente Arena %s en http://%s:%s (token: %s)", __version__, host, port, "sí" if token else "no")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

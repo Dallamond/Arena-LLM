@@ -16,10 +16,28 @@ from pydantic import BaseModel, field_validator
 from server import __version__
 from server.agents import AgentError, AgentMonitor
 from server.db import Database
+from server.detect import EndpointDetector
 from server.hub import EventHub, sse_format
+from server.runs.manager import RunError, RunManager, _run_public
+from server.runs.suites import SUITES
 from server.settings import Settings
 
 SSE_HEARTBEAT_S = 15.0
+
+
+class RunIn(BaseModel):
+    suite: str
+    endpoint_id: int
+    label: str | None = None
+    params: dict[str, Any] = {}
+
+
+class AliasIn(BaseModel):
+    alias: str | None = None
+
+
+#: Claves de ajustes que acepta la API (el resto se rechaza).
+SETTINGS_KEYS = {"appearance", "thresholds"}
 
 
 class HostIn(BaseModel):
@@ -37,9 +55,7 @@ class HostIn(BaseModel):
         return v
 
 
-def create_app(
-    settings: Settings | None = None, transport: httpx.AsyncBaseTransport | None = None
-) -> FastAPI:
+def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTransport | None = None) -> FastAPI:
     settings = settings or Settings()
 
     @asynccontextmanager
@@ -49,14 +65,25 @@ def create_app(
             db.ensure_host(url.rstrip("/"))
         client = httpx.AsyncClient(timeout=settings.request_timeout_s, transport=transport)
         hub = EventHub()
+        # Cliente aparte para inferencia: respuestas largas en streaming
+        llm = httpx.AsyncClient(timeout=httpx.Timeout(10.0, read=600.0), transport=transport)
+        hub = EventHub()
         monitor = AgentMonitor(db, hub, client, settings.poll_interval_s, settings.info_interval_s)
+        detector = EndpointDetector(db, hub, monitor, client)
+        runs = RunManager(db, hub, monitor, llm)
+        db.mark_interrupted_runs()
         app.state.db, app.state.hub, app.state.monitor = db, hub, monitor
+        app.state.detector, app.state.runs = detector, runs
         monitor.start_all()
+        detector.start()
         try:
             yield
         finally:
+            await runs.shutdown()
+            await detector.stop()
             await monitor.stop_all()
             await client.aclose()
+            await llm.aclose()
             db.close()
 
     app = FastAPI(title="Arena LLM", version=__version__, lifespan=lifespan)
@@ -119,6 +146,92 @@ def create_app(
     @app.get("/api/hosts/{host_id}/gguf")
     async def host_gguf(request: Request, host_id: int, path: str) -> dict[str, Any]:
         return await proxy(request, host_id, "/gguf", {"path": path})
+
+    # --- ajustes -------------------------------------------------------------
+
+    @app.get("/api/settings")
+    def get_settings(request: Request) -> dict[str, Any]:
+        return request.app.state.db.get_settings()
+
+    @app.put("/api/settings/{key}")
+    async def put_setting(request: Request, key: str) -> dict[str, Any]:
+        if key not in SETTINGS_KEYS:
+            raise HTTPException(404, f"Ajuste desconocido: {key}")
+        value = await request.json()
+        if not isinstance(value, dict):
+            raise HTTPException(422, "El valor debe ser un objeto JSON")
+        request.app.state.db.set_setting(key, value)
+        request.app.state.hub.publish("settings", {"key": key, "value": value})
+        return {"key": key, "value": value}
+
+    # --- servidores detectados -----------------------------------------------
+
+    @app.get("/api/endpoints")
+    def endpoints(request: Request, host: int | None = None) -> list[dict[str, Any]]:
+        return request.app.state.db.list_endpoints(host)
+
+    @app.post("/api/endpoints/detect", status_code=202)
+    def detect_now(request: Request) -> dict[str, Any]:
+        request.app.state.detector.trigger()
+        return {"status": "detectando"}
+
+    @app.patch("/api/endpoints/{endpoint_id}")
+    def set_alias(request: Request, endpoint_id: int, body: AliasIn) -> dict[str, Any]:
+        db: Database = request.app.state.db
+        if db.get_endpoint(endpoint_id) is None:
+            raise HTTPException(404, "Servidor no registrado")
+        db.set_endpoint_alias(endpoint_id, (body.alias or "").strip() or None)
+        return db.get_endpoint(endpoint_id)
+
+    @app.get("/api/changes")
+    def changes(request: Request, endpoint: int | None = None, limit: int = 100) -> list[dict[str, Any]]:
+        return request.app.state.db.list_config_changes(endpoint, min(max(limit, 1), 1000))
+
+    # --- pruebas (runs) -------------------------------------------------------
+
+    @app.get("/api/suites")
+    def suites() -> list[dict[str, Any]]:
+        return [s.public() for s in SUITES.values()]
+
+    @app.get("/api/runs")
+    def list_runs(request: Request, limit: int = 200) -> list[dict[str, Any]]:
+        return request.app.state.db.list_runs(min(max(limit, 1), 2000))
+
+    @app.post("/api/runs", status_code=201)
+    async def start_run(request: Request, body: RunIn) -> dict[str, Any]:
+        try:
+            run = await request.app.state.runs.start(body.suite, body.endpoint_id, body.params, body.label)
+        except RunError as exc:
+            raise HTTPException(exc.status, exc.message) from exc
+        return _run_public(run)
+
+    @app.get("/api/runs/{run_id}")
+    def get_run(request: Request, run_id: int) -> dict[str, Any]:
+        db: Database = request.app.state.db
+        run = db.get_run(run_id)
+        if run is None:
+            raise HTTPException(404, "Run no encontrado")
+        return {
+            **run,
+            "items": db.list_items(run_id),
+            "tps": db.list_tps(run_id),
+            "samples": db.list_samples(run_id),
+        }
+
+    @app.post("/api/runs/{run_id}/cancel", status_code=202)
+    async def cancel_run(request: Request, run_id: int) -> dict[str, Any]:
+        try:
+            await request.app.state.runs.cancel(run_id)
+        except RunError as exc:
+            raise HTTPException(exc.status, exc.message) from exc
+        return {"status": "cancelando"}
+
+    @app.delete("/api/runs/{run_id}", status_code=204)
+    def delete_run(request: Request, run_id: int) -> None:
+        if run_id in request.app.state.runs.active:
+            raise HTTPException(409, "La prueba está en marcha: detenla antes de borrarla")
+        if not request.app.state.db.delete_run(run_id):
+            raise HTTPException(404, "Run no encontrado")
 
     @app.get("/api/devices")
     def devices(request: Request) -> list[dict[str, Any]]:

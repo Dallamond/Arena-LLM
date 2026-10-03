@@ -56,9 +56,7 @@ def is_loopback(host: str) -> bool:
 def check_bind(host: str, token: str | None) -> None:
     """Se niega a escuchar fuera de loopback sin token."""
     if not is_loopback(host) and not token:
-        raise ValueError(
-            f"Escuchar en {host!r} (fuera de localhost) exige un token (--token o ARENA_AGENT_TOKEN)"
-        )
+        raise ValueError(f"Escuchar en {host!r} (fuera de localhost) exige un token (--token o ARENA_AGENT_TOKEN)")
 
 
 class AgentApp:
@@ -151,9 +149,7 @@ class AgentApp:
             raise ApiError(HTTPStatus.FORBIDDEN, "no_model_dirs", "No hay carpetas de modelos configuradas")
         path = self.config.allowed_model(raw)
         if path is None:
-            raise ApiError(
-                HTTPStatus.FORBIDDEN, "path", "Ruta no permitida: debe ser un .gguf dentro de model_dirs"
-            )
+            raise ApiError(HTTPStatus.FORBIDDEN, "path", "Ruta no permitida: debe ser un .gguf dentro de model_dirs")
         st = path.stat()
         key = (str(path), st.st_size, st.st_mtime_ns)
         with self._gguf_lock:

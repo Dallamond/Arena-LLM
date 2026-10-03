@@ -195,9 +195,7 @@ class SimCpuRamProvider(TelemetryProvider):
             return {self.device_id: CpuSample(util_pct=None, freq_mhz=None)}
         load = load_at(self.clock())
         util = 4 + 30 * load + self.rng.uniform(-2, 2)
-        return {
-            self.device_id: CpuSample(util_pct=round(max(0.0, util), 1), freq_mhz=round(3600 + 600 * load))
-        }
+        return {self.device_id: CpuSample(util_pct=round(max(0.0, util), 1), freq_mhz=round(3600 + 600 * load))}
 
     def ram(self) -> RamSample | None:
         load = load_at(self.clock())
@@ -216,9 +214,7 @@ def _gpu(profile: str, i: int, **kw) -> SimGpuSpec:
     return SimGpuSpec(**{**base, **kw})
 
 
-def build_profile(
-    profile: str, clock: Clock = time.time
-) -> tuple[HostInfo, list[TelemetryProvider], SimProcessSource]:
+def build_profile(profile: str, clock: Clock = time.time) -> tuple[HostInfo, list[TelemetryProvider], SimProcessSource]:
     if profile not in PROFILES:
         raise ValueError(f"Perfil desconocido: {profile} (válidos: {', '.join(PROFILES)})")
     host = HostInfo(
@@ -304,7 +300,5 @@ def build_profile(
                 server_pid=4301,
             )
         ]
-        procs = [
-            _server(4301, 8081, "sim-7b-Q5_K_M.gguf", "-ngl", "24", "-c", "4096", "--jinja", "--rara", "1")
-        ]
+        procs = [_server(4301, 8081, "sim-7b-Q5_K_M.gguf", "-ngl", "24", "-c", "4096", "--jinja", "--rara", "1")]
     return host, [SimGpuProvider(gpus, clock=clock), cpu], SimProcessSource(procs)

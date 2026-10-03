@@ -42,10 +42,7 @@ def write_gguf(path, *, magic=b"GGUF", version=3, tokens=5, truncate=None):
         ),
     ]
     tensors = [
-        _s("token_embd.weight")
-        + struct.pack("<I", 2)
-        + struct.pack("<2Q", 64, tokens)
-        + struct.pack("<IQ", 12, 0),
+        _s("token_embd.weight") + struct.pack("<I", 2) + struct.pack("<2Q", 64, tokens) + struct.pack("<IQ", 12, 0),
         _s("output_norm.weight") + struct.pack("<I", 1) + struct.pack("<Q", 64) + struct.pack("<IQ", 0, 4096),
     ]
     head = magic + struct.pack("<I", version) + struct.pack("<QQ", len(tensors), len(kvs))

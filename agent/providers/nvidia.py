@@ -96,11 +96,7 @@ def convert(raw: str | None, kind: str):
 
 
 def parse_csv(text: str) -> list[list[str]]:
-    return [
-        [c.strip() for c in row]
-        for row in csv.reader(io.StringIO(text))
-        if row and any(c.strip() for c in row)
-    ]
+    return [[c.strip() for c in row] for row in csv.reader(io.StringIO(text)) if row and any(c.strip() for c in row)]
 
 
 def parse_temperature_limits(text: str) -> dict[str, dict[str, float | None]]:

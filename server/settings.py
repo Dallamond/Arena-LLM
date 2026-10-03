@@ -15,9 +15,7 @@ class Settings:
     port: int = 8090
     #: Agentes que se registran al arrancar si no existen (ARENA_AGENTS="http://a:9100,http://b:9100").
     agents: list[str] = field(
-        default_factory=lambda: [
-            u.strip() for u in os.environ.get("ARENA_AGENTS", "").split(",") if u.strip()
-        ]
+        default_factory=lambda: [u.strip() for u in os.environ.get("ARENA_AGENTS", "").split(",") if u.strip()]
     )
     poll_interval_s: float = 1.0
     info_interval_s: float = 30.0

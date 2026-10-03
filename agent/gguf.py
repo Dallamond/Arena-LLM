@@ -211,9 +211,7 @@ def read_header(path: str | Path) -> GgufInfo:
         architecture=arch,
         general_type=meta.get("general.type") if isinstance(meta.get("general.type"), str) else None,
         name=meta.get("general.name") if isinstance(meta.get("general.name"), str) else None,
-        size_label=meta.get("general.size_label")
-        if isinstance(meta.get("general.size_label"), str)
-        else None,
+        size_label=meta.get("general.size_label") if isinstance(meta.get("general.size_label"), str) else None,
         file_type=FILE_TYPES.get(ftype, f"ftype_{ftype}") if isinstance(ftype, int) else None,
         block_count=_int(a("block_count")),
         context_length=_int(a("context_length")),
@@ -224,9 +222,7 @@ def read_header(path: str | Path) -> GgufInfo:
         value_length=_int(a("attention.value_length")),
         expert_count=_int(a("expert_count")),
         expert_used_count=_int(a("expert_used_count")),
-        vocab_size=tokens["len"]
-        if isinstance(tokens, dict)
-        else (len(tokens) if isinstance(tokens, list) else None),
+        vocab_size=tokens["len"] if isinstance(tokens, dict) else (len(tokens) if isinstance(tokens, list) else None),
         split_count=_int(meta.get("split.count")),
         tensor_types=dict(sorted(types.items(), key=lambda kv: -kv[1])),
         metadata={k: v for k, v in meta.items() if not k.startswith("tokenizer.ggml.")},
