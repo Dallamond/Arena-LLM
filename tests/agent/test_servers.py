@@ -186,7 +186,10 @@ def test_flags_negativos_de_builds_recientes():
 
 def test_linea_real_b11379():
     # Capturada del llama-server real (03/10/2026, build b11379, RTX 3060)
-    line = r"D:\dev-tools\llama.cpp\b11379\llama-server.exe -m D:/ollama/models/Qwen/q.gguf -ngl 99 -c 8192 -np 2 -fa on --port 8081"
+    line = (
+        r"D:\dev-tools\llama.cpp\b11379\llama-server.exe"
+        " -m D:/ollama/models/Qwen/q.gguf -ngl 99 -c 8192 -np 2 -fa on --port 8081"
+    )
     argv = split_windows_cmdline(line)
     p = parse_llama_server_args(argv[1:])
     assert p.flags == {"model": "D:/ollama/models/Qwen/q.gguf", "ngl": 99, "ctx": 8192, "parallel": 2,
