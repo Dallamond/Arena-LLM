@@ -175,3 +175,19 @@ def test_detector_cachea_y_aisla_errores():
     r2 = det.detect()
     assert r1 is r2 and Boom.calls == 1
     assert r1["servers"] == [] and "denegado" in r1["errors"]["processes"]
+
+
+def test_flags_negativos_de_builds_recientes():
+    p = parse("-no-kvu --no-jinja --no-cache-prompt -mmdev none -sm tensor")
+    assert p.flags["no_kv_unified"] and p.flags["no_jinja"] and p.flags["no_cache_prompt"]
+    assert p.flags["mmproj_device"] == "none" and p.flags["split_mode"] == "tensor"
+    assert p.unknown == {}
+
+
+def test_linea_real_b11379():
+    # Capturada del llama-server real (03/10/2026, build b11379, RTX 3060)
+    line = r"D:\dev-tools\llama.cpp\b11379\llama-server.exe -m D:/ollama/models/Qwen/q.gguf -ngl 99 -c 8192 -np 2 -fa on --port 8081"
+    argv = split_windows_cmdline(line)
+    p = parse_llama_server_args(argv[1:])
+    assert p.flags == {"model": "D:/ollama/models/Qwen/q.gguf", "ngl": 99, "ctx": 8192, "parallel": 2,
+                       "flash_attn": "on", "port": 8081}  # fmt: skip
