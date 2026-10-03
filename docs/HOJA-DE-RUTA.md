@@ -236,7 +236,7 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
 
 ### F3 — Servidores, modelos y detección
 - [x] **Varios equipos (`hosts`)**: registrar agentes de distintas máquinas y cambiar de equipo en la GUI. Autodescubrimiento opcional en la red local. *(03/10/2026: registro de agentes y selector de equipo; sin autodescubrimiento en red)*
-- [ ] CRUD de endpoints (URL del `llama-server`, URL del agente, dispositivo asociado, alias). Botón **Detectar** (§5). *(03/10/2026: detección automática + alias; falta añadir un endpoint a mano)*
+- [x] CRUD de endpoints (URL del `llama-server`, URL del agente, dispositivo asociado, alias). Botón **Detectar** (§5). *(03/10/2026: alta manual con equipo, URL, alias y GPU; se sondea cada 5 s aunque el agente no vea el proceso; GPU asignable a mano en cualquier servidor; baja de manuales y detenidos)*
 - [x] Página **Modelos/Servidores**: tarjeta por servidor detectado con modelo, cuantización, contexto, `-ngl`, `-ts`, slots, KV, flags, GPU y VRAM que ocupa.
 - [x] Carpeta de modelos configurable: lista de GGUF con **calculadora de encaje**. *(03/10/2026: pestaña GGUF en disco en Servidores; pesos reales por capa, KV solo en capas de atención en híbridos, estado recurrente, `-ngl` sugerido; verificada con los 4 GGUF de Lucas)*
 - [x] Cada cambio de configuración detectado queda registrado con fecha.

@@ -75,7 +75,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const body = await r.json().catch(() => null);
   if (!r.ok) {
     const detail = body?.detail;
-    throw new Error(typeof detail === "string" ? detail : Array.isArray(detail) ? detail.map((d) => d.msg).join(" · ") : `HTTP ${r.status}`);
+    throw new Error(typeof detail === "string" ? detail : Array.isArray(detail) ? detail.map((d) => String(d.msg).replace(/^Value error, /, "")).join(" · ") : `HTTP ${r.status}`);
   }
   return body as T;
 }

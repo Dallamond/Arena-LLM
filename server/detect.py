@@ -13,6 +13,7 @@ import hashlib
 import json
 import logging
 import time
+from pathlib import PurePath
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -36,6 +37,31 @@ def reach_host(server_host: str, agent_url: str) -> str:
     if server_host in WILDCARD_HOSTS:
         return agent_host
     return server_host
+
+
+def normalize_base_url(raw: str) -> str:
+    """URL base de un llama-server escrita a mano: sin barra final ni `/v1`, `localhost` → 127.0.0.1.
+
+    Así coincide con la que construye la detección para el mismo servidor.
+    """
+    v = raw.strip().rstrip("/")
+    if v.lower().endswith("/v1"):
+        v = v[:-3].rstrip("/")
+    parts = urlsplit(v)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise ValueError("URL inválida (ej.: http://127.0.0.1:8080)")
+    if parts.path or parts.query or parts.fragment:
+        raise ValueError("Solo la URL base del servidor, sin ruta (ej.: http://127.0.0.1:8080)")
+    host = parts.hostname.lower()
+    if host == "localhost":
+        host = "127.0.0.1"
+    if ":" in host:
+        host = f"[{host}]"
+    try:
+        port = parts.port
+    except ValueError as exc:
+        raise ValueError("Puerto inválido") from exc
+    return f"{parts.scheme}://{host}" + (f":{port}" if port else "")
 
 
 def base_url_for(server: dict[str, Any], agent_url: str) -> str | None:
@@ -176,23 +202,28 @@ class EndpointDetector:
         }
 
     async def detect_host(self, state: HostState) -> list[dict[str, Any]]:
-        if state.status != "online":
-            return []
-        try:
-            body = await self.monitor.agent.get(state, "/servers")
-        except AgentError:
+        servers: list[dict[str, Any]] = []
+        agent_ok = False
+        if state.status == "online":
+            try:
+                servers = (await self.monitor.agent.get(state, "/servers")).get("servers", [])
+                agent_ok = True
+            except AgentError:
+                pass
+        manual = [e for e in self.db.list_endpoints(state.pk) if e["manual"]]
+        if not agent_ok and not manual:
             return []
         seen: set[int] = set()
         out = []
-        for srv in body.get("servers", []):
+        for srv in servers:
             base = base_url_for(srv, state.agent_url)
             if base is None:
                 continue
             probe = await self.probe(base)
-            props = probe["props"]
             snapshot = {
                 "engine": srv.get("engine"),
                 "base_url": base,
+                "source": "proceso",
                 "pid": srv.get("pid"),
                 "started_at": srv.get("started_at"),
                 "exe": srv.get("exe"),
@@ -204,48 +235,92 @@ class EndpointDetector:
                 "port_source": srv.get("port_source"),
                 "devices": srv.get("devices") or [],
                 "gpu_link": srv.get("gpu_link"),
-                "status": probe["status"],
-                "props": {k: v for k, v in props.items() if k not in PROPS_DROP} if props else None,
-                "slots": probe["slots"],
-                "models": probe["models"],
-                "derived": derive(props, probe["slots"], srv.get("flags") or {}),
-                "detected_at": time.time(),
             }
-            prev = next((e for e in self.db.list_endpoints(state.pk) if e["base_url"] == base), None)
-            prev_snap = (prev["snapshot"] if prev else None) or {}
-            ready = probe["status"] == "listo"
-            # Solo una configuración completa (servidor listo, con /props) cuenta: mientras carga
-            # se conserva la última configuración lista para no registrar cambios falsos.
-            last_ready = prev_snap.get("last_ready")
-            if ready:
-                snapshot["last_ready"] = config_view(snapshot)
-                fp = fingerprint(snapshot)
-            else:
-                snapshot["last_ready"] = last_ready
-                fp = prev["fingerprint"] if prev else None
-            ep, change = self.db.upsert_endpoint(state.pk, base, "llama.cpp", probe["status"], fp or "", snapshot)
+            ep = self._record(state, base, probe, snapshot)
             seen.add(ep["id"])
-            if change == "nuevo":
-                self._change(ep, "nuevo", None, snapshot)
-            elif prev_snap and prev_snap.get("pid") != snapshot["pid"]:
-                self._change(ep, "reinicio", {"pid": [prev_snap.get("pid"), snapshot["pid"]]}, snapshot)
-            elif prev and prev["status"] == "detenido":
-                self._change(ep, "vuelve", None, snapshot)
-            if ready and change != "nuevo":
-                if last_ready is None and prev and prev["status"] != "listo":
-                    self._change(ep, "listo", None, snapshot)  # terminó de cargar por primera vez
-                elif last_ready is not None:
-                    a, b = last_ready, snapshot["last_ready"]
-                    diff = {k: [a.get(k), b.get(k)] for k in sorted(set(a) | set(b)) if a.get(k) != b.get(k)}
-                    if diff:
-                        self._change(ep, "cambio", diff, snapshot)
             out.append(ep)
-        for ep in self.db.list_endpoints(state.pk):
-            if ep["id"] not in seen and ep["status"] != "detenido":
-                self.db.set_endpoint_status(ep["id"], "detenido")
-                self._change(ep, "detenido", None, None)
+        # Alta manual: el agente no ve el proceso (otra máquina, contenedor, otro usuario…),
+        # así que solo hay lo que el propio llama-server cuenta por HTTP.
+        for m in manual:
+            if m["id"] in seen:
+                continue
+            probe = await self.probe(m["base_url"])
+            model_path = (probe["props"] or {}).get("model_path")
+            snapshot = {
+                "engine": "llama.cpp",
+                "base_url": m["base_url"],
+                "source": "manual",
+                "pid": None,
+                "started_at": None,
+                "exe": None,
+                "argv": None,
+                "flags": {},
+                "unknown": {},
+                "model_path": model_path,
+                "model_file": PurePath(model_path.replace("\\", "/")).name if isinstance(model_path, str) else None,
+                "port_source": None,
+                "devices": [],
+                "gpu_link": None,
+            }
+            out.append(self._record(state, m["base_url"], probe, snapshot))
+        if agent_ok:
+            for ep in self.db.list_endpoints(state.pk):
+                if ep["id"] not in seen and not ep["manual"] and ep["status"] != "detenido":
+                    self.db.set_endpoint_status(ep["id"], "detenido")
+                    self._change(ep, "detenido", None, None)
         self.hub.publish("endpoints", {"host": state.pk, "endpoints": self.db.list_endpoints(state.pk)})
         return out
+
+    def _record(self, state: HostState, base: str, probe: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
+        """Completa la foto con el sondeo HTTP, la guarda y registra los cambios."""
+        props = probe["props"]
+        prev = next((e for e in self.db.list_endpoints(state.pk) if e["base_url"] == base), None)
+        if prev and prev.get("device_ids") is not None:
+            # GPU asociadas a mano: mandan sobre la detección
+            snapshot["devices"] = [{"device_id": d, "mem_used_mib": None} for d in prev["device_ids"]]
+            snapshot["gpu_link"] = "manual"
+        snapshot.update(
+            status=probe["status"],
+            props={k: v for k, v in props.items() if k not in PROPS_DROP} if props else None,
+            slots=probe["slots"],
+            models=probe["models"],
+            derived=derive(props, probe["slots"], snapshot.get("flags") or {}),
+            detected_at=time.time(),
+        )
+        prev_snap = (prev["snapshot"] if prev else None) or {}
+        ready = probe["status"] == "listo"
+        # Solo una configuración completa (servidor listo, con /props) cuenta: mientras carga
+        # se conserva la última configuración lista para no registrar cambios falsos.
+        last_ready = prev_snap.get("last_ready")
+        if ready:
+            snapshot["last_ready"] = config_view(snapshot)
+            fp = fingerprint(snapshot)
+        else:
+            snapshot["last_ready"] = last_ready
+            fp = prev["fingerprint"] if prev else None
+        ep, change = self.db.upsert_endpoint(state.pk, base, "llama.cpp", probe["status"], fp or "", snapshot)
+        if change == "nuevo":
+            self._change(ep, "nuevo", None, snapshot)
+        elif prev_snap.get("pid") is not None and snapshot["pid"] is not None and prev_snap["pid"] != snapshot["pid"]:
+            self._change(ep, "reinicio", {"pid": [prev_snap.get("pid"), snapshot["pid"]]}, snapshot)
+        elif (
+            prev
+            and prev_snap
+            and prev["status"] in ("detenido", "sin respuesta")
+            and probe["status"] != "sin respuesta"
+        ):
+            self._change(ep, "vuelve", None, snapshot)
+        elif prev and prev["manual"] and prev["status"] != "sin respuesta" and probe["status"] == "sin respuesta":
+            self._change(ep, "detenido", None, None)
+        if ready and change != "nuevo":
+            if last_ready is None and prev and prev["status"] != "listo":
+                self._change(ep, "listo", None, snapshot)  # terminó de cargar por primera vez
+            elif last_ready is not None:
+                a, b = last_ready, snapshot["last_ready"]
+                diff = {k: [a.get(k), b.get(k)] for k in sorted(set(a) | set(b)) if a.get(k) != b.get(k)}
+                if diff:
+                    self._change(ep, "cambio", diff, snapshot)
+        return ep
 
     def _change(self, ep: dict[str, Any], kind: str, diff: dict | None, snapshot: dict | None) -> None:
         row = self.db.add_config_change(ep["id"], kind, diff, snapshot)

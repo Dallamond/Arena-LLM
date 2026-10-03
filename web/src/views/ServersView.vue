@@ -49,9 +49,72 @@ async function detect() {
 }
 
 async function saveAlias(ep: Endpoint) {
-  await api(`/api/endpoints/${ep.id}`, { method: "PATCH", body: JSON.stringify({ alias: aliasText.value }) });
-  ep.alias = aliasText.value.trim() || null;
+  await patchEndpoint(ep, { alias: aliasText.value });
   editing.value = null;
+}
+
+// --- alta manual --------------------------------------------------------------
+const adding = ref(false);
+const form = ref({ host_id: 0, base_url: "http://127.0.0.1:8080", alias: "", device_ids: [] as string[] });
+const formError = ref<string | null>(null);
+const saving = ref(false);
+
+function hostGpus(hostId: number) {
+  return (live.hosts[hostId]?.devices ?? []).filter((d) => d.kind === "gpu");
+}
+
+function openAdd() {
+  form.value = { host_id: hostList.value[0]?.id ?? 0, base_url: "http://127.0.0.1:8080", alias: "", device_ids: [] };
+  formError.value = null;
+  adding.value = true;
+}
+
+async function addEndpoint() {
+  saving.value = true;
+  formError.value = null;
+  try {
+    const f = form.value;
+    await api("/api/endpoints", {
+      method: "POST",
+      body: JSON.stringify({ ...f, alias: f.alias || null, device_ids: f.device_ids.length ? f.device_ids : null }),
+    });
+    adding.value = false;
+    openTab("running");
+  } catch (e) {
+    formError.value = (e as Error).message;
+  } finally {
+    saving.value = false;
+  }
+}
+
+// --- GPU asociadas a mano y baja -------------------------------------------------
+const editingGpus = ref<number | null>(null);
+const gpuChoice = ref<string[]>([]);
+const actionError = ref<Record<number, string>>({});
+const confirmDelete = ref<number | null>(null);
+
+function startGpuEdit(ep: Endpoint) {
+  editingGpus.value = ep.id;
+  gpuChoice.value = [...(ep.device_ids ?? (ep.snapshot?.devices ?? []).map((d) => d.device_id))];
+}
+
+async function patchEndpoint(ep: Endpoint, body: Record<string, unknown>) {
+  try {
+    await api(`/api/endpoints/${ep.id}`, { method: "PATCH", body: JSON.stringify(body) });
+    delete actionError.value[ep.id];
+    editingGpus.value = null;
+  } catch (e) {
+    actionError.value[ep.id] = (e as Error).message;
+  }
+}
+
+async function removeEndpoint(ep: Endpoint) {
+  try {
+    await api(`/api/endpoints/${ep.id}`, { method: "DELETE" });
+    confirmDelete.value = null;
+  } catch (e) {
+    actionError.value[ep.id] = (e as Error).message;
+  }
 }
 
 function gpuOf(hostId: number, deviceId: string) {
@@ -73,6 +136,7 @@ const KIND: Record<string, { text: string; tone: "info" | "warn" | "crit" | "dim
   detenido: { text: "detenido", tone: "crit" },
   vuelve: { text: "vuelve", tone: "info" },
   listo: { text: "cargado", tone: "info" },
+  manual: { text: "alta manual", tone: "info" },
 };
 const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
   listo: "info",
@@ -86,8 +150,46 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
     <div class="head">
       <h2 class="title">Servidores</h2>
       <span class="dim small">Arena detecta los <code>llama-server</code> que lanzas; no los arranca ni los para.</span>
-      <button class="btn" type="button" :disabled="detecting" @click="detect">{{ detecting ? "Detectando…" : "Detectar ahora" }}</button>
+      <div class="head__actions">
+        <button class="btn" type="button" :aria-expanded="adding" @click="adding ? (adding = false) : openAdd()">＋ Añadir a mano</button>
+        <button class="btn" type="button" :disabled="detecting" @click="detect">{{ detecting ? "Detectando…" : "Detectar ahora" }}</button>
+      </div>
     </div>
+
+    <BlueprintCard v-if="adding" title="Añadir un servidor a mano" class="ep">
+      <p class="dim small intro">
+        Para un <code>llama-server</code> que Arena no detecta solo (otra máquina sin agente, un contenedor, otro usuario…).
+        Se consulta por HTTP cada 5 s; sin línea de comandos, los datos salen de <code>/props</code>. La telemetría es la del equipo elegido.
+      </p>
+      <form class="addform" @submit.prevent="addEndpoint">
+        <label>
+          <span class="label">Equipo (telemetría)</span>
+          <select v-model.number="form.host_id" @change="form.device_ids = []">
+            <option v-for="h in hostList" :key="h.id" :value="h.id">{{ h.name }}</option>
+          </select>
+        </label>
+        <label class="grow">
+          <span class="label">URL del servidor</span>
+          <input v-model="form.base_url" class="mono" type="text" required placeholder="http://127.0.0.1:8080" />
+        </label>
+        <label>
+          <span class="label">Alias (opcional)</span>
+          <input v-model="form.alias" type="text" maxlength="60" />
+        </label>
+        <fieldset v-if="hostGpus(form.host_id).length" class="gpus">
+          <legend class="label">GPU que usa (opcional)</legend>
+          <label v-for="d in hostGpus(form.host_id)" :key="d.device_id" class="check">
+            <input v-model="form.device_ids" type="checkbox" :value="d.device_id" />
+            <span :style="{ color: deviceColor(d) }" aria-hidden="true">■</span> {{ shortName(d.name) }}
+          </label>
+        </fieldset>
+        <div class="formactions">
+          <button class="btn btn--primary" type="submit" :disabled="saving || !form.host_id">{{ saving ? "Guardando…" : "Añadir" }}</button>
+          <button class="btn" type="button" @click="adding = false">Cancelar</button>
+          <span v-if="formError" class="err" role="alert">✕ {{ formError }}</span>
+        </div>
+      </form>
+    </BlueprintCard>
 
     <div class="tabs" role="tablist">
       <button role="tab" type="button" class="tab" :aria-selected="tab === 'running'" @click="openTab('running')">
@@ -121,7 +223,15 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
         :class="{ 'ep--off': ep.status === 'detenido' }"
       >
         <template #actions>
+          <Stamp v-if="ep.manual" text="manual" tone="dim" :tilt="0" />
           <Stamp :text="ep.status" :tone="STATUS_TONE[ep.status] ?? 'crit'" />
+          <template v-if="ep.manual || ep.status === 'detenido'">
+            <button v-if="confirmDelete !== ep.id" class="btn" type="button" @click="confirmDelete = ep.id">Quitar</button>
+            <template v-else>
+              <button class="btn btn--danger" type="button" @click="removeEndpoint(ep)">Quitar y borrar su historial</button>
+              <button class="btn" type="button" @click="confirmDelete = null">No</button>
+            </template>
+          </template>
           <RouterLink v-if="ep.status === 'listo'" class="btn btn--primary" :to="{ path: '/calidad', query: { endpoint: ep.id } }">▶ Probar</RouterLink>
         </template>
 
@@ -144,10 +254,27 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
             <div>
               <dt>GPU</dt>
               <dd>
-                <span v-for="u in ep.snapshot?.devices ?? []" :key="u.device_id" :style="{ color: gpuOf(g.host.id, u.device_id).color }">
-                  ■ {{ gpuOf(g.host.id, u.device_id).name }}
-                </span>
-                <span v-if="!ep.snapshot?.devices?.length" class="dim">sin asociar (no se pudo leer qué GPU usa)</span>
+                <template v-if="editingGpus === ep.id">
+                  <label v-for="d in hostGpus(g.host.id)" :key="d.device_id" class="check">
+                    <input v-model="gpuChoice" type="checkbox" :value="d.device_id" />
+                    <span :style="{ color: deviceColor(d) }" aria-hidden="true">■</span> {{ shortName(d.name) }}
+                  </label>
+                  <button class="btn tiny" type="button" @click="patchEndpoint(ep, { device_ids: gpuChoice })">Guardar</button>
+                  <button class="btn tiny" type="button" title="Volver a la detección automática" @click="patchEndpoint(ep, { device_ids: null })">
+                    Automático
+                  </button>
+                  <button class="btn tiny" type="button" @click="editingGpus = null">Cancelar</button>
+                </template>
+                <template v-else>
+                  <span v-for="u in ep.snapshot?.devices ?? []" :key="u.device_id" class="gpu" :style="{ color: gpuOf(g.host.id, u.device_id).color }">
+                    ■ {{ gpuOf(g.host.id, u.device_id).name }}
+                  </span>
+                  <span v-if="ep.snapshot?.gpu_link === 'manual'" class="dim">(a mano)</span>
+                  <span v-if="!ep.snapshot?.devices?.length" class="dim">sin asociar{{ ep.manual ? "" : " (no se pudo leer qué GPU usa)" }}</span>
+                  <button v-if="hostGpus(g.host.id).length" class="btn tiny" type="button" @click="startGpuEdit(ep)">
+                    {{ ep.snapshot?.devices?.length ? "Cambiar" : "Asignar" }}
+                  </button>
+                </template>
               </dd>
             </div>
             <div><dt>url</dt><dd>{{ ep.base_url }}<span v-if="ep.snapshot?.port_source === 'default'" class="dim"> (puerto por defecto)</span></dd></div>
@@ -169,14 +296,19 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
           </dl>
 
           <div>
+            <p v-if="actionError[ep.id]" class="err" role="alert">✕ {{ actionError[ep.id] }}</p>
             <h4 class="label">Flags detectados</h4>
+            <p v-if="!ep.snapshot || ep.snapshot.source === 'manual'" class="dim small">
+              Alta manual: el agente no ve el proceso, así que no hay línea de comandos ni flags. Contexto, slots, modelo y build
+              salen de <code>/props</code>.
+            </p>
             <div class="flags mono">
               <span v-for="(v, k) in ep.snapshot?.flags ?? {}" :key="k" class="flag" v-show="k !== 'model'">{{ k }} <b>{{ val(v) }}</b></span>
               <span v-for="(v, k) in ep.snapshot?.unknown ?? {}" :key="'u' + k" class="flag flag--unknown" title="Flag no reconocido: se guarda tal cual">
                 {{ k }} <b>{{ val(v) }}</b> ?
               </span>
             </div>
-            <button class="btn tiny" type="button" :aria-expanded="!!showArgv[ep.id]" @click="showArgv[ep.id] = !showArgv[ep.id]">
+            <button v-if="ep.snapshot?.argv" class="btn tiny" type="button" :aria-expanded="!!showArgv[ep.id]" @click="showArgv[ep.id] = !showArgv[ep.id]">
               {{ showArgv[ep.id] ? "Ocultar" : "Ver" }} línea de comandos
             </button>
             <pre v-if="showArgv[ep.id]" class="argv mono">{{ (ep.snapshot?.argv ?? []).join(" ") }}</pre>
@@ -208,8 +340,66 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
   flex-wrap: wrap;
   margin-bottom: 14px;
 }
-.head .btn {
+.head__actions {
   margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+.intro {
+  margin: 0 0 12px;
+  max-width: 80ch;
+}
+.addform {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: flex-end;
+}
+.addform > label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.addform .grow {
+  flex: 1 1 260px;
+}
+.addform input[type="text"],
+.addform select {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 5px 8px;
+}
+.gpus {
+  border: 1px solid var(--line);
+  padding: 4px 10px 8px;
+  margin: 0;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 10px;
+}
+.formactions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-basis: 100%;
+}
+.err {
+  color: var(--crit);
+  font-size: 12px;
+  margin: 0 0 8px;
+}
+.btn--danger {
+  border-color: var(--crit);
+  color: var(--crit);
+}
+.gpu {
+  margin-right: 8px;
 }
 .title {
   font-size: 20px;

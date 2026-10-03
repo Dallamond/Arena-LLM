@@ -19,10 +19,10 @@ relacionado: ["Arena LLM"]
 | F0 — Preparación del PC | Parcial: falta XMP y la M40 (llega la semana del 05/10) |
 | F1 — Esqueleto y agente | ✅ Cerrada (detecta el llama-server real) |
 | F2 — GUI base | ✅ + pulido visual tras la opinión de Lucas (sin `FIG.`, títulos destacados, datos en mono) |
-| F3 — Servidores y detección | Casi: ✅ calculadora de encaje; falta alta manual de endpoints |
+| F3 — Servidores y detección | Casi: ✅ calculadora y alta manual; falta comprobar el criterio relanzando un llama-server real con otro `-c` |
 | F4 — Runner | ✅ Criterio cumplido: 33,6 t/s Arena frente a 34,5 t/s llama-bench (−2,7 %) |
 | F5 — Telemetría, resumen y estrés | ✅ salvo la prueba real de 5 min (hecha de 60 s) |
-| Siguiente | Lucas revisa el pulido visual y la pestaña GGUF → alta manual de endpoints (F3) → F6 (llama-bench por componente) |
+| Siguiente | Lucas revisa la GUI (pulido, GGUF, alta manual) y relanza su llama-server con otro `-c` (criterio F3) → F6 (llama-bench por componente) |
 
 ## Primera prueba real (03/10/2026, 21:01)
 
@@ -75,7 +75,7 @@ Después: **Calidad** → elegir servidor → Lanzar estrés o prompt libre.
   - Vista de run en vivo con gráficas y resultado completo.
   - Historial básico.
   - Ajustes: apariencia (acento, contraste, tamaño, rejilla, croquis), equipos, umbrales y datos.
-- **Tests:** 144 de Python (incluye un laboratorio completo sin GPU y la calculadora de encaje) y 10 de la web.
+- **Tests:** 155 de Python (incluye un laboratorio completo sin GPU y la calculadora de encaje) y 10 de la web.
 
 ## Calculadora de encaje (03/10/2026)
 
@@ -85,12 +85,16 @@ Con c=8192 en la 3060 (11,6 GiB libres) caben los tres modelos. El 7B Q8 estima 
 
 Limitaciones: ventana deslizante (cota superior), MoE sin `--cpu-moe` y búfer de cómputo aproximado (supone flash attention).
 
+## Alta manual de endpoints (03/10/2026)
+
+Servidores → **＋ Añadir a mano**: equipo (de él sale la telemetría), URL, alias y GPU opcionales. La URL se normaliza (`localhost` → `127.0.0.1`, sin `/v1`) para que coincida con la detectada. Se sondea cada 5 s aunque el agente no vea el proceso y no se borra al parar: queda "sin respuesta". Si además se detecta como proceso, se fusiona (conserva pid y flags). Cualquier servidor admite **GPU a mano** (mandan sobre la detección y cuentan como cambio de configuración). Se pueden quitar los manuales y los detenidos. BD: migración 4 (`manual`, `device_ids`).
+
 ## Pendiente (orden propuesto)
 
 1. Lucas revisa el pulido visual (sin `FIG.`, títulos y rótulos en Inter seminegrita, datos vivos en mono más clara) y la pestaña GGUF. No se pudo revisar con capturas: la extensión de Chrome no estaba conectada.
 2. F3:
-   - Alta manual de endpoints.
-   - Asociar GPU por aumento de VRAM cuando `compute-apps` no la dé.
+   - Criterio: relanzar el llama-server real con otro `-c` y ver el cambio en menos de 10 s.
+   - Opcional: asociar GPU por aumento de VRAM cuando `compute-apps` no la dé (de momento se asigna a mano desde la tarjeta del servidor).
 3. F6: `llama-bench` desde el agente, por componente. Servirá para investigar el procesado de prompt lento.
 4. F5: prueba real de 5 min y prueba de la M40 cuando llegue (driver R580).
 

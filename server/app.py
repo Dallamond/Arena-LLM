@@ -16,7 +16,7 @@ from pydantic import BaseModel, field_validator
 from server import __version__
 from server.agents import AgentError, AgentMonitor
 from server.db import Database
-from server.detect import EndpointDetector
+from server.detect import EndpointDetector, normalize_base_url
 from server.fit import FitError, FitParams, estimate, fit, gpus_from_state, ram_free_from_metrics
 from server.hub import EventHub, sse_format
 from server.runs.manager import RunError, RunManager, _run_public
@@ -33,8 +33,23 @@ class RunIn(BaseModel):
     params: dict[str, Any] = {}
 
 
-class AliasIn(BaseModel):
+class EndpointPatch(BaseModel):
+    """Solo se cambian los campos enviados. `device_ids: null` vuelve a la detección automática."""
+
     alias: str | None = None
+    device_ids: list[str] | None = None
+
+
+class EndpointIn(BaseModel):
+    host_id: int
+    base_url: str
+    alias: str | None = None
+    device_ids: list[str] | None = None
+
+    @field_validator("base_url")
+    @classmethod
+    def _url(cls, v: str) -> str:
+        return normalize_base_url(v)
 
 
 #: Datos de la cabecera GGUF que acompañan al encaje (la lista de modelos los muestra).
@@ -205,13 +220,63 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
         request.app.state.detector.trigger()
         return {"status": "detectando"}
 
-    @app.patch("/api/endpoints/{endpoint_id}")
-    def set_alias(request: Request, endpoint_id: int, body: AliasIn) -> dict[str, Any]:
+    def check_devices(request: Request, host_pk: int, device_ids: list[str] | None) -> None:
+        if device_ids is None:
+            return
+        state = state_or_404(request, host_pk)
+        gpus = {d["device_id"] for d in (state.info or {}).get("devices", []) if d.get("kind") == "gpu"}
+        unknown = [d for d in device_ids if d not in gpus]
+        if unknown:
+            raise HTTPException(422, f"GPU desconocidas en ese equipo: {', '.join(unknown)}")
+
+    def publish_endpoints(request: Request, host_pk: int) -> None:
         db: Database = request.app.state.db
-        if db.get_endpoint(endpoint_id) is None:
+        request.app.state.hub.publish("endpoints", {"host": host_pk, "endpoints": db.list_endpoints(host_pk)})
+
+    @app.post("/api/endpoints", status_code=201)
+    def add_endpoint(request: Request, body: EndpointIn) -> dict[str, Any]:
+        """Alta manual: un llama-server que la detección no ve. Se sondea en cada ciclo."""
+        db: Database = request.app.state.db
+        state_or_404(request, body.host_id)
+        check_devices(request, body.host_id, body.device_ids)
+        existing = next((e for e in db.list_endpoints(body.host_id) if e["base_url"] == body.base_url), None)
+        if existing and existing["manual"]:
+            raise HTTPException(409, "Ese servidor ya está dado de alta en ese equipo")
+        ep = db.add_manual_endpoint(body.host_id, body.base_url, (body.alias or "").strip() or None, body.device_ids)
+        row = db.add_config_change(ep["id"], "manual", None, None)
+        request.app.state.hub.publish("config_change", {**row, "snapshot": None, "base_url": ep["base_url"]})
+        publish_endpoints(request, body.host_id)
+        request.app.state.detector.trigger()
+        return ep
+
+    @app.patch("/api/endpoints/{endpoint_id}")
+    def patch_endpoint(request: Request, endpoint_id: int, body: EndpointPatch) -> dict[str, Any]:
+        db: Database = request.app.state.db
+        ep = db.get_endpoint(endpoint_id)
+        if ep is None:
             raise HTTPException(404, "Servidor no registrado")
-        db.set_endpoint_alias(endpoint_id, (body.alias or "").strip() or None)
+        if "alias" in body.model_fields_set:
+            db.set_endpoint_alias(endpoint_id, (body.alias or "").strip() or None)
+        if "device_ids" in body.model_fields_set:
+            check_devices(request, ep["host_pk"], body.device_ids)
+            db.set_endpoint_devices(endpoint_id, body.device_ids)
+            request.app.state.detector.trigger()
+        publish_endpoints(request, ep["host_pk"])
         return db.get_endpoint(endpoint_id)
+
+    @app.delete("/api/endpoints/{endpoint_id}", status_code=204)
+    def delete_endpoint(request: Request, endpoint_id: int) -> None:
+        """Baja de un servidor manual o detenido (uno detectado en marcha volvería a aparecer)."""
+        db: Database = request.app.state.db
+        ep = db.get_endpoint(endpoint_id)
+        if ep is None:
+            raise HTTPException(404, "Servidor no registrado")
+        if not ep["manual"] and ep["status"] != "detenido":
+            raise HTTPException(409, "Está en marcha y detectado: volvería a aparecer. Páralo antes de borrarlo.")
+        if any(a.endpoint["id"] == endpoint_id for a in request.app.state.runs.active.values()):
+            raise HTTPException(409, "Hay una prueba en marcha en este servidor")
+        db.delete_endpoint(endpoint_id)
+        publish_endpoints(request, ep["host_pk"])
 
     @app.get("/api/changes")
     def changes(request: Request, endpoint: int | None = None, limit: int = 100) -> list[dict[str, Any]]:

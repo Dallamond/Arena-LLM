@@ -131,6 +131,11 @@ MIGRATIONS: list[str] = [
     DROP TABLE endpoints;
     ALTER TABLE endpoints_v3 RENAME TO endpoints;
     """,
+    # 4 — alta manual de endpoints y GPU asociadas a mano (cuando la detección no las da)
+    """
+    ALTER TABLE endpoints ADD COLUMN manual INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE endpoints ADD COLUMN device_ids TEXT;
+    """,
 ]
 
 #: Tamaño de la paleta de dispositivos de la GUI (--dev-1 … --dev-N).
@@ -306,6 +311,46 @@ class Database:
                 )
             return self.get_endpoint(ep_id), change
 
+    def add_manual_endpoint(
+        self, host_pk: int, base_url: str, alias: str | None, device_ids: list[str] | None
+    ) -> dict[str, Any]:
+        """Alta a mano. Si ya existe (p. ej. detectado), se marca como manual y se conservan sus datos."""
+        now = time.time()
+        with self.lock:
+            row = self.conn.execute(
+                "SELECT id FROM endpoints WHERE host_pk=? AND base_url=?", (host_pk, base_url)
+            ).fetchone()
+            if row is None:
+                cur = self.conn.execute(
+                    "INSERT INTO endpoints(host_pk, base_url, alias, engine, status, fingerprint, snapshot,"
+                    " first_seen_at, last_seen_at, manual, device_ids) VALUES (?,?,?,?,?,?,?,?,?,1,?)",
+                    (host_pk, base_url, alias, "llama.cpp", "sin respuesta", "", None, now, now,
+                     json.dumps(device_ids) if device_ids is not None else None),
+                )  # fmt: skip
+                ep_id = cur.lastrowid
+            else:
+                ep_id = row["id"]
+                self.conn.execute(
+                    "UPDATE endpoints SET manual=1, alias=COALESCE(?, alias),"
+                    " device_ids=COALESCE(?, device_ids) WHERE id=?",
+                    (alias, json.dumps(device_ids) if device_ids is not None else None, ep_id),
+                )
+            return self.get_endpoint(ep_id)
+
+    def set_endpoint_devices(self, endpoint_id: int, device_ids: list[str] | None) -> None:
+        """GPU asociadas a mano (`None` = usar la detección)."""
+        with self.lock:
+            self.conn.execute(
+                "UPDATE endpoints SET device_ids=? WHERE id=?",
+                (json.dumps(device_ids) if device_ids is not None else None, endpoint_id),
+            )
+
+    def delete_endpoint(self, endpoint_id: int) -> None:
+        """Borra el servidor y su historial de cambios. Los runs conservan su foto de configuración."""
+        with self.lock:
+            self.conn.execute("DELETE FROM config_changes WHERE endpoint_id=?", (endpoint_id,))
+            self.conn.execute("DELETE FROM endpoints WHERE id=?", (endpoint_id,))
+
     def set_endpoint_status(self, endpoint_id: int, status: str) -> None:
         with self.lock:
             self.conn.execute("UPDATE endpoints SET status=? WHERE id=?", (status, endpoint_id))
@@ -317,7 +362,7 @@ class Database:
     def get_endpoint(self, endpoint_id: int) -> dict[str, Any] | None:
         with self.lock:
             row = self.conn.execute("SELECT * FROM endpoints WHERE id=?", (endpoint_id,)).fetchone()
-        return _json_cols(row, "snapshot") if row else None
+        return _endpoint(row) if row else None
 
     def list_endpoints(self, host_pk: int | None = None) -> list[dict[str, Any]]:
         sql, args = "SELECT * FROM endpoints", ()
@@ -325,7 +370,7 @@ class Database:
             sql, args = sql + " WHERE host_pk=?", (host_pk,)
         with self.lock:
             rows = self.conn.execute(sql + " ORDER BY base_url", args).fetchall()
-        return [_json_cols(r, "snapshot") for r in rows]
+        return [_endpoint(r) for r in rows]
 
     def add_config_change(
         self, endpoint_id: int, kind: str, diff: dict[str, Any] | None, snapshot: dict[str, Any] | None
@@ -444,6 +489,12 @@ def _json_cols(row: sqlite3.Row, *cols: str) -> dict[str, Any]:
     for c in cols:
         if d.get(c) is not None:
             d[c] = json.loads(d[c])
+    return d
+
+
+def _endpoint(row: sqlite3.Row) -> dict[str, Any]:
+    d = _json_cols(row, "snapshot", "device_ids")
+    d["manual"] = bool(d.get("manual"))
     return d
 
 

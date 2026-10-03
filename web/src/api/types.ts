@@ -123,6 +123,7 @@ export interface ServersResponse {
 export interface EndpointSnapshot {
   engine: string | null;
   base_url: string;
+  source?: "proceso" | "manual";
   pid: number | null;
   started_at: string | null;
   exe: string | null;
@@ -164,6 +165,8 @@ export interface Endpoint {
   snapshot: EndpointSnapshot | null;
   first_seen_at: number;
   last_seen_at: number;
+  manual: boolean; // dado de alta a mano: se sondea aunque el agente no vea el proceso
+  device_ids: string[] | null; // GPU asociadas a mano (null = detección automática)
 }
 
 export interface ConfigChange {

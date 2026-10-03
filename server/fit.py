@@ -139,9 +139,7 @@ def estimate(g: dict[str, Any], p: FitParams) -> dict[str, Any]:
         notes.append("Sin embedding_length: búfer de cómputo sin datos.")
 
     kv_total = None if kv_unknown else sum(int(k or 0) for k in kv_bytes)
-    layer_cost = [
-        blocks[i] + int(kv_bytes[i] or 0) + rec_bytes[i] for i in range(n)
-    ]
+    layer_cost = [blocks[i] + int(kv_bytes[i] or 0) + rec_bytes[i] for i in range(n)]
     return {
         "kind": "model",
         "params": p.__dict__,
@@ -205,7 +203,9 @@ def fit(est: dict[str, Any], gpus: list[dict[str, Any]], ram_free_mib: float | N
     # Varias GPUs: cada una paga su reserva y su búfer de cómputo.
     cap = sum(max(g["free_mib"] * MIB - reserve - compute, 0) for g in known)
     if len(known) >= 2 and sum(costs) + est["output"] <= cap:
-        out.update(verdict="split", label="Cabe repartido entre GPUs", ngl=est["n_layers"] + 1, ram_need=est["token_embd"])
+        out.update(
+            verdict="split", label="Cabe repartido entre GPUs", ngl=est["n_layers"] + 1, ram_need=est["token_embd"]
+        )
         return out
     k, _ = _gpu_layers(costs, cap)
     ram_need = est["token_embd"] + est["output"] + sum(costs[: len(costs) - k]) + compute
