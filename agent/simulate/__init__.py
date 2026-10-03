@@ -204,9 +204,11 @@ class SimCpuRamProvider(TelemetryProvider):
         return RamSample(used_mib=round(self.total_mib * (0.35 + 0.15 * load), 1), total_mib=self.total_mib)
 
 
-def _gpu(i: int, **kw) -> SimGpuSpec:
+def _gpu(profile: str, i: int, **kw) -> SimGpuSpec:
+    # UUID único por perfil y GPU: dos perfiles distintos nunca comparten tarjeta
+    tag = PROFILES.index(profile) + 1
     base = dict(
-        uuid=f"GPU-51a00000-0000-0000-0000-00000000000{i}",
+        uuid=f"GPU-51a00000-0000-0000-{tag:04d}-{i:012d}",
         index=i,
         pci_bus_id=f"00000000:0{i + 1}:00.0",
         clock_mem_mhz=7000.0,
@@ -232,6 +234,7 @@ def build_profile(
     if profile == "nvidia2":
         gpus = [
             _gpu(
+                profile,
                 0,
                 name="GPU simulada 12 GB",
                 memory_total_mib=12288,
@@ -246,6 +249,7 @@ def build_profile(
                 server_pid=4201,
             ),
             _gpu(
+                profile,
                 1,
                 name="GPU simulada 24 GB",
                 memory_total_mib=24576,
@@ -281,6 +285,7 @@ def build_profile(
     else:  # partial
         gpus = [
             _gpu(
+                profile,
                 0,
                 name="GPU simulada parcial 8 GB",
                 memory_total_mib=8192,
