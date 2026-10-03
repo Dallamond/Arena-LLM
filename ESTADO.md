@@ -17,8 +17,8 @@ relacionado: ["Arena LLM"]
 | # | Hito | Estado |
 |---|---|---|
 | 1 | Esqueleto del repositorio | ✅ 03/10/2026 |
-| 2 | Contrato del agente y servidor HTTP | ⏳ siguiente |
-| 3 | Proveedor CPU/RAM | — |
+| 2 | Contrato del agente y servidor HTTP | ✅ 03/10/2026 |
+| 3 | Proveedor CPU/RAM | ⏳ siguiente |
 | 4 | Proveedor NVIDIA | — |
 | 5 | Perfiles de hardware simulados | — |
 | 6 | Detección de llama-server | — (necesita llama.cpp instalado) |
@@ -38,5 +38,7 @@ Detalle de cada hito: `docs/PLAN-CONSTRUCCION.md` §6.
 
 ## Entorno
 
-- Python del proyecto: `.venv` con 3.12 (`scripts\setup.bat`). El comando `python` de Windows es el atajo de la Store: usar `py -3`.
+- Python del proyecto: `.venv` con 3.12 (`scripts\setup.bat`). El comando `python` de Windows es el atajo de la Store.
+- ⚠️ `py -3` apunta a un Python 3.14 registrado en `D:\python.exe` que **ya no existe** (entrada huérfana en `HKCU\Software\Python\PythonCore.14`). Por eso `start-agent.bat` usa `.venv` o `ARENA_PY`. Pendiente de Lucas: reinstalar 3.14 o borrar esa entrada.
+- Agente: `/health`, `/info`, `/metrics` con contrato `agent_api: 1`; puerto por defecto 9100; fuera de localhost exige token (`ARENA_AGENT_TOKEN`).
 - Remoto: https://github.com/Dallamond/Arena-LLM (privado).
