@@ -54,8 +54,11 @@ def check_bind(host: str, token: str | None) -> None:
 
 
 class AgentApp:
-    def __init__(self, host: HostInfo, sampler: Sampler, token: str | None = None):
+    def __init__(
+        self, host: HostInfo, sampler: Sampler, token: str | None = None, simulated: str | None = None
+    ):
         self.host = host
+        self.simulated = simulated
         self.sampler = sampler
         self.token = token or None
         self.started = time.time()
@@ -66,12 +69,13 @@ class AgentApp:
         }
 
     def health(self) -> dict[str, Any]:
-        return {"status": "ok", "uptime_s": round(time.time() - self.started, 3)}
+        return {"status": "ok", "uptime_s": round(time.time() - self.started, 3), "simulated": self.simulated}
 
     def info(self) -> dict[str, Any]:
         devices, errors = self.sampler.devices()
         return {
             "host": self.host,
+            "simulated": self.simulated,
             "devices": devices,
             "providers": [p.name for p in self.sampler.providers],
             "errors": errors,
