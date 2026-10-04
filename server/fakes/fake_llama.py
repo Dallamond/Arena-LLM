@@ -45,6 +45,7 @@ class FakeLlama:
         self.fail_prompt = fail_prompt
         self.busy = 0
         self.requests = 0
+        self.bodies: list[dict] = []  # peticiones recibidas (para los tests)
 
     @property
     def loading(self) -> bool:
@@ -105,6 +106,7 @@ def create_fake_app(fake: FakeLlama | None = None) -> FastAPI:
         if fake.loading:
             return loading_response()
         body = await request.json()
+        fake.bodies.append(body)
         prompt = " ".join(str(m.get("content", "")) for m in body.get("messages", []))
         if fake.fail_prompt and fake.fail_prompt in prompt:
             return JSONResponse(

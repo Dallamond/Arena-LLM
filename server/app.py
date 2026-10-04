@@ -13,18 +13,34 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 
-from server import __version__, launch, library
+from server import __version__, compare, launch, library
 from server.agents import AgentError, AgentMonitor
 from server.db import Database
 from server.detect import EndpointDetector, normalize_base_url
 from server.fit import FitError, FitParams, estimate, fit, gpus_from_state, ram_free_from_metrics
 from server.hub import EventHub, sse_format
+from server.runs.battle import BattleManager
 from server.runs.bench import BENCH_SUITES
 from server.runs.manager import BENCH_DEVICES_TIMEOUT_S, GGUF_TIMEOUT_S, RunError, RunManager, _run_public
 from server.runs.suites import SUITES
 from server.settings import Settings
 
 SSE_HEARTBEAT_S = 15.0
+MAX_COMPARE = 12
+
+
+class BattleSideIn(BaseModel):
+    endpoint_id: int
+    label: str | None = None
+    params: dict[str, Any] = {}
+
+
+class BattleIn(BaseModel):
+    mode: str = "paralelo"
+    label: str | None = None
+    prompts: list[str]
+    common: dict[str, Any] = {}
+    sides: list[BattleSideIn]
 
 
 class RunIn(BaseModel):
@@ -100,14 +116,17 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
         monitor = AgentMonitor(db, hub, client, settings.poll_interval_s, settings.info_interval_s)
         detector = EndpointDetector(db, hub, monitor, client)
         runs = RunManager(db, hub, monitor, llm)
+        battles = BattleManager(db, hub, runs)
         db.mark_interrupted_runs()
+        db.mark_interrupted_battles()
         app.state.db, app.state.hub, app.state.monitor = db, hub, monitor
-        app.state.detector, app.state.runs = detector, runs
+        app.state.detector, app.state.runs, app.state.battles = detector, runs, battles
         monitor.start_all()
         detector.start()
         try:
             yield
         finally:
+            await battles.shutdown()
             await runs.shutdown()
             await detector.stop()
             await monitor.stop_all()
@@ -339,6 +358,63 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
         except RunError as exc:
             raise HTTPException(exc.status, exc.message) from exc
         return _run_public(run)
+
+    # --- batallas y comparación ---------------------------------------------
+
+    @app.get("/api/battles")
+    def list_battles(request: Request, limit: int = 100) -> list[dict[str, Any]]:
+        return request.app.state.db.list_battles(min(max(limit, 1), 1000))
+
+    @app.post("/api/battles", status_code=201)
+    async def start_battle(request: Request, body: BattleIn) -> dict[str, Any]:
+        try:
+            return await request.app.state.battles.start(
+                body.mode, body.prompts, body.common, [s.model_dump() for s in body.sides], body.label
+            )
+        except RunError as exc:
+            raise HTTPException(exc.status, exc.message) from exc
+
+    @app.get("/api/battles/{battle_id}")
+    def get_battle(request: Request, battle_id: int, items: bool = True) -> dict[str, Any]:
+        try:
+            return request.app.state.battles.public(battle_id, with_items=items)
+        except RunError as exc:
+            raise HTTPException(exc.status, exc.message) from exc
+
+    @app.post("/api/battles/{battle_id}/cancel", status_code=202)
+    async def cancel_battle(request: Request, battle_id: int) -> dict[str, Any]:
+        try:
+            await request.app.state.battles.cancel(battle_id)
+        except RunError as exc:
+            raise HTTPException(exc.status, exc.message) from exc
+        return {"status": "cancelando"}
+
+    @app.delete("/api/battles/{battle_id}", status_code=204)
+    def delete_battle(request: Request, battle_id: int) -> None:
+        if battle_id in request.app.state.battles.tasks:
+            raise HTTPException(409, "La batalla está en marcha: detenla antes de borrarla")
+        if not request.app.state.db.delete_battle(battle_id):
+            raise HTTPException(404, "Batalla no encontrada")
+
+    @app.get("/api/compare")
+    def compare_runs(request: Request, runs: str) -> dict[str, Any]:
+        try:
+            ids = [int(x) for x in runs.split(",") if x.strip()]
+        except ValueError as exc:
+            raise HTTPException(422, "'runs' debe ser una lista de ids separados por comas") from exc
+        if not 1 <= len(ids) <= MAX_COMPARE:
+            raise HTTPException(422, f"Se comparan de 1 a {MAX_COMPARE} runs")
+        db: Database = request.app.state.db
+        found = db.get_runs(list(dict.fromkeys(ids)))
+        if not found:
+            raise HTTPException(404, "Ningún run encontrado")
+        return compare.build(
+            found,
+            {r["id"]: db.list_items(r["id"]) for r in found},
+            {r["id"]: db.list_tps(r["id"]) for r in found},
+            {r["id"]: db.list_samples(r["id"]) for r in found},
+            {r["id"]: db.list_bench_rows(r["id"]) for r in found},
+        )
 
     @app.get("/api/runs/{run_id}")
     def get_run(request: Request, run_id: int) -> dict[str, Any]:

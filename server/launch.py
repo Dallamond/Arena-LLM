@@ -121,7 +121,9 @@ def build(
 
     def option(oid: str, label: str, extra: list[str], env: dict[str, str] | None = None) -> None:
         args = [*base, *extra, *tail]
-        options.append({"id": oid, "label": label, "args": args, "env": env or {}, **render(exe, args, env or {}, windows)})
+        options.append(
+            {"id": oid, "label": label, "args": args, "env": env or {}, **render(exe, args, env or {}, windows)}
+        )
 
     if v == "gpu":
         fitting = [g for g in verdict.get("gpus", []) if g.get("fits")]
@@ -134,12 +136,18 @@ def build(
             else:
                 option(g["device_id"], f"En {name}", ["-ngl", str(ngl)])
         if len(fitting) > 1:
-            notes.append("Cabe en varias GPU: elige cuál; la de más memoria libre va primero, no necesariamente la más rápida.")
+            notes.append(
+                "Cabe en varias GPU: elige cuál; la de más memoria libre va primero, no necesariamente la más rápida."
+            )
     elif v in ("split", "ram"):
         label = "Repartido entre GPU" if v == "split" else f"{ngl} de {est['n_layers']} capas en GPU, el resto en RAM"
         if len(mapped) > 1 and all_mapped:
-            option(v, label, ["-ngl", str(ngl), "-ts", ",".join(_ts_values(mapped, reserve, compute))], DEVICE_ORDER_ENV)
-            notes.append("`-ts` reparte según la memoria libre ahora (ESTIMADO); ajústalo si cambia lo que hay cargado.")
+            option(
+                v, label, ["-ngl", str(ngl), "-ts", ",".join(_ts_values(mapped, reserve, compute))], DEVICE_ORDER_ENV
+            )
+            notes.append(
+                "`-ts` reparte según la memoria libre ahora (ESTIMADO); ajústalo si cambia lo que hay cargado."
+            )
         else:
             option(v, label, ["-ngl", str(ngl)])
     else:  # cpu

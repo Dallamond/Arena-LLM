@@ -25,7 +25,10 @@ def info(os_name="windows", gpus=(("nvidia:A", 0, "nvidia"), ("nvidia:B", 1, "nv
 
 
 def gpus(*frees):
-    return [{"device_id": f"nvidia:{'AB'[i]}", "name": f"GPU {'AB'[i]}", "free_mib": f, "total_mib": 24576} for i, f in enumerate(frees)]
+    return [
+        {"device_id": f"nvidia:{'AB'[i]}", "name": f"GPU {'AB'[i]}", "free_mib": f, "total_mib": 24576}
+        for i, f in enumerate(frees)
+    ]
 
 
 def build(verdict, *, e=None, inf=None, g=None, endpoints=(), model=None, **kw):
@@ -45,7 +48,10 @@ def gpu_verdict(*fits):
     return {
         "verdict": "gpu",
         "ngl": 29,
-        "gpus": [{"device_id": f"nvidia:{'AB'[i]}", "name": f"GPU {'AB'[i]}", "fits": f, "free": (i + 1) * GIB} for i, f in enumerate(fits)],
+        "gpus": [
+            {"device_id": f"nvidia:{'AB'[i]}", "name": f"GPU {'AB'[i]}", "fits": f, "free": (i + 1) * GIB}
+            for i, f in enumerate(fits)
+        ],
     }
 
 
@@ -99,13 +105,31 @@ def test_solo_cpu_desactiva_gpu():
 def test_no_cabe_o_sin_datos_no_propone():
     assert build({"verdict": "no", "gpus": []})["available"] is False
     assert build({"verdict": "unknown", "gpus": []})["available"] is False
-    assert launch.build(path="x", est={"kind": "mmproj"}, verdict={"verdict": "mmproj"}, model={}, host_info={}, gpus=[], endpoints=[])["available"] is False
+    assert (
+        launch.build(
+            path="x",
+            est={"kind": "mmproj"},
+            verdict={"verdict": "mmproj"},
+            model={},
+            host_info={},
+            gpus=[],
+            endpoints=[],
+        )["available"]
+        is False
+    )
 
 
 def test_parametros_no_por_defecto():
     out = build(gpu_verdict(True, False), e=est(ctx=16384, parallel=2, kv_type="q8_0", ubatch=1024))
     args = out["options"][0]["args"]
-    for flag, val in (("-c", "16384"), ("-np", "2"), ("-ctk", "q8_0"), ("-ctv", "q8_0"), ("-ub", "1024"), ("-fa", "on")):
+    for flag, val in (
+        ("-c", "16384"),
+        ("-np", "2"),
+        ("-ctk", "q8_0"),
+        ("-ctv", "q8_0"),
+        ("-ub", "1024"),
+        ("-fa", "on"),
+    ):
         assert args[args.index(flag) + 1] == val
     plain = build(gpu_verdict(True, False))["options"][0]["args"]
     assert "-np" not in plain and "-ctk" not in plain and "-ub" not in plain
@@ -122,11 +146,29 @@ def test_puerto_libre_salta_los_ocupados_y_los_reservados():
 
 
 def test_binario_configurado_detectado_o_supuesto():
-    assert build(gpu_verdict(True, False), inf=info(tools={"llama_server": r"D:\ll\llama-server.exe"}))["exe_source"] == "configurado"
+    assert (
+        build(gpu_verdict(True, False), inf=info(tools={"llama_server": r"D:\ll\llama-server.exe"}))["exe_source"]
+        == "configurado"
+    )
     eps = [
-        {"base_url": "http://127.0.0.1:8080", "status": "listo", "last_seen_at": 1, "snapshot": {"exe": r"C:\viejo\llama-server.exe"}},
-        {"base_url": "http://127.0.0.1:8081", "status": "listo", "last_seen_at": 2, "snapshot": {"exe": r"D:\nuevo\llama-server.exe"}},
-        {"base_url": "http://127.0.0.1:9931", "status": "listo", "last_seen_at": 3, "snapshot": {"exe": r"C:\LlamaApp.exe"}},
+        {
+            "base_url": "http://127.0.0.1:8080",
+            "status": "listo",
+            "last_seen_at": 1,
+            "snapshot": {"exe": r"C:\viejo\llama-server.exe"},
+        },
+        {
+            "base_url": "http://127.0.0.1:8081",
+            "status": "listo",
+            "last_seen_at": 2,
+            "snapshot": {"exe": r"D:\nuevo\llama-server.exe"},
+        },
+        {
+            "base_url": "http://127.0.0.1:9931",
+            "status": "listo",
+            "last_seen_at": 3,
+            "snapshot": {"exe": r"C:\LlamaApp.exe"},
+        },
     ]
     out = build(gpu_verdict(True, False), endpoints=eps)
     assert (out["exe"], out["exe_source"]) == (r"D:\nuevo\llama-server.exe", "detectado")

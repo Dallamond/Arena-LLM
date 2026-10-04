@@ -288,7 +288,8 @@ def bench_summary(suite: BenchSuite, rows: list[dict[str, Any]]) -> dict[str, An
             break
         curve.setdefault(r["test"], []).append(
             {"x": r["derived"].get("sweep"), "t_s": r["t_s_mean"], "std": r["t_s_std"],
-             "layers_pct": r["derived"].get("layers_pct"), "bandwidth_gbs": r["derived"].get("bandwidth_gbs")}  # fmt: skip
+             "layers_pct": r["derived"].get("layers_pct"),
+             "bandwidth_gbs": r["derived"].get("bandwidth_gbs")}  # fmt: skip
         )
     first = rows[0]["raw"] if rows else {}
     return {

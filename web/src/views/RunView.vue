@@ -6,9 +6,11 @@ import { api, live, onEvent, serverNow } from "../api/live";
 import type { BenchRow, DeviceInfo, LibraryPrompt, PromptLibrary, RunDetail, Sample, Snapshot, TpsPoint } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import LineChart, { type ChartBand, type ChartLine, type ChartMarker, type ChartSeries } from "../components/LineChart.vue";
+import ResponsesMatrix from "../components/ResponsesMatrix.vue";
 import Stamp from "../components/Stamp.vue";
 import { deviceColor, shortName } from "../lib/devices";
 import { NO_DATA, RUN_STATUS, fmt, fmtDate, fmtDuration, gib, isNum, suiteLabel } from "../lib/format";
+import { itemsToRows } from "../lib/compare";
 import { findByText } from "../lib/library";
 
 const props = defineProps<{ id: string }>();
@@ -180,6 +182,7 @@ const SWEEP_UNIT: Record<string, { unit: string; name: string; label: string }> 
   tensor_split: { unit: "", name: "-ts", label: "reparto -ts" },
 };
 const isBench = computed(() => run.value?.kind === "bench");
+const responseRows = computed(() => (detail.value?.items.length ? itemsToRows(detail.value.items) : []));
 const benchRows = computed<BenchRow[]>(() => [...(detail.value?.bench_rows ?? []), ...liveRows.value]);
 const benchSnap = computed(() => (isBench.value ? (detail.value?.servers_snapshot as unknown as BenchSnapshot | null) : null));
 const sweepKey = computed<string | null>(() => run.value?.summary?.bench?.sweep ?? SWEEP_OF[run.value?.suite ?? ""] ?? null);
@@ -308,6 +311,9 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
             Run #{{ run.id }} · {{ suiteLabel(run.suite) }}
             <span v-if="run.label" class="dim">— {{ run.label }}</span>
           </h2>
+          <p v-if="run.battle_id" class="small battle-link">
+            <RouterLink :to="`/batalla/${run.battle_id}`">⚔ Lado {{ run.side }} de la batalla #{{ run.battle_id }}</RouterLink>
+          </p>
           <p class="dim small">
             {{ fmtDate(run.started_at, true) }} · {{ snap?.model_file ?? "modelo sin identificar" }} ·
             {{ isBench ? (benchSnap?.simulated ? "llama-bench simulado" : "llama-bench") : snap?.base_url }} ·
@@ -319,6 +325,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
           <button v-if="running" class="btn" type="button" :disabled="busy" @click="stop">■ Detener</button>
           <template v-else>
             <button class="btn btn--primary" type="button" :disabled="busy" @click="repeat">↻ Repetir</button>
+            <RouterLink v-if="!isBench" class="btn" :to="`/comparar?runs=${run.id}`">Comparar…</RouterLink>
             <button class="btn" type="button" :disabled="busy" @click="remove">Borrar</button>
           </template>
         </div>
@@ -601,6 +608,15 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
           </tbody>
         </table></div>
       </BlueprintCard>
+
+      <!-- Lectura de todas las respuestas -->
+      <BlueprintCard v-if="responseRows.length && !running" :title="`Respuestas (${responseRows.length})`" class="gap">
+        <p class="dim small intro">
+          Todas las respuestas una debajo de otra, con la de referencia cuando el prompt es de la biblioteca. Para revisar si
+          redacta bien o comete errores.
+        </p>
+        <ResponsesMatrix :rows="responseRows" :columns="[{ title: snap?.model_file ?? 'run' }]" :start-collapsed="run.suite === 'estres'" />
+      </BlueprintCard>
     </template>
   </div>
 </template>
@@ -792,6 +808,12 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
 .detail pre.ref {
   border-left: 2px solid var(--accent);
   padding-left: 8px;
+}
+.battle-link {
+  margin: 2px 0 0;
+}
+.intro {
+  margin: 0 0 10px;
 }
 .btn.tiny {
   padding: 1px 8px;

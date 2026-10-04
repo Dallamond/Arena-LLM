@@ -329,6 +329,8 @@ export interface Run {
   abort_reason: string | null;
   notes?: string | null;
   tags?: string[] | null;
+  battle_id?: number | null;
+  side?: string | null;
 }
 
 export interface RunItem {
@@ -512,4 +514,85 @@ export interface PromptLibrary {
   categorias: { id: string; nombre: string }[];
   prompts: LibraryPrompt[];
   avisos: string[];
+}
+
+// --- Batalla ---------------------------------------------------------------------
+
+export interface BattleSide {
+  side: string;
+  endpoint_id: number;
+  label: string | null;
+  params: Record<string, unknown>;
+  run_id: number | null;
+}
+
+export interface Battle {
+  id: number;
+  label: string | null;
+  mode: "paralelo" | "secuencial";
+  status: RunStatus;
+  params: { prompts: string[]; common: Record<string, unknown> } | null;
+  sides: BattleSide[];
+  error: string | null;
+  created_at: number;
+  finished_at: number | null;
+}
+
+export interface BattleDetail extends Battle {
+  runs: ((Run & { servers_snapshot: EndpointSnapshot | null; items?: RunItem[] }) | null)[];
+}
+
+// --- Comparar --------------------------------------------------------------------
+
+export interface CompareCell {
+  response: string | null;
+  reasoning: string | null;
+  error: string | null;
+  tokens: number | null;
+  tps: number | null;
+  ttft: number | null;
+  finish: string | null;
+}
+
+export interface CompareRow {
+  prompt: string;
+  rep: number;
+  cells: (CompareCell | null)[];
+}
+
+export interface CompareRun {
+  id: number;
+  title: string;
+  label: string | null;
+  kind: string;
+  suite: string;
+  suite_version: string | null;
+  suite_hash: string | null;
+  status: RunStatus;
+  battle_id: number | null;
+  side: string | null;
+  started_at: number | null;
+  base_url: string | null;
+  metrics: Record<string, number | null>;
+  bench_rows: number;
+}
+
+export interface CompareMetric {
+  key: string;
+  label: string;
+  unit: string;
+  better: "high" | "low" | null;
+  digits: number;
+  values: (number | null)[];
+  best: number[];
+}
+
+export interface CompareResponse {
+  runs: CompareRun[];
+  comparability: { level: "si" | "parcial" | "no" | null; label: string; reasons: string[]; changes: string[] };
+  config_diff: { key: string; factor: string; values: unknown[]; same: boolean }[];
+  metrics: CompareMetric[];
+  verdicts: { key: string; title: string; run_index: number; value: number; runner_up: number; margin_pct: number | null }[];
+  items: CompareRow[];
+  series: { tps: { t: number; v: number }[]; temp: { t: number; v: number }[]; power: { t: number; v: number }[]; device: string | null }[];
 }

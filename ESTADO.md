@@ -10,7 +10,7 @@ relacionado: ["Arena LLM"]
 ---
 # Arena LLM — Estado
 
-> Leer al retomar. Última actualización: 04/10/2026 (biblioteca de prompts, comando de llama-server y README).
+> Leer al retomar. Última actualización: 04/10/2026 (tarde: Batalla, Comparar y lectura de respuestas).
 
 ## Resumen
 
@@ -23,8 +23,28 @@ relacionado: ["Arena LLM"]
 | F4 — Runner | ✅ Criterio cumplido: 33,6 t/s Arena frente a 34,5 t/s llama-bench (−2,7 %) |
 | F5 — Telemetría, resumen y estrés | ✅ salvo la prueba real de 5 min (hecha de 60 s) |
 | F6 — Rendimiento por componente | ✅ Criterio cumplido con la 3060 real (curva `-ngl`). Reparto `-ts` solo probado en simulado (falta la M40) |
-| Ideas de Lucas | ✅ Biblioteca de prompts · ✅ comando copiable de llama-server · falta recomendaciones por hardware |
-| Siguiente | Recomendaciones de modelos por hardware → F7 (calidad) → F8 → F9 → F10 |
+| F8 — Batalla | ✅ núcleo (pedido por Lucas antes de F7): 2–6 lados, paralelo/secuencial, columnas en vivo, marcador. Falta la prueba real con la M40 y el modo guiado |
+| F9 — Comparar | Gran parte: insignia, veredictos, métricas, gráficas, diff, respuestas por prompt, export MD/CSV/JSON. Faltan etiquetas/notas, filtros, métricas normalizadas, imagen y paquete de resultados |
+| Ideas de Lucas | ✅ Biblioteca de prompts · ✅ comando copiable de llama-server · ✅ ver todas las respuestas · falta recomendaciones por hardware |
+| Siguiente | Lucas prueba Batalla/Comparar → recomendaciones por hardware → F7 (calidad) → resto de F9 → F10 |
+
+## Batalla, Comparar y respuestas (04/10/2026, tarde)
+
+Lucas pidió acabar **Batalla** y **Comparar** (adelantadas a F7) y poder **leer todas las respuestas** para revisar la redacción y los errores.
+
+- **Batalla** (`/batalla`, `server/runs/battle.py`). Cada lado es un run `libre` normal con `battle_id` y `side` (migración 6: tabla `battles`, más esas dos columnas en `runs`).
+  - Común a todos los lados: prompts (con la biblioteca), semilla, repeticiones y fases. Por lado: temperatura, `max_tokens`, `top_k/top_p/min_p`, `repeat_penalty`, caché de prompt, sistema y `extra`. La semilla por lado se rechaza a propósito.
+  - **Paralelo** exige un servidor distinto por lado. **Secuencial** lanza un lado tras otro y vale con el mismo servidor.
+  - Vista en vivo: columnas con streaming, t/s, TTFT, tokens, temperatura máxima y minigráfica. Al terminar: marcador (veredictos + métricas con ▲) y respuestas por prompt. Botones: Detener, Repetir, Borrar y Ver en Comparar.
+- **Comparar** (`/comparar?runs=…`, `server/compare.py`, `GET /api/compare`). Hasta 12 runs; con uno solo sirve para leer sus respuestas.
+  - **Insignia**: *No comparables* si cambia la prueba o su versión. *Parcialmente* si los prompts son distintos, algún run está incompleto o cambian ≥2 factores a la vez (modelo · equipo/GPU · build · contexto · flags · parámetros). *Comparables* si cambia como mucho uno, que es lo que se compara.
+  - Además: veredictos (más rápido, responde antes, más frío, más eficiente, con margen), métricas con el mejor valor resaltado, gráficas superpuestas (t/s, °C, W desde el inicio de la carga) y diff de configuración.
+  - Las métricas de dispositivo usan **solo las GPU de cada run** (las vigiladas): en una batalla en paralelo en el mismo equipo no se mezclan. La energía del resumen general sí sumaba todas las GPU; aquí no.
+  - Exporta Markdown para el vault (YAML de tipo proyecto, tablas y respuestas completas), CSV con `;` y JSON.
+- **Respuestas**: componente `ResponsesMatrix` (una fila por prompt y repetición, una columna por run). Incluye la referencia de la biblioteca, tokens, palabras, t/s y TTFT, avisa de «cortada por tokens máximos», tiene buscador, razonamiento opcional y desplegar/plegar todo. Está en la vista de cada run (sección «Respuestas»; plegada en estrés), en Batalla y en Comparar.
+- **Historial**: casillas, bandeja «Comparar (N)» («Ver respuestas» con uno) y enlace ⚔ a la batalla de cada lado. Calidad y Batalla comparten `PromptPicker`.
+- Probado de punta a punta en simulado con Playwright (batalla en paralelo con 2 GPU simuladas → marcador → Comparar → Historial → run), sin errores en consola. Arreglado al verlo: temperatura máxima «sin datos» al terminar un lado y enteros con decimal en el diff.
+- Tests: 5 de batalla de punta a punta (`test_battle.py`: paralelo con mismos prompts y semilla en lo que recibe cada servidor, secuencial, validaciones, cancelar/borrar), 11 de `compare.py` y 3 de la web (filas, Markdown y CSV). `ruff` limpio en todo el repo.
 
 ## Comando de llama-server (04/10/2026)
 
@@ -126,7 +146,7 @@ Después: **Calidad** → elegir servidor → Lanzar estrés o prompt libre.
   - Historial básico.
   - Ajustes: apariencia (acento, contraste, tamaño, rejilla, croquis), equipos, umbrales y datos.
 - **Rendimiento (F6):** llama-bench por componente, ver arriba.
-- **Tests:** 204 de Python (laboratorio completo sin GPU, calculadora de encaje y llama-bench real con un ejecutable falso y simulado) y 14 de la web.
+- **Tests:** 220 de Python (laboratorio completo sin GPU, calculadora de encaje y llama-bench real con un ejecutable falso y simulado) y 17 de la web.
 
 ## Calculadora de encaje (03/10/2026)
 

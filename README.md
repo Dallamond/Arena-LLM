@@ -4,7 +4,7 @@ Banco de pruebas **independiente del hardware** para modelos de IA locales (llam
 
 ![Panel de Arena LLM: dos GPU, CPU y RAM en vivo, con medidores y aviso de throttling](docs/img/panel.png)
 
-> Estado: fases F1–F6 hechas (telemetría, detección de servidores, calculadora de encaje con comando de arranque, estrés, prompt libre con biblioteca y rendimiento por componente con `llama-bench`). Ver [`ESTADO.md`](ESTADO.md) y [`docs/HOJA-DE-RUTA.md`](docs/HOJA-DE-RUTA.md).
+> Estado: F1–F6 hechas, más **Batalla** (F8) y gran parte de **Comparar** (F9): telemetría, detección de servidores, calculadora de encaje con comando de arranque, estrés, prompt libre con biblioteca, rendimiento por componente con `llama-bench`, batallas entre modelos y comparación de runs con lectura de todas las respuestas. Ver [`ESTADO.md`](ESTADO.md) y [`docs/HOJA-DE-RUTA.md`](docs/HOJA-DE-RUTA.md).
 >
 > Todas las capturas están hechas con el **modo simulado** (perfiles `nvidia2` y `cpu-only`, `llama-server` simulados y GGUF falsos): no hay datos ni rutas reales.
 
@@ -12,7 +12,7 @@ Banco de pruebas **independiente del hardware** para modelos de IA locales (llam
 
 1. **Muestra siempre el estado del equipo** (cada GPU, CPU y RAM) para ver de un vistazo que no pasa nada raro.
 2. **Detecta sola** qué modelo, contexto y flags tiene cada `llama-server` y lo guarda con cada prueba.
-3. **Prueba y compara**: estrés, prompt libre y rendimiento por componente. En próximas fases llegarán calidad, batallas A contra B y comparación de resultados.
+3. **Prueba y compara**: estrés, prompt libre, rendimiento por componente, batallas A contra B y comparación de resultados. En próximas fases llegarán las pruebas de calidad con corrección automática.
 
 ## Funcionalidades
 
@@ -87,9 +87,46 @@ El run muestra la curva, una tabla con el % de capas en GPU y el ancho de banda 
 
 ![Resultado de una curva -ngl con llama-bench: t/s de generación y de procesado de prompt según las capas en GPU](docs/img/rendimiento.png)
 
+### Batalla
+
+Los mismos prompts contra 2–6 servidores (lados), **en paralelo** (cada lado en su servidor, por ejemplo uno por GPU) o **uno detrás de otro** (vale con un solo servidor, por ejemplo para variar solo la temperatura).
+
+- **Común a todos los lados**: prompts (con la biblioteca), semilla, repeticiones y fases.
+- **Por lado**: temperatura, tokens máximos, `top_k/top_p/min_p`, penalización, caché de prompt, prompt de sistema y JSON `extra`, con «Copiar A →».
+- **En vivo**: una columna por lado con la respuesta en streaming, t/s, TTFT, tokens, temperatura de su GPU y minigráfica.
+- **Al terminar**: el **marcador** (más rápido, responde antes, más frío, más eficiente) y las respuestas de todos los lados, prompt a prompt.
+
+![Batalla terminada: dos lados con sus cifras y el marcador con veredictos y métricas](docs/img/batalla.png)
+
+### Comparar
+
+Elige runs en el Historial (bandeja «Comparar (N)»), desde una batalla o en la propia página. Se pueden comparar hasta 12.
+
+- **Insignia de comparabilidad** con sus motivos:
+  - *No comparables*: es otra prueba u otra versión de la prueba.
+  - *Parcialmente*: prompts distintos, algún run incompleto o cambian varias cosas a la vez (por ejemplo, modelo y GPU).
+  - *Comparables*: cambia como mucho un factor, justo el que se compara.
+- **Veredictos** con su margen, **métricas** con el mejor valor marcado (▲), **gráficas superpuestas** (t/s, °C, W) y **diff de configuración**. La temperatura, la potencia y la energía son solo las de la GPU de cada run.
+- **Exportar**: Markdown para el vault (frontmatter YAML, tablas y respuestas completas), CSV y JSON.
+
+![Comparar dos runs: insignia, veredictos y tabla de métricas con el mejor valor resaltado](docs/img/comparar.png)
+
+### Leer todas las respuestas
+
+Para revisar si un modelo redacta bien o se equivoca, todas las respuestas se pueden leer **prompt a prompt**: en la vista de cada run (sección «Respuestas»), en la batalla y en Comparar, con una columna por run. Cada respuesta lleva:
+
+- La respuesta de referencia de la biblioteca, cuando la hay.
+- Tokens, palabras, t/s y TTFT.
+- El aviso «cortada por tokens máximos» cuando llega al límite.
+- El razonamiento, opcional.
+
+Además hay un buscador.
+
+![Respuestas por prompt de dos modelos, lado a lado, con la respuesta de referencia](docs/img/respuestas.png)
+
 ### Historial
 
-Todos los runs guardados, con su servidor, modelo, suite (versión y hash) y métricas principales.
+Todos los runs guardados, con su servidor, modelo, suite (versión y hash) y métricas principales. Se marcan con casillas para compararlos («Ver respuestas» con uno solo), y los lados de una batalla enlazan a ella.
 
 ![Historial de runs](docs/img/historial.png)
 
@@ -153,8 +190,9 @@ Abre `http://127.0.0.1:8090`. Después:
 1. **Servidores → GGUF en disco**: elige contexto y slots, mira si el modelo cabe y pulsa **Ver comando**.
 2. Copia el comando y ejecútalo en una terminal. Arena detecta el servidor en unos 5 s, y cuando aparece como **listo** ya se puede probar.
 3. **Calidad**: elige el servidor y lanza **Prompt libre** (con prompts de la biblioteca) o **Estrés**.
-4. **Rendimiento**: `llama-bench` por componente, sin necesidad de tener un `llama-server` cargado. Es mejor que no lo haya, porque ocupa la tarjeta.
-5. **Historial**: todos los runs. Desde cada run se ve el resultado completo.
+4. **Batalla**: elige prompts, un servidor por lado y lanza. Para enfrentar dos modelos a la vez, lanza dos `llama-server` (uno por GPU, en puertos distintos). Con uno solo, usa «uno detrás de otro».
+5. **Comparar** o **Historial**: marca runs y compáralos, o abre uno y baja a «Respuestas» para leerlas todas.
+6. **Rendimiento**: `llama-bench` por componente, sin necesidad de tener un `llama-server` cargado. Es mejor que no lo haya, porque ocupa la tarjeta.
 
 `scripts\stop.bat` para todo lo de Arena, pero no toca los `llama-server` que hayas lanzado tú. En Linux, los mismos scripts terminan en `.sh`.
 
@@ -199,8 +237,8 @@ En Windows, `python` es el de `.venv\Scripts\python.exe` (los scripts `.bat` ya 
 | F6 | Rendimiento por componente (`llama-bench`) | ✅ (reparto `-ts` probado solo en simulado) |
 | — | Recomendaciones de modelos según el hardware | Siguiente |
 | F7 | Pruebas de calidad (razonamiento, código aislado, contexto largo, concurrencia) | Pendiente |
-| F8 | Batalla: el mismo prompt en dos o más lados | Pendiente |
-| F9 | Historial, comparación (insignia de comparabilidad) y exportación | Pendiente |
+| F8 | Batalla: el mismo prompt en dos o más lados | ✅ (falta la prueba real con dos GPU y el modo guiado) |
+| F9 | Historial, comparación (insignia de comparabilidad) y exportación | Gran parte: faltan etiquetas/notas, filtros, métricas normalizadas, imagen del marcador y paquete de resultados |
 | F10–F12 | Modo vídeo, despliegue en Linux y backlog | Pendiente |
 
 ## Datos

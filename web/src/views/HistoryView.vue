@@ -1,13 +1,20 @@
 <script setup lang="ts">
-// Historial básico de runs (filtros, comparar y exportar llegan en F9).
+// Historial de runs: búsqueda, selección para Comparar y enlace a la batalla de cada lado.
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import { live, refreshRuns, runList } from "../api/live";
 import type { Run } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import Stamp from "../components/Stamp.vue";
 import { RUN_STATUS, fmt, fmtDate, fmtDuration, suiteLabel } from "../lib/format";
 
+const MAX_COMPARE = 12;
+const router = useRouter();
 const text = ref("");
+const selected = ref<number[]>([]);
+const toggle = (id: number) =>
+  (selected.value = selected.value.includes(id) ? selected.value.filter((x) => x !== id) : [...selected.value, id]);
+const compare = () => router.push(`/comparar?runs=${[...selected.value].sort((a, b) => a - b).join(",")}`);
 onMounted(() => refreshRuns().catch(() => {}));
 
 function endpointName(r: Run): string {
@@ -46,13 +53,14 @@ const rows = computed(() => {
     <div class="head">
       <h2 class="title">Historial</h2>
       <input v-model="text" class="search mono" type="search" placeholder="Buscar (suite, etiqueta, modelo, estado)…" aria-label="Buscar en el historial" />
-      <Stamp text="comparar y exportar: F9" tone="dim" />
+      <span class="dim small">Marca runs para compararlos (también vale uno solo, para leer sus respuestas).</span>
     </div>
     <BlueprintCard>
       <p v-if="!rows.length" class="dim">Sin runs todavía. Lanza uno desde <RouterLink to="/calidad">Calidad</RouterLink>.</p>
       <div v-else class="scroll"><table class="runs mono">
         <thead>
           <tr>
+            <th><span class="sr-only">elegir</span></th>
             <th>#</th>
             <th>fecha</th>
             <th>prueba</th>
@@ -66,11 +74,21 @@ const rows = computed(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="r in rows" :key="r.id">
+          <tr v-for="r in rows" :key="r.id" :class="{ sel: selected.includes(r.id) }">
+            <td>
+              <input
+                type="checkbox"
+                :checked="selected.includes(r.id)"
+                :disabled="r.status === 'running' || (!selected.includes(r.id) && selected.length >= MAX_COMPARE)"
+                :aria-label="`Elegir el run #${r.id} para comparar`"
+                @change="toggle(r.id)"
+              />
+            </td>
             <td><RouterLink :to="`/pruebas/${r.id}`">#{{ r.id }}</RouterLink></td>
             <td>{{ fmtDate(r.started_at ?? r.created_at) }}</td>
             <td>
               {{ suiteLabel(r.suite) }}
+              <RouterLink v-if="r.battle_id" :to="`/batalla/${r.battle_id}`" class="battle">⚔ #{{ r.battle_id }} · {{ r.side }}</RouterLink>
               <span v-if="r.label" class="dim">· {{ r.label }}</span>
             </td>
             <td>{{ endpointName(r) }}</td>
@@ -86,6 +104,13 @@ const rows = computed(() => {
         </tbody>
       </table></div>
     </BlueprintCard>
+
+    <!-- Bandeja de comparar -->
+    <div v-if="selected.length" class="tray" role="region" aria-label="Runs elegidos para comparar">
+      <span class="mono">{{ selected.map((id) => `#${id}`).join(" · ") }}</span>
+      <button class="btn" type="button" @click="selected = []">Vaciar</button>
+      <button class="btn btn--primary" type="button" @click="compare">{{ selected.length === 1 ? "Ver respuestas" : `Comparar (${selected.length})` }}</button>
+    </div>
   </div>
 </template>
 
@@ -136,5 +161,34 @@ const rows = computed(() => {
 }
 .runs tbody tr:hover {
   background: rgba(108, 180, 255, 0.04);
+}
+.runs tr.sel {
+  background: rgba(108, 180, 255, 0.08);
+}
+.battle {
+  margin-left: 6px;
+  font-size: 11px;
+}
+.small {
+  font-size: 11px;
+}
+.tray {
+  position: sticky;
+  bottom: 12px;
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  padding: 8px 12px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+.tray .mono {
+  margin-right: auto;
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 </style>

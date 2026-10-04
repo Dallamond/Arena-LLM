@@ -35,7 +35,13 @@ def test_biblioteca_propia_anade_y_sustituye(tmp_path):
                 "categorias": {"mia": "Mis pruebas"},
                 "prompts": [
                     {"id": "mia-1", "categoria": "mia", "titulo": "Uno", "prompt": "Hola"},
-                    {"id": "mates-tren", "categoria": "mates", "titulo": "Tren mío", "prompt": "Otro tren", "respuesta": "1"},
+                    {
+                        "id": "mates-tren",
+                        "categoria": "mates",
+                        "titulo": "Tren mío",
+                        "prompt": "Otro tren",
+                        "respuesta": "1",
+                    },
                 ],
             }
         ),

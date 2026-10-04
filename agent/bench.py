@@ -428,9 +428,14 @@ class SimBenchRunner(BenchRunner):
                     "tensor_split": c["tensor_split"], "n_prompt": n if kind == "pp" else 0,
                     "n_gen": n if kind == "tg" else 0, "n_depth": c.get("n_depth", 0),
                     "avg_ts": ts, "stddev_ts": ts * 0.02, "avg_ns": int(n / ts * 1e9),
-                    "samples_ts": [ts * (0.98 + 0.04 * i / max(spec.repetitions - 1, 1)) for i in range(spec.repetitions)], "t": time.time(),
+                    "samples_ts": _sim_samples(ts, spec.repetitions), "t": time.time(),
                 }  # fmt: skip
                 job.rows.append(row)
         job.finished_at = time.time()
         if job.status == "running":
             job.status, job.returncode = "done", 0
+
+
+def _sim_samples(ts: float, reps: int) -> list[float]:
+    """Una muestra por repetición, repartidas ±2 % alrededor de la media (llama-bench simulado)."""
+    return [ts * (0.98 + 0.04 * i / max(reps - 1, 1)) for i in range(reps)]

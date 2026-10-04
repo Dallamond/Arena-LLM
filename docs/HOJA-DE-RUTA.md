@@ -280,16 +280,18 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
 **Criterio:** mismas semillas ⇒ mismos prompts; un código con bucle infinito o escritura de ficheros no bloquea ni daña el servidor.
 
 ### F8 — Batalla
-- [ ] 2+ lados (paralelo o secuencial) con parámetros editables por lado (muestreo, `max_tokens`, `cache_prompt`, `extra` JSON, prompt de sistema), copia A→B y "variar solo un parámetro".
-- [ ] Vista en columnas con respuesta en streaming, números grandes y mini-gráficas; marcador final.
+- [x] 2+ lados (paralelo o secuencial) con parámetros editables por lado (muestreo, `max_tokens`, `cache_prompt`, `extra` JSON, prompt de sistema), copia A→B y "variar solo un parámetro".
+  *Hecho 04/10/2026 (2–6 lados; semilla, prompts y fases comunes por diseño). "Variar solo un parámetro" se cubre con el modo secuencial en el mismo servidor y la insignia, que avisa si cambia más de un factor; falta un asistente dedicado.*
+- [x] Vista en columnas con respuesta en streaming, números grandes y mini-gráficas; marcador final (04/10/2026).
 - [ ] **Modo guiado** de barridos (§6).
 **Criterio:** dos lados simultáneos en M40 y 3060, telemetría separada por GPU, prompts y semillas idénticos verificados por test.
+*04/10/2026: verificado por test con las dos GPU simuladas (`tests/server/test_battle.py`: mismos prompts y semilla en las peticiones que recibe cada servidor, cada lado vigila su GPU). Falta la prueba real con la M40.*
 
 ### F9 — Historial, comparación y exportación
-- [ ] Historial filtrable con etiquetas/notas; bandeja "Comparar (N)".
-- [ ] Comparador: tarjetas de veredicto, tabla con mejor valor resaltado, gráficas superpuestas, matriz por ítem, diff de configuración.
-- [ ] Exportar JSON, CSV, **Markdown para el vault** (con YAML válido) e imagen del marcador.
-- [ ] **Comparación entre equipos y tarjetas:** insignia de comparabilidad (Comparables / Parcialmente / No comparables, con los motivos), métricas normalizadas opcionales (t/s por GiB de VRAM, por W, por Wh) y filtro por equipo/dispositivo.
+- [~] Historial filtrable con etiquetas/notas; bandeja "Comparar (N)". *04/10/2026: búsqueda y bandeja hechas; faltan etiquetas/notas editables y filtros por equipo/dispositivo.*
+- [x] Comparador: tarjetas de veredicto, tabla con mejor valor resaltado, gráficas superpuestas, matriz por ítem (respuestas por prompt), diff de configuración (04/10/2026).
+- [~] Exportar JSON, CSV, **Markdown para el vault** (con YAML válido) e imagen del marcador. *04/10/2026: JSON, CSV y Markdown hechos; falta la imagen.*
+- [~] **Comparación entre equipos y tarjetas:** insignia de comparabilidad (Comparables / Parcialmente / No comparables, con los motivos), métricas normalizadas opcionales (t/s por GiB de VRAM, por W, por Wh) y filtro por equipo/dispositivo. *04/10/2026: insignia con motivos hecha (no comparables = otra prueba o versión; parcialmente = prompts distintos, runs incompletos o más de un factor cambiado); faltan métricas normalizadas y filtro.*
 - [ ] **Paquete de resultados**: exportar e importar runs (con ficha de equipo, versión de prueba y modelo) para comparar entre instalaciones.
 **Criterio:** comparar 5+ runs de al menos dos equipos o dispositivos distintos; el Markdown exportado se pega en el vault sin errores; un run de otra versión de prueba se marca como no comparable.
 

@@ -157,6 +157,23 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX bench_rows_run ON bench_rows(run_id, idx);
     """,
+    # 6 — batallas: varios runs (lados) con los mismos prompts
+    """
+    CREATE TABLE battles (
+        id INTEGER PRIMARY KEY,
+        label TEXT,
+        mode TEXT NOT NULL,
+        status TEXT NOT NULL,
+        params TEXT,
+        sides TEXT,
+        error TEXT,
+        created_at REAL NOT NULL,
+        finished_at REAL
+    );
+    ALTER TABLE runs ADD COLUMN battle_id INTEGER;
+    ALTER TABLE runs ADD COLUMN side TEXT;
+    CREATE INDEX runs_battle ON runs(battle_id);
+    """,
 ]
 
 #: Tamaño de la paleta de dispositivos de la GUI (--dev-1 … --dev-N).
@@ -443,11 +460,68 @@ class Database:
     def list_runs(self, limit: int = 200) -> list[dict[str, Any]]:
         with self.lock:
             rows = self.conn.execute(
-                "SELECT id, kind, suite, suite_version, label, status, host_pk, endpoint_id, params, created_at,"
-                " started_at, finished_at, summary, error, abort_reason, tags FROM runs ORDER BY id DESC LIMIT ?",
+                "SELECT id, kind, suite, suite_version, suite_hash, label, status, host_pk, endpoint_id, params,"
+                " created_at, started_at, finished_at, summary, error, abort_reason, tags, battle_id, side"
+                " FROM runs ORDER BY id DESC LIMIT ?",
                 (limit,),
             ).fetchall()
         return [_json_cols(r, "params", "summary", "tags") for r in rows]
+
+    def get_runs(self, run_ids: list[int]) -> list[dict[str, Any]]:
+        """Varios runs completos, en el orden pedido (los que no existen se omiten)."""
+        out = []
+        for rid in run_ids:
+            run = self.get_run(rid)
+            if run:
+                out.append(run)
+        return out
+
+    # --- batallas ------------------------------------------------------------
+
+    BATTLE_JSON = ("params", "sides")
+
+    def create_battle(self, **fields: Any) -> dict[str, Any]:
+        fields.setdefault("created_at", time.time())
+        for k in self.BATTLE_JSON:
+            if k in fields:
+                fields[k] = json.dumps(fields[k])
+        cols = ", ".join(fields)
+        marks = ", ".join("?" for _ in fields)
+        with self.lock:
+            cur = self.conn.execute(f"INSERT INTO battles({cols}) VALUES ({marks})", tuple(fields.values()))
+        return self.get_battle(cur.lastrowid)
+
+    def update_battle(self, battle_id: int, **fields: Any) -> None:
+        for k in self.BATTLE_JSON:
+            if k in fields:
+                fields[k] = json.dumps(fields[k])
+        sets = ", ".join(f"{k}=?" for k in fields)
+        with self.lock:
+            self.conn.execute(f"UPDATE battles SET {sets} WHERE id=?", (*fields.values(), battle_id))
+
+    def get_battle(self, battle_id: int) -> dict[str, Any] | None:
+        with self.lock:
+            row = self.conn.execute("SELECT * FROM battles WHERE id=?", (battle_id,)).fetchone()
+        return _json_cols(row, *self.BATTLE_JSON) if row else None
+
+    def list_battles(self, limit: int = 200) -> list[dict[str, Any]]:
+        with self.lock:
+            rows = self.conn.execute("SELECT * FROM battles ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [_json_cols(r, *self.BATTLE_JSON) for r in rows]
+
+    def delete_battle(self, battle_id: int) -> bool:
+        """Borra la batalla y sus runs."""
+        with self.lock:
+            self.conn.execute("DELETE FROM runs WHERE battle_id=?", (battle_id,))
+            return self.conn.execute("DELETE FROM battles WHERE id=?", (battle_id,)).rowcount > 0
+
+    def mark_interrupted_battles(self) -> int:
+        with self.lock:
+            return self.conn.execute(
+                "UPDATE battles SET status='error', error='Servidor detenido durante la batalla', finished_at=?"
+                " WHERE status IN ('pending', 'running')",
+                (time.time(),),
+            ).rowcount
 
     def delete_run(self, run_id: int) -> bool:
         with self.lock:

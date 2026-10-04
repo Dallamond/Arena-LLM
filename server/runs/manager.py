@@ -124,7 +124,15 @@ class RunManager:
 
     # --- API ---------------------------------------------------------------
 
-    async def start(self, suite_id: str, endpoint_id: int, user_params: dict[str, Any], label: str | None) -> dict:
+    async def start(
+        self,
+        suite_id: str,
+        endpoint_id: int,
+        user_params: dict[str, Any],
+        label: str | None,
+        battle_id: int | None = None,
+        side: str | None = None,
+    ) -> dict:
         suite = SUITES.get(suite_id)
         if suite is None:
             raise RunError(404, f"Suite desconocida: {suite_id}")
@@ -156,6 +164,8 @@ class RunManager:
             servers_snapshot=ep["snapshot"],
             host_snapshot=host_snapshot,
             started_at=time.time(),
+            battle_id=battle_id,
+            side=side,
         )
         ar = ActiveRun(id=run["id"], suite=suite, host_pk=state.pk, endpoint=ep, params=params, watch=watch)
         self.active[ar.id] = ar
@@ -317,6 +327,15 @@ class RunManager:
                     f"ESTIMADO: el modelo necesita {need / 1024**3:.1f} GiB y hay {free / 1024**3:.1f} GiB libres "
                     "en la GPU elegida. Prueba la curva -ngl o lanza igualmente.",
                 )
+
+    async def wait(self, run_id: int) -> None:
+        """Espera a que termine un run en marcha (vuelve enseguida si ya terminó)."""
+        ar = self.active.get(run_id)
+        if ar and ar.task:
+            await asyncio.shield(ar.task)
+
+    def is_active(self, run_id: int) -> bool:
+        return run_id in self.active
 
     async def cancel(self, run_id: int) -> None:
         ar = self.active.get(run_id)
