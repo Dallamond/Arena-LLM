@@ -10,7 +10,7 @@ relacionado: ["Arena LLM"]
 ---
 # Arena LLM — Estado
 
-> Leer al retomar. Última actualización: 04/10/2026 (biblioteca de prompts).
+> Leer al retomar. Última actualización: 04/10/2026 (biblioteca de prompts, comando de llama-server y README).
 
 ## Resumen
 
@@ -23,8 +23,26 @@ relacionado: ["Arena LLM"]
 | F4 — Runner | ✅ Criterio cumplido: 33,6 t/s Arena frente a 34,5 t/s llama-bench (−2,7 %) |
 | F5 — Telemetría, resumen y estrés | ✅ salvo la prueba real de 5 min (hecha de 60 s) |
 | F6 — Rendimiento por componente | ✅ Criterio cumplido con la 3060 real (curva `-ngl`). Reparto `-ts` solo probado en simulado (falta la M40) |
-| Ideas de Lucas | ✅ Biblioteca de prompts · falta comando copiable de llama-server y recomendaciones por hardware |
-| Siguiente | Comando copiable de `llama-server` → recomendaciones por hardware → F7 (calidad) → F8 → F9 → F10 |
+| Ideas de Lucas | ✅ Biblioteca de prompts · ✅ comando copiable de llama-server · falta recomendaciones por hardware |
+| Siguiente | Recomendaciones de modelos por hardware → F7 (calidad) → F8 → F9 → F10 |
+
+## Comando de llama-server (04/10/2026)
+
+Servidores → GGUF en disco → **Ver comando** en cada GGUF que cabe. Lo compone `server/launch.py` (devuelto en `/api/hosts/{id}/fit` como `command`) a partir del veredicto de la calculadora:
+
+- `-m`, `-c`, `-ngl` sugerido, `-np` si es mayor que 1, `-ctk/-ctv` si la KV no es f16, `-ub` si no es 512, `-fa on` y `--port`. El puerto es el primero desde 8080 que no usa ningún servidor vivo del equipo ni el propio Arena.
+- Si cabe en varias GPU, se elige una (`-dev CUDAn`, la de más memoria libre primero). Si va repartido o parcial con varias GPU, se usa `-ts` según la memoria aprovechable. Solo CPU: `-ngl 0 -dev none`. Si no cabe o faltan datos, no se propone comando.
+- Con `-dev`/`-ts`, el comando fija `CUDA_DEVICE_ORDER=PCI_BUS_ID`. Los prefijos de backend van en una tabla por proveedor (`nvidia → CUDA`); otro proveedor deja el reparto automático con un aviso.
+- Binario, por orden: `llama_server` de `agent.json` → `llama-server` junto a `llama_bench` (el agente lo publica en `/info` → `tools`) → último llama-server detectado → `llama-server` del PATH, con aviso.
+- Sintaxis cmd y PowerShell en Windows, bash en Linux. Avisa si el contexto por slot supera el de entrenamiento.
+- **Probado de verdad**: el comando del Qwen 7B Q8 (`-c 8192 -ngl 29 -fa on --port 8080`) arrancó a la primera con b11379 en la 3060 (70 s de carga; 8,5 GiB de VRAM usada frente a 8,3 GiB estimados más 0,65 GiB del escritorio) y Arena lo detectó como listo.
+- Tests: 13 de `server/launch.py` y 1 de la configuración del agente.
+
+Otros arreglos de esta sesión:
+- Historial: rotulaba todo lo que no era estrés como "Libre" (también los bench); ahora usa el nombre de la suite y, en los bench, muestra el GGUF y la mejor tg del barrido.
+- Calculadora: «Slots (-np)» ya se alinea con los otros controles.
+- llama-bench simulado: devuelve tantas muestras como repeticiones (antes, como mucho 2).
+- README repasado: puesta en marcha paso a paso, configuración del agente con `llama_server`, secciones de Rendimiento, biblioteca y comando, y capturas nuevas en simulado (`servidores.png`, `historial.png`, `comando-llama-server.png`, `prompt-biblioteca.png`, `rendimiento.png`).
 
 ## Biblioteca de prompts (04/10/2026)
 
@@ -108,7 +126,7 @@ Después: **Calidad** → elegir servidor → Lanzar estrés o prompt libre.
   - Historial básico.
   - Ajustes: apariencia (acento, contraste, tamaño, rejilla, croquis), equipos, umbrales y datos.
 - **Rendimiento (F6):** llama-bench por componente, ver arriba.
-- **Tests:** 190 de Python (laboratorio completo sin GPU, calculadora de encaje y llama-bench real con un ejecutable falso y simulado) y 14 de la web.
+- **Tests:** 204 de Python (laboratorio completo sin GPU, calculadora de encaje y llama-bench real con un ejecutable falso y simulado) y 14 de la web.
 
 ## Calculadora de encaje (03/10/2026)
 
@@ -124,7 +142,7 @@ Servidores → **＋ Añadir a mano**: equipo (de él sale la telemetría), URL,
 
 ## Pendiente (orden propuesto)
 
-0. **Ideas de Lucas (03/10/2026)**, ver la hoja de ruta: ~~biblioteca de prompts~~ (hecha 04/10) · comando copiable de `llama-server` por GGUF desde la calculadora · recomendaciones de modelos según el hardware. Después F7 → F8 → F9 → F10.
+0. **Ideas de Lucas (03/10/2026)**, ver la hoja de ruta: ~~biblioteca de prompts~~ y ~~comando copiable~~ (hechos 04/10) · comando copiable de `llama-server` por GGUF desde la calculadora · recomendaciones de modelos según el hardware. Después F7 → F8 → F9 → F10.
 0. ~~README con capturas y GIFs~~: ya está en `main` (merge 82986d9). Quedan las capturas de Servidores e Historial (ver abajo).
 
 1. Lucas revisa el pulido visual (sin `FIG.`, títulos y rótulos en Inter seminegrita, datos vivos en mono más clara) y la pestaña GGUF. No se pudo revisar con capturas: la extensión de Chrome no estaba conectada.

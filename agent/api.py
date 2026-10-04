@@ -122,6 +122,7 @@ class AgentApp:
             "providers": [p.name for p in self.sampler.providers],
             "errors": errors,
             "capabilities": {"bench": self.bench.available},
+            "tools": {"llama_server": _path_or_none(self.config.llama_server_path())},
         }
 
     def metrics(self, query: dict[str, str] | None = None) -> dict[str, Any]:
@@ -337,3 +338,7 @@ def make_server(app: AgentApp, host: str, port: int) -> ThreadingHTTPServer:
     server = ThreadingHTTPServer((host, port), make_handler(app))
     server.daemon_threads = True
     return server
+
+
+def _path_or_none(p) -> str | None:
+    return str(p) if p else None

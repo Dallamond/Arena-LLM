@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 
-from server import __version__, library
+from server import __version__, launch, library
 from server.agents import AgentError, AgentMonitor
 from server.db import Database
 from server.detect import EndpointDetector, normalize_base_url
@@ -202,10 +202,21 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
         g = (await proxy(request, host_id, "/gguf", {"path": path}, timeout=GGUF_TIMEOUT_S))["gguf"]
         state = state_or_404(request, host_id)
         est = estimate(g, params)
-        verdict = fit(est, gpus_from_state(state.info, state.metrics), ram_free_from_metrics(state.metrics))
-        est.pop("layer_cost", None)
+        gpus = gpus_from_state(state.info, state.metrics)
+        verdict = fit(est, gpus, ram_free_from_metrics(state.metrics))
         model = {k: g.get(k) for k in MODEL_SUMMARY_KEYS}
-        return {"path": path, "estimated": True, "model": model, "estimate": est, "fit": verdict}
+        command = launch.build(
+            path=path,
+            est=est,
+            verdict=verdict,
+            model=model,
+            host_info=state.info,
+            gpus=gpus,
+            endpoints=request.app.state.db.list_endpoints(host_id),
+            reserved_ports={settings.port},
+        )
+        est.pop("layer_cost", None)
+        return {"path": path, "estimated": True, "model": model, "estimate": est, "fit": verdict, "command": command}
 
     # --- ajustes -------------------------------------------------------------
 

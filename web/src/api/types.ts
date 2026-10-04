@@ -458,7 +458,30 @@ export interface FitResponse {
   model: GgufHeader;
   estimate: FitEstimate;
   fit: FitVerdict;
+  command?: LaunchCommand;
 }
+
+/** Comando de llama-server propuesto para un GGUF (ESTIMADO; Arena no lo ejecuta). */
+export interface LaunchOption {
+  id: string;
+  label: string;
+  args: string[];
+  env: Record<string, string>;
+  shells: Record<string, string>;
+}
+
+export type LaunchCommand =
+  | { available: false; reason: string }
+  | {
+      available: true;
+      exe: string;
+      exe_source: "configurado" | "detectado" | "supuesto";
+      os: string | null;
+      port: number;
+      options: LaunchOption[];
+      notes: string[];
+      estimated: true;
+    };
 
 export interface GgufHeader {
   name: string | null;

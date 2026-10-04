@@ -6,6 +6,7 @@ import type { FitParams, FitResponse, ModelFile, ModelsResponse } from "../api/t
 import { shortName } from "../lib/devices";
 import { NO_DATA, fmt, isNum } from "../lib/format";
 import BarWithOverflow from "./BarWithOverflow.vue";
+import LaunchCommand from "./LaunchCommand.vue";
 import Stamp from "./Stamp.vue";
 
 const props = defineProps<{ hostId: number }>();
@@ -29,6 +30,7 @@ const models = ref<ModelsResponse | null>(null);
 const error = ref<string | null>(null);
 const fits = reactive<Record<string, FitResponse | { error: string } | undefined>>({});
 const open = ref<Record<string, boolean>>({});
+const openCmd = ref<Record<string, boolean>>({});
 const loading = ref(false);
 
 // Las partes 2..n de un modelo partido no se listan: la parte 1 ya suma el modelo entero.
@@ -204,9 +206,20 @@ function params_b(n: number | null | undefined): string {
                 />
                 <span class="dim small">necesita {{ gb(r!.fit.need_full_gpu) }} · libre en {{ b!.name }}</span>
               </div>
-              <button class="btn tiny" type="button" :aria-expanded="!!open[f.path]" @click="open[f.path] = !open[f.path]">
-                {{ open[f.path] ? "Ocultar" : "Ver" }} desglose
-              </button>
+              <div class="actions">
+                <button class="btn tiny" type="button" :aria-expanded="!!open[f.path]" @click="open[f.path] = !open[f.path]">
+                  {{ open[f.path] ? "Ocultar" : "Ver" }} desglose
+                </button>
+                <button
+                  v-if="r!.command"
+                  class="btn tiny"
+                  type="button"
+                  :aria-expanded="!!openCmd[f.path]"
+                  @click="openCmd[f.path] = !openCmd[f.path]"
+                >
+                  {{ openCmd[f.path] ? "Ocultar" : "Ver" }} comando
+                </button>
+              </div>
             </template>
             <span v-else class="dim small">{{ r!.estimate.notes[0] }}</span>
           </div>
@@ -238,6 +251,7 @@ function params_b(n: number | null | undefined): string {
               <li v-for="n in r!.estimate.notes" :key="n">{{ n }}</li>
             </ul>
           </div>
+          <LaunchCommand v-if="openCmd[f.path] && r!.command" :command="r!.command" />
         </template>
 
         <template v-else>
@@ -269,6 +283,16 @@ function params_b(n: number | null | undefined): string {
 }
 .controls input {
   width: 80px;
+}
+.controls input,
+.controls select {
+  height: 28px;
+  box-sizing: border-box;
+}
+.actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 .rows {
   list-style: none;

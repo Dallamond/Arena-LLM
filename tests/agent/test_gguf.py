@@ -210,3 +210,16 @@ def test_layout_modelo_partido(tmp_path):
     p2.unlink()
     app._gguf_cache.clear()
     assert app.gguf({"path": str(p1)})["gguf"].layout["split_missing"] == [p2.name]
+
+
+def test_llama_server_configurado_o_junto_a_llama_bench(tmp_path):
+    bench = tmp_path / "llama-bench.exe"
+    bench.write_bytes(b"")
+    assert AgentConfig(llama_bench=bench).llama_server_path() is None  # no hay llama-server al lado
+    (tmp_path / "llama-server.exe").write_bytes(b"")
+    assert AgentConfig(llama_bench=bench).llama_server_path() == tmp_path / "llama-server.exe"
+    other = tmp_path / "otro" / "llama-server"
+    assert AgentConfig(llama_bench=bench, llama_server=other).llama_server_path() == other
+    f = tmp_path / "agent.json"
+    f.write_text(json.dumps({"llama_server": str(other)}), encoding="utf-8")
+    assert load_config(f).llama_server == other

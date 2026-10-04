@@ -270,7 +270,8 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
 ### Ideas de Lucas (03/10/2026) — para después de F6
 - [x] **Biblioteca de prompts predefinidos** en Prompt libre: problemas de lógica, acertijos tipo test de CI, matemáticas, código, redacción… elegibles con un clic (encaja con los datasets de F7).
   *Hecho 04/10/2026: 28 prompts en 7 categorías en `server/catalog/prompts.json` (datos, no código), ampliable con `prompts.json` en la carpeta de datos; respuesta de referencia visible en el run.*
-- [ ] **Comando copiable de `llama-server`** para cada GGUF desde la calculadora de encaje (ruta del binario detectada, `-m`, `-ngl` sugerido, `-c`, `-ts`, `--port` libre, `-fa`). Es también el paso 2 del modo guiado de F8.
+- [x] **Comando copiable de `llama-server`** para cada GGUF desde la calculadora de encaje (ruta del binario detectada, `-m`, `-ngl` sugerido, `-c`, `-ts`, `--port` libre, `-fa`). Es también el paso 2 del modo guiado de F8.
+  *Hecho 04/10/2026: Servidores → GGUF en disco → Ver comando (cmd/PowerShell o bash, `-dev` o `-ts` con `CUDA_DEVICE_ORDER=PCI_BUS_ID`, puerto libre, binario de `llama_server`/junto a `llama_bench`/detectado). Probado arrancando el comando real en la 3060 con b11379.*
 - [ ] **Recomendaciones de modelos según el hardware**: qué tamaño y cuantización caben en cada equipo (por VRAM + RAM y ancho de banda medido en F6), con un catálogo editable de modelos conocidos (fichero de datos, no código).
 
 ### F7 — Pruebas de calidad

@@ -5,7 +5,7 @@ import { live, refreshRuns, runList } from "../api/live";
 import type { Run } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import Stamp from "../components/Stamp.vue";
-import { RUN_STATUS, fmt, fmtDate, fmtDuration } from "../lib/format";
+import { RUN_STATUS, fmt, fmtDate, fmtDuration, suiteLabel } from "../lib/format";
 
 const text = ref("");
 onMounted(() => refreshRuns().catch(() => {}));
@@ -15,7 +15,15 @@ function endpointName(r: Run): string {
     const e = list.find((x) => x.id === r.endpoint_id);
     if (e) return e.alias || e.snapshot?.model_file || e.base_url;
   }
+  // Un bench no tiene servidor: se muestra el GGUF que midió llama-bench
+  const model = r.params?.model;
+  if (r.kind === "bench" && typeof model === "string") return model.split(/[\\/]/).pop() ?? model;
   return r.endpoint_id ? `servidor #${r.endpoint_id}` : "—";
+}
+
+/** t/s de la fila: mediana del cliente; en un bench, la mejor generación (tg) del barrido. */
+function tps(r: Run): number | null | undefined {
+  return r.kind === "bench" ? r.summary?.bench?.best_tg?.t_s : r.summary?.tps_client.median;
 }
 
 function maxTemp(r: Run): number | null {
@@ -62,15 +70,15 @@ const rows = computed(() => {
             <td><RouterLink :to="`/pruebas/${r.id}`">#{{ r.id }}</RouterLink></td>
             <td>{{ fmtDate(r.started_at ?? r.created_at) }}</td>
             <td>
-              {{ r.suite === "estres" ? "Estrés" : "Libre" }}
+              {{ suiteLabel(r.suite) }}
               <span v-if="r.label" class="dim">· {{ r.label }}</span>
             </td>
             <td>{{ endpointName(r) }}</td>
             <td>
               <Stamp :text="`${RUN_STATUS[r.status]?.icon} ${RUN_STATUS[r.status]?.text ?? r.status}`" :tone="RUN_STATUS[r.status]?.tone ?? 'dim'" :tilt="0" />
             </td>
-            <td>{{ fmt(r.summary?.tps_client.median, 1) }}</td>
-            <td>{{ fmt(r.summary?.completion_tokens) }}</td>
+            <td>{{ fmt(tps(r), 1) }}<span v-if="r.kind === 'bench' && tps(r) != null" class="dim"> tg</span></td>
+            <td>{{ r.kind === "bench" ? "—" : fmt(r.summary?.completion_tokens) }}</td>
             <td>{{ fmt(maxTemp(r), 0, "°C") }}</td>
             <td>{{ fmt(r.summary?.energy_wh, 2, "Wh") }}</td>
             <td>{{ fmtDuration(r.finished_at && r.started_at ? r.finished_at - r.started_at : null) }}</td>

@@ -428,7 +428,7 @@ class SimBenchRunner(BenchRunner):
                     "tensor_split": c["tensor_split"], "n_prompt": n if kind == "pp" else 0,
                     "n_gen": n if kind == "tg" else 0, "n_depth": c.get("n_depth", 0),
                     "avg_ts": ts, "stddev_ts": ts * 0.02, "avg_ns": int(n / ts * 1e9),
-                    "samples_ts": [ts * 0.98, ts * 1.02][: spec.repetitions], "t": time.time(),
+                    "samples_ts": [ts * (0.98 + 0.04 * i / max(spec.repetitions - 1, 1)) for i in range(spec.repetitions)], "t": time.time(),
                 }  # fmt: skip
                 job.rows.append(row)
         job.finished_at = time.time()

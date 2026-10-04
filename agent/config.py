@@ -6,6 +6,9 @@ configuración del usuario (`%APPDATA%\\ArenaLLM\\agent.json` en Windows,
 
 Ejemplo:
     {"model_dirs": ["D:/modelos"], "llama_bench": "D:/dev-tools/llama.cpp/llama-bench.exe"}
+
+`llama_server` es opcional: si falta, se busca `llama-server` junto a `llama-bench`.
+Solo se usa para proponer el comando de arranque; el agente nunca lo ejecuta.
 """
 
 import json
@@ -19,7 +22,19 @@ from pathlib import Path
 class AgentConfig:
     model_dirs: list[Path] = field(default_factory=list)
     llama_bench: Path | None = None
+    llama_server: Path | None = None
     source: Path | None = None  # fichero del que se cargó
+
+    def llama_server_path(self) -> Path | None:
+        """`llama_server` configurado, o el `llama-server` que haya junto a `llama-bench`."""
+        if self.llama_server:
+            return self.llama_server
+        if self.llama_bench:
+            name = "llama-server" + (".exe" if self.llama_bench.suffix.lower() == ".exe" else "")
+            candidate = self.llama_bench.with_name(name)
+            if candidate.is_file():
+                return candidate
+        return None
 
     def allowed_model(self, raw: str) -> Path | None:
         """Ruta resuelta si es un .gguf dentro de una carpeta permitida; si no, None."""
@@ -62,8 +77,10 @@ def load_config(
         raise FileNotFoundError(f"No existe el fichero de configuración {cfg_path}")
     dirs = [Path(d).expanduser() for d in [*data.get("model_dirs", []), *(extra_model_dirs or [])]]
     bench = llama_bench or data.get("llama_bench")
+    server = data.get("llama_server")
     return AgentConfig(
         model_dirs=dirs,
         llama_bench=Path(bench).expanduser() if bench else None,
+        llama_server=Path(server).expanduser() if server else None,
         source=cfg_path if cfg_path.exists() else None,
     )
