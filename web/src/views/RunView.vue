@@ -3,12 +3,13 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { api, live, onEvent, serverNow } from "../api/live";
-import type { BenchRow, DeviceInfo, RunDetail, Sample, Snapshot, TpsPoint } from "../api/types";
+import type { BenchRow, DeviceInfo, LibraryPrompt, PromptLibrary, RunDetail, Sample, Snapshot, TpsPoint } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import LineChart, { type ChartBand, type ChartLine, type ChartMarker, type ChartSeries } from "../components/LineChart.vue";
 import Stamp from "../components/Stamp.vue";
 import { deviceColor, shortName } from "../lib/devices";
 import { NO_DATA, RUN_STATUS, fmt, fmtDate, fmtDuration, gib, isNum, suiteLabel } from "../lib/format";
+import { findByText } from "../lib/library";
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
@@ -21,6 +22,10 @@ const liveSamples = ref<Sample[]>([]);
 const liveRows = ref<BenchRow[]>([]);
 const busy = ref(false);
 const expanded = ref<Record<number, boolean>>({});
+
+// Respuestas de referencia de la biblioteca de prompts (se buscan por el texto del prompt)
+const libraryPrompts = ref<LibraryPrompt[]>([]);
+const libEntry = (prompt: string | null | undefined) => (prompt ? findByText(prompt, libraryPrompts.value) : undefined);
 
 async function load() {
   try {
@@ -41,6 +46,9 @@ const lv = computed(() => live.runLive[runId.value]);
 const offs: (() => void)[] = [];
 onMounted(() => {
   load();
+  api<PromptLibrary>("/api/prompts")
+    .then((lib) => (libraryPrompts.value = lib.prompts))
+    .catch(() => (libraryPrompts.value = []));
   offs.push(
     onEvent("run_live", (d: { run: number; t: number; tps?: number; tokens: number }) => {
       if (d.run === runId.value && isNum(d.tps) && running.value && lv.value?.phase === "carga") {
@@ -560,7 +568,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
             <template v-for="it in detail.items" :key="it.id">
               <tr :class="{ 'row--error': it.error && !isCut(it.error) }">
                 <td>{{ it.idx + 1 }}</td>
-                <td>{{ it.name }}</td>
+                <td>{{ it.name }}<span v-if="libEntry(it.prompt)" class="dim"> · {{ libEntry(it.prompt)?.titulo }}</span></td>
                 <td>{{ fmt(m(it, "completion_tokens")) }}</td>
                 <td>{{ fmt(m(it, "tps_client"), 1) }}</td>
                 <td>{{ fmt(m(it, "tps_server"), 1) }}</td>
@@ -583,6 +591,10 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
                   </template>
                   <h4 class="label">Respuesta</h4>
                   <pre>{{ it.response || NO_DATA }}</pre>
+                  <template v-if="libEntry(it.prompt)?.respuesta">
+                    <h4 class="label">Respuesta de referencia <span class="dim">(biblioteca · compárala tú: no hay corrección automática)</span></h4>
+                    <pre class="ref">{{ libEntry(it.prompt)?.respuesta }}</pre>
+                  </template>
                 </td>
               </tr>
             </template>
@@ -776,6 +788,10 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
 }
 .bar__val {
   text-align: right;
+}
+.detail pre.ref {
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
 }
 .btn.tiny {
   padding: 1px 8px;

@@ -471,3 +471,22 @@ export interface GgufHeader {
   expert_count: number | null;
   file_size: number;
 }
+
+/** Biblioteca de prompts predefinidos (/api/prompts). */
+export interface LibraryPrompt {
+  id: string;
+  categoria: string;
+  titulo: string;
+  prompt: string;
+  respuesta: string | null;
+  max_tokens: number | null;
+  origen: "base" | "propia";
+  hash: string;
+}
+
+export interface PromptLibrary {
+  version: string;
+  categorias: { id: string; nombre: string }[];
+  prompts: LibraryPrompt[];
+  avisos: string[];
+}

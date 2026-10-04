@@ -1,6 +1,6 @@
 ---
 fecha_creacion: 2026-10-03
-fecha_modificacion: 2026-10-03
+fecha_modificacion: 2026-10-04
 tipo: proyecto
 categoria: tech
 tags: [tech, homelab, agente]
@@ -10,7 +10,7 @@ relacionado: ["Arena LLM"]
 ---
 # Arena LLM — Estado
 
-> Leer al retomar. Última actualización: 03/10/2026 (noche, 3.ª sesión: F6).
+> Leer al retomar. Última actualización: 04/10/2026 (biblioteca de prompts).
 
 ## Resumen
 
@@ -23,7 +23,16 @@ relacionado: ["Arena LLM"]
 | F4 — Runner | ✅ Criterio cumplido: 33,6 t/s Arena frente a 34,5 t/s llama-bench (−2,7 %) |
 | F5 — Telemetría, resumen y estrés | ✅ salvo la prueba real de 5 min (hecha de 60 s) |
 | F6 — Rendimiento por componente | ✅ Criterio cumplido con la 3060 real (curva `-ngl`). Reparto `-ts` solo probado en simulado (falta la M40) |
-| Siguiente | Las 3 ideas de Lucas (biblioteca de prompts, comando copiable de llama-server, recomendaciones por hardware) → F7 (calidad) → F8 → F9 → F10 |
+| Ideas de Lucas | ✅ Biblioteca de prompts · falta comando copiable de llama-server y recomendaciones por hardware |
+| Siguiente | Comando copiable de `llama-server` → recomendaciones por hardware → F7 (calidad) → F8 → F9 → F10 |
+
+## Biblioteca de prompts (04/10/2026)
+
+Calidad → Prompt libre → **Biblioteca**: 28 prompts en 7 categorías (lógica, tipo test de CI, matemáticas, código, seguir instrucciones, redacción, explicar). Un clic añade o quita el prompt de la lista (el primero sustituye al prompt por defecto); "añadir esta categoría" mete todos los visibles. «Tokens máximos» pasa al mayor sugerido. Los que tienen respuesta objetiva llevan `ref`: en el run aparece el título junto a la petición y la **respuesta de referencia** bajo la respuesta (sin corrección automática; eso es F7).
+
+- Datos en `server/catalog/prompts.json` (versión `1`); `GET /api/prompts`. Para añadir prompts propios sin tocar el repo: `prompts.json` con la misma forma en la carpeta de datos (`data/` o `ARENA_DATA_DIR`); un `id` repetido sustituye al de la base, y un fichero roto se ignora con aviso en la página.
+- El run sigue siendo la suite `libre`: los prompts van en los parámetros y en el hash, así que dos runs con la misma selección son comparables.
+- Tests: 8 de Python (`tests/server/test_library.py`) y 4 de la web (`web/tests/library.test.ts`).
 
 ## F6 · llama-bench desde el agente (03/10/2026, 22:55)
 
@@ -99,7 +108,7 @@ Después: **Calidad** → elegir servidor → Lanzar estrés o prompt libre.
   - Historial básico.
   - Ajustes: apariencia (acento, contraste, tamaño, rejilla, croquis), equipos, umbrales y datos.
 - **Rendimiento (F6):** llama-bench por componente, ver arriba.
-- **Tests:** 182 de Python (laboratorio completo sin GPU, calculadora de encaje y llama-bench real con un ejecutable falso y simulado) y 10 de la web.
+- **Tests:** 190 de Python (laboratorio completo sin GPU, calculadora de encaje y llama-bench real con un ejecutable falso y simulado) y 14 de la web.
 
 ## Calculadora de encaje (03/10/2026)
 
@@ -115,8 +124,8 @@ Servidores → **＋ Añadir a mano**: equipo (de él sale la telemetría), URL,
 
 ## Pendiente (orden propuesto)
 
-0. **Ideas de Lucas (03/10/2026)**, ver la hoja de ruta: biblioteca de prompts predefinidos (lógica, tipo test de CI, código…) en Prompt libre · comando copiable de `llama-server` por GGUF desde la calculadora · recomendaciones de modelos según el hardware. Después F7 → F8 → F9 → F10.
-0. README con capturas y GIFs: lo preparó un subagente en una rama aparte (ver `git log`/ramas); si no está en `main`, integrarlo.
+0. **Ideas de Lucas (03/10/2026)**, ver la hoja de ruta: ~~biblioteca de prompts~~ (hecha 04/10) · comando copiable de `llama-server` por GGUF desde la calculadora · recomendaciones de modelos según el hardware. Después F7 → F8 → F9 → F10.
+0. ~~README con capturas y GIFs~~: ya está en `main` (merge 82986d9). Quedan las capturas de Servidores e Historial (ver abajo).
 
 1. Lucas revisa el pulido visual (sin `FIG.`, títulos y rótulos en Inter seminegrita, datos vivos en mono más clara) y la pestaña GGUF. No se pudo revisar con capturas: la extensión de Chrome no estaba conectada.
 2. F3:

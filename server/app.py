@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 
-from server import __version__
+from server import __version__, library
 from server.agents import AgentError, AgentMonitor
 from server.db import Database
 from server.detect import EndpointDetector, normalize_base_url
@@ -302,6 +302,10 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
     @app.get("/api/suites")
     def suites() -> list[dict[str, Any]]:
         return [s.public() for s in (*SUITES.values(), *BENCH_SUITES.values())]
+
+    @app.get("/api/prompts")
+    def prompt_library() -> dict[str, Any]:
+        return library.load(settings.data_dir)
 
     @app.get("/api/runs")
     def list_runs(request: Request, limit: int = 200) -> list[dict[str, Any]]:

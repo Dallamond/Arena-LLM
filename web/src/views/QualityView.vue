@@ -3,10 +3,11 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api, hostList, live } from "../api/live";
-import type { Endpoint, Suite } from "../api/types";
+import type { Endpoint, PromptLibrary, Suite } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import Stamp from "../components/Stamp.vue";
 import { fmt, fmtDuration } from "../lib/format";
+import { joinPrompts, splitPrompts, suggestedMaxTokens, togglePrompt } from "../lib/library";
 
 const route = useRoute();
 const router = useRouter();
@@ -41,6 +42,35 @@ const free = reactive({ prompts: "", repeats: 1, max_tokens: 512, baseline_s: 5,
 const adv = reactive({ temperature: 0, seed: 42, top_k: "", top_p: "", min_p: "", cache_prompt: false, system: "", extra: "{}" });
 const showAdv = ref(false);
 
+// Biblioteca de prompts predefinidos (fichero de datos del servidor)
+const library = ref<PromptLibrary | null>(null);
+const libraryError = ref<string | null>(null);
+const libCat = ref<string>("todas");
+const freeDefaults = ref<string[]>([]);
+const freeList = computed(() => splitPrompts(free.prompts));
+const libVisible = computed(() =>
+  (library.value?.prompts ?? []).filter((p) => libCat.value === "todas" || p.categoria === libCat.value),
+);
+const libSelected = computed(() => (library.value?.prompts ?? []).filter((p) => freeList.value.includes(p.prompt)));
+const catCount = (id: string) => (library.value?.prompts ?? []).filter((p) => p.categoria === id).length;
+
+function setFree(list: string[]) {
+  free.prompts = joinPrompts(list.length ? list : freeDefaults.value);
+  const sug = suggestedMaxTokens(list, library.value?.prompts ?? []);
+  if (sug !== null) free.max_tokens = sug;
+}
+function toggleLib(prompt: string) {
+  setFree(togglePrompt(freeList.value, prompt, freeDefaults.value));
+}
+function addVisible() {
+  let list = freeList.value;
+  for (const p of libVisible.value) if (!list.includes(p.prompt)) list = togglePrompt(list, p.prompt, freeDefaults.value);
+  setFree(list);
+}
+function clearLib() {
+  setFree(freeList.value.filter((p) => !libSelected.value.some((e) => e.prompt === p)));
+}
+
 onMounted(async () => {
   try {
     suites.value = await api<Suite[]>("/api/suites");
@@ -53,9 +83,15 @@ onMounted(async () => {
       cooldown_s: s.cooldown_s ?? stress.cooldown_s,
     });
     const f = suites.value.find((x) => x.id === "libre")?.defaults ?? {};
-    free.prompts = ((f.prompts as string[]) ?? []).join("\n---\n");
+    freeDefaults.value = (f.prompts as string[]) ?? [];
+    free.prompts = joinPrompts(freeDefaults.value);
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
+  }
+  try {
+    library.value = await api<PromptLibrary>("/api/prompts");
+  } catch (e) {
+    libraryError.value = e instanceof Error ? e.message : String(e);
   }
 });
 
@@ -84,7 +120,7 @@ async function launch(suite: "estres" | "libre") {
         ? { ...base, duration_s: stress.duration_s, parallel: stress.parallel, max_tokens: stress.max_tokens, baseline_s: stress.baseline_s, cooldown_s: stress.cooldown_s }
         : {
             ...base,
-            prompts: free.prompts.split(/^\s*---\s*$/m).map((p) => p.trim()).filter(Boolean),
+            prompts: freeList.value,
             repeats: free.repeats,
             max_tokens: free.max_tokens,
             baseline_s: free.baseline_s,
@@ -164,8 +200,44 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
       <!-- Libre -->
       <BlueprintCard title="Prompt libre">
         <p class="desc">Uno o varios prompts propios, separados por una línea con <code>---</code>. Mide TTFT, t/s y tokens, y guarda prompt y respuesta.</p>
+        <fieldset class="lib">
+          <legend class="label">Biblioteca <span v-if="library" class="dim mono">v{{ library.version }}</span></legend>
+          <p v-if="libraryError" class="error mono small">✕ {{ libraryError }}</p>
+          <p v-for="w in library?.avisos ?? []" :key="w" class="warn small">▲ {{ w }}</p>
+          <template v-if="library">
+            <div class="lib__cats" role="group" aria-label="Categorías">
+              <button type="button" class="chip" :aria-pressed="libCat === 'todas'" @click="libCat = 'todas'">
+                Todas <span class="mono">{{ library.prompts.length }}</span>
+              </button>
+              <button v-for="c in library.categorias" :key="c.id" type="button" class="chip" :aria-pressed="libCat === c.id" @click="libCat = c.id">
+                {{ c.nombre }} <span class="mono">{{ catCount(c.id) }}</span>
+              </button>
+            </div>
+            <div class="lib__items">
+              <button
+                v-for="p in libVisible"
+                :key="p.id"
+                type="button"
+                class="item"
+                :aria-pressed="freeList.includes(p.prompt)"
+                :title="p.prompt + (p.respuesta ? `\n\nReferencia: ${p.respuesta}` : '')"
+                @click="toggleLib(p.prompt)"
+              >
+                <span aria-hidden="true">{{ freeList.includes(p.prompt) ? "■" : "□" }}</span> {{ p.titulo }}
+                <span v-if="p.respuesta" class="item__tag mono">ref</span>
+                <span v-if="p.origen === 'propia'" class="item__tag mono">propio</span>
+              </button>
+            </div>
+            <p class="dim small lib__foot">
+              {{ libSelected.length }} de la biblioteca en la lista ·
+              <button type="button" class="link" @click="addVisible">añadir {{ libCat === "todas" ? "todos" : "esta categoría" }}</button>
+              <template v-if="libSelected.length"> · <button type="button" class="link" @click="clearLib">quitar los de la biblioteca</button></template>
+              <br />Los marcados <span class="mono">ref</span> traen respuesta de referencia: se ve junto a la respuesta en el run. «Tokens máximos» pasa al mayor sugerido.
+            </p>
+          </template>
+        </fieldset>
         <div class="form">
-          <label class="wide"><span class="label">prompts</span><textarea v-model="free.prompts" rows="6" /></label>
+          <label class="wide"><span class="label">prompts <span class="dim mono">({{ freeList.length }})</span></span><textarea v-model="free.prompts" rows="6" /></label>
           <label><span class="label">repeticiones</span><input v-model.number="free.repeats" type="number" min="1" max="100" /></label>
           <label><span class="label">tokens máximos</span><input v-model.number="free.max_tokens" type="number" min="1" max="131072" /></label>
           <label><span class="label">reposo antes (s)</span><input v-model.number="free.baseline_s" type="number" min="0" max="600" /></label>
@@ -318,5 +390,75 @@ textarea {
 }
 code {
   font-family: var(--font-mono);
+}
+.lib {
+  border: 1px dashed var(--line);
+  padding: 8px 10px 4px;
+  margin: 0 0 12px;
+  min-width: 0;
+}
+.lib legend {
+  padding: 0 4px;
+}
+.lib__cats,
+.lib__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.lib__items {
+  max-height: 168px;
+  overflow-y: auto;
+}
+.chip,
+.item {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  padding: 3px 9px;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+}
+.chip[aria-pressed="true"],
+.item[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--ink);
+  background: rgba(108, 180, 255, 0.08);
+}
+.chip:hover,
+.item:hover {
+  border-color: var(--line-strong);
+}
+.chip:focus-visible,
+.item:focus-visible,
+.link:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.chip .mono {
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+.item__tag {
+  font-size: 9px;
+  color: var(--ink-faint);
+  border: 1px solid var(--line);
+  padding: 0 3px;
+}
+.lib__foot {
+  margin: 0 0 4px;
+}
+.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
 }
 </style>

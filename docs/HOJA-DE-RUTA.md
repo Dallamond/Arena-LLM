@@ -268,7 +268,8 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
   *Cumplido 03/10/2026: RTX 3060 · Qwen2.5-Coder 7B Q8 · b11379 → tg 3,2 / 3,6 / 4,4 / 8,8 / 38,7 t/s con 0 / 7 / 14 / 22 / 29 capas (run guardado). El reparto `-ts` solo se ha probado con el agente simulado (falta la M40).*
 
 ### Ideas de Lucas (03/10/2026) — para después de F6
-- [ ] **Biblioteca de prompts predefinidos** en Prompt libre: problemas de lógica, acertijos tipo test de CI, matemáticas, código, redacción… elegibles con un clic (encaja con los datasets de F7).
+- [x] **Biblioteca de prompts predefinidos** en Prompt libre: problemas de lógica, acertijos tipo test de CI, matemáticas, código, redacción… elegibles con un clic (encaja con los datasets de F7).
+  *Hecho 04/10/2026: 28 prompts en 7 categorías en `server/catalog/prompts.json` (datos, no código), ampliable con `prompts.json` en la carpeta de datos; respuesta de referencia visible en el run.*
 - [ ] **Comando copiable de `llama-server`** para cada GGUF desde la calculadora de encaje (ruta del binario detectada, `-m`, `-ngl` sugerido, `-c`, `-ts`, `--port` libre, `-fa`). Es también el paso 2 del modo guiado de F8.
 - [ ] **Recomendaciones de modelos según el hardware**: qué tamaño y cuantización caben en cada equipo (por VRAM + RAM y ancho de banda medido en F6), con un catálogo editable de modelos conocidos (fichero de datos, no código).
 

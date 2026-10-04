@@ -1,0 +1,239 @@
+{
+  "version": "1",
+  "nota": "Biblioteca de prompts predefinidos para Prompt libre. Fichero de datos: se puede editar sin tocar código. Para añadir los tuyos sin modificar este fichero, crea prompts.json en la carpeta de datos (ARENA_DATA_DIR) con la misma forma; un id repetido sustituye al de aquí. 'respuesta' es la respuesta de referencia (null si es abierta) y 'max_tokens' el valor sugerido.",
+  "categorias": {
+    "logica": "Lógica",
+    "ci": "Tipo test de CI",
+    "mates": "Matemáticas",
+    "codigo": "Código",
+    "formato": "Seguir instrucciones",
+    "redaccion": "Redacción",
+    "explicar": "Explicar"
+  },
+  "prompts": [
+    {
+      "id": "logica-bate-pelota",
+      "categoria": "logica",
+      "titulo": "Bate y pelota",
+      "prompt": "Un bate y una pelota cuestan 1,10 € en total. El bate cuesta 1 € más que la pelota. ¿Cuánto cuesta la pelota? Razona brevemente y da la respuesta final.",
+      "respuesta": "0,05 € (5 céntimos)",
+      "max_tokens": 512
+    },
+    {
+      "id": "logica-maquinas",
+      "categoria": "logica",
+      "titulo": "Máquinas y piezas",
+      "prompt": "Si 5 máquinas tardan 5 minutos en fabricar 5 piezas, ¿cuánto tardan 100 máquinas en fabricar 100 piezas? Razona brevemente y da la respuesta final.",
+      "respuesta": "5 minutos",
+      "max_tokens": 512
+    },
+    {
+      "id": "logica-nenufares",
+      "categoria": "logica",
+      "titulo": "Nenúfares",
+      "prompt": "En un lago hay una mancha de nenúfares que dobla su tamaño cada día. Si tarda 48 días en cubrir el lago entero, ¿cuántos días tarda en cubrir la mitad del lago? Razona brevemente y da la respuesta final.",
+      "respuesta": "47 días",
+      "max_tokens": 512
+    },
+    {
+      "id": "logica-hermanas",
+      "categoria": "logica",
+      "titulo": "Hermanos y hermanas",
+      "prompt": "Lucía tiene 3 hermanos varones. Cada uno de sus hermanos tiene 2 hermanas. ¿Cuántas hermanas tiene Lucía? Razona brevemente y da la respuesta final.",
+      "respuesta": "1 hermana",
+      "max_tokens": 512
+    },
+    {
+      "id": "logica-caballeros",
+      "categoria": "logica",
+      "titulo": "Caballeros y bribones",
+      "prompt": "En una isla, los caballeros siempre dicen la verdad y los bribones siempre mienten. A dice: «B es un bribón». B dice: «A y yo somos del mismo tipo». ¿Qué es cada uno? Razona y da la respuesta final.",
+      "respuesta": "A es caballero y B es bribón",
+      "max_tokens": 768
+    },
+    {
+      "id": "ci-serie-producto",
+      "categoria": "ci",
+      "titulo": "Serie 2, 6, 12, 20…",
+      "prompt": "¿Qué número sigue en la serie? 2, 6, 12, 20, 30, ? Explica la regla en una frase y da el número.",
+      "respuesta": "42 (n·(n+1))",
+      "max_tokens": 256
+    },
+    {
+      "id": "ci-serie-doble",
+      "categoria": "ci",
+      "titulo": "Serie 3, 5, 9, 17…",
+      "prompt": "¿Qué número sigue en la serie? 3, 5, 9, 17, 33, ? Explica la regla en una frase y da el número.",
+      "respuesta": "65 (×2 − 1)",
+      "max_tokens": 256
+    },
+    {
+      "id": "ci-serie-letras",
+      "categoria": "ci",
+      "titulo": "Serie de letras",
+      "prompt": "Usando el alfabeto inglés de 26 letras, ¿qué letra sigue en la serie? A, C, F, J, O, ? Explica la regla en una frase y da la letra.",
+      "respuesta": "U (saltos de +2, +3, +4, +5, +6)",
+      "max_tokens": 256
+    },
+    {
+      "id": "ci-analogia",
+      "categoria": "ci",
+      "titulo": "Analogía",
+      "prompt": "Completa la analogía con una sola palabra: «Pez es a agua como pájaro es a …». Después justifica en una frase.",
+      "respuesta": "aire",
+      "max_tokens": 128
+    },
+    {
+      "id": "ci-intruso",
+      "categoria": "ci",
+      "titulo": "El intruso",
+      "prompt": "¿Cuál de estas palabras no pertenece al grupo y por qué? Manzana, plátano, zanahoria, pera, uva.",
+      "respuesta": "zanahoria (es una hortaliza; las demás son frutas)",
+      "max_tokens": 128
+    },
+    {
+      "id": "mates-operaciones",
+      "categoria": "mates",
+      "titulo": "Orden de operaciones",
+      "prompt": "Calcula 17 × 24 − 96 ÷ 8. Muestra los pasos y da el resultado final.",
+      "respuesta": "396",
+      "max_tokens": 256
+    },
+    {
+      "id": "mates-tren",
+      "categoria": "mates",
+      "titulo": "Velocidad media",
+      "prompt": "Un tren sale a las 14:35 y llega a las 17:10 tras recorrer 310 km. ¿Cuál es su velocidad media en km/h? Muestra los pasos.",
+      "respuesta": "120 km/h",
+      "max_tokens": 384
+    },
+    {
+      "id": "mates-porcentajes",
+      "categoria": "mates",
+      "titulo": "Sube y baja",
+      "prompt": "Un producto cuesta 80 €. Sube un 25 % y después baja un 20 %. ¿Cuál es el precio final? Muestra los pasos.",
+      "respuesta": "80 €",
+      "max_tokens": 256
+    },
+    {
+      "id": "mates-divisibles",
+      "categoria": "mates",
+      "titulo": "Divisibles por 3 o 5",
+      "prompt": "¿Cuántos números enteros entre 1 y 100, ambos incluidos, son divisibles por 3 o por 5? Muestra los pasos.",
+      "respuesta": "47",
+      "max_tokens": 384
+    },
+    {
+      "id": "codigo-palindromo",
+      "categoria": "codigo",
+      "titulo": "Palíndromo en Python",
+      "prompt": "Escribe una función en Python `es_palindromo(texto)` que devuelva True si el texto es un palíndromo, ignorando mayúsculas, espacios, tildes y signos de puntuación. Incluye tres ejemplos de uso.",
+      "respuesta": null,
+      "max_tokens": 768
+    },
+    {
+      "id": "codigo-que-imprime",
+      "categoria": "codigo",
+      "titulo": "¿Qué imprime?",
+      "prompt": "¿Qué imprime este código de Python? Explícalo brevemente.\n\nprint([x * x for x in range(10) if x % 3 == 0])",
+      "respuesta": "[0, 9, 36, 81]",
+      "max_tokens": 256
+    },
+    {
+      "id": "codigo-fallo",
+      "categoria": "codigo",
+      "titulo": "Encuentra el fallo",
+      "prompt": "Esta función de Python tiene un fallo en un caso concreto. ¿Cuál es y cómo lo arreglarías?\n\ndef media(valores):\n    return sum(valores) / len(valores)",
+      "respuesta": "Con una lista vacía lanza ZeroDivisionError",
+      "max_tokens": 384
+    },
+    {
+      "id": "codigo-sql",
+      "categoria": "codigo",
+      "titulo": "Consulta SQL",
+      "prompt": "Con las tablas clientes(id, nombre) y pedidos(id, cliente_id, importe), escribe una consulta SQL que devuelva los 5 clientes con mayor importe total de pedidos, de mayor a menor, con su nombre y el total.",
+      "respuesta": null,
+      "max_tokens": 512
+    },
+    {
+      "id": "codigo-bash",
+      "categoria": "codigo",
+      "titulo": "Una línea de bash",
+      "prompt": "Escribe un único comando de bash que cuente el total de líneas de todos los archivos .py de un directorio y sus subdirectorios. Explica cada parte en una línea.",
+      "respuesta": null,
+      "max_tokens": 384
+    },
+    {
+      "id": "formato-json",
+      "categoria": "formato",
+      "titulo": "Solo JSON",
+      "prompt": "Devuelve únicamente un objeto JSON válido, sin texto adicional ni bloques de código, con las claves \"nombre\", \"edad\" (número) y \"ciudad\" a partir de esta frase: «Me llamo Ana, tengo 34 años y vivo en Segovia».",
+      "respuesta": "{\"nombre\": \"Ana\", \"edad\": 34, \"ciudad\": \"Segovia\"}",
+      "max_tokens": 128
+    },
+    {
+      "id": "formato-lista",
+      "categoria": "formato",
+      "titulo": "Exactamente cinco",
+      "prompt": "Escribe exactamente cinco ríos de España, uno por línea, sin numerar, sin viñetas y sin ningún otro texto.",
+      "respuesta": "Cinco líneas, solo nombres de ríos",
+      "max_tokens": 64
+    },
+    {
+      "id": "formato-sin-letra",
+      "categoria": "formato",
+      "titulo": "Sin la letra «e»",
+      "prompt": "Escribe una frase de al menos diez palabras sobre la montaña sin usar la letra «e».",
+      "respuesta": "Ninguna «e» en la frase",
+      "max_tokens": 128
+    },
+    {
+      "id": "redaccion-correo",
+      "categoria": "redaccion",
+      "titulo": "Correo de reclamación",
+      "prompt": "Escribe un correo breve y educado a un proveedor reclamando un pedido que lleva dos semanas de retraso. Pide una fecha de entrega concreta. Máximo 120 palabras.",
+      "respuesta": null,
+      "max_tokens": 384
+    },
+    {
+      "id": "redaccion-haiku",
+      "categoria": "redaccion",
+      "titulo": "Haiku",
+      "prompt": "Escribe un haiku (5-7-5 sílabas) sobre la sierra en invierno. Después indica el recuento de sílabas de cada verso.",
+      "respuesta": "Versos de 5, 7 y 5 sílabas",
+      "max_tokens": 192
+    },
+    {
+      "id": "redaccion-producto",
+      "categoria": "redaccion",
+      "titulo": "Descripción de producto",
+      "prompt": "Escribe una descripción de venta de 60 a 80 palabras para una sudadera negra de algodón, talla M, usada dos veces, en tono cercano y sin exagerar.",
+      "respuesta": null,
+      "max_tokens": 256
+    },
+    {
+      "id": "explicar-cielo",
+      "categoria": "explicar",
+      "titulo": "Cielo azul",
+      "prompt": "¿Por qué el cielo es azul? Responde en dos frases.",
+      "respuesta": "Dispersión de Rayleigh: la luz azul se dispersa más que la roja",
+      "max_tokens": 128
+    },
+    {
+      "id": "explicar-vram",
+      "categoria": "explicar",
+      "titulo": "RAM y VRAM",
+      "prompt": "Explica en un párrafo, para alguien que no sabe informática, la diferencia entre RAM y VRAM y por qué importa para ejecutar modelos de IA en casa.",
+      "respuesta": null,
+      "max_tokens": 384
+    },
+    {
+      "id": "explicar-cuantizacion",
+      "categoria": "explicar",
+      "titulo": "Cuantización",
+      "prompt": "Explica qué es la cuantización de un modelo de lenguaje (por ejemplo Q4_K_M frente a Q8_0) y qué se gana y qué se pierde, en no más de 150 palabras.",
+      "respuesta": null,
+      "max_tokens": 384
+    }
+  ]
+}
