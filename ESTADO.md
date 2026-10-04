@@ -142,7 +142,7 @@ Servidores → **＋ Añadir a mano**: equipo (de él sale la telemetría), URL,
 
 ## Pendiente (orden propuesto)
 
-0. **Ideas de Lucas (03/10/2026)**, ver la hoja de ruta: ~~biblioteca de prompts~~ y ~~comando copiable~~ (hechos 04/10) · comando copiable de `llama-server` por GGUF desde la calculadora · recomendaciones de modelos según el hardware. Después F7 → F8 → F9 → F10.
+0. **Ideas de Lucas (03/10/2026)**, ver la hoja de ruta: ~~biblioteca de prompts~~ y ~~comando copiable de `llama-server`~~ (hechos 04/10) · recomendaciones de modelos según el hardware. Después F7 → F8 → F9 → F10.
 0. ~~README con capturas y GIFs~~: ya está en `main` (merge 82986d9). Quedan las capturas de Servidores e Historial (ver abajo).
 
 1. Lucas revisa el pulido visual (sin `FIG.`, títulos y rótulos en Inter seminegrita, datos vivos en mono más clara) y la pestaña GGUF. No se pudo revisar con capturas: la extensión de Chrome no estaba conectada.
@@ -157,19 +157,19 @@ Servidores → **＋ Añadir a mano**: equipo (de él sale la telemetría), URL,
 En `docs/img/` hay capturas y GIF hechos en modo simulado con Playwright: `panel.png`, `panel-telemetria.gif`, `deteccion-servidores.gif`, `calculadora-gguf.gif`, `estres-en-vivo.gif`, `resultado-run.png`, `prompt-libre-streaming.gif` y `ajustes-apariencia.png`.
 
 **Pendiente para mañana:**
-- Capturas estáticas de **Servidores** (`servidores.png`, con la cabecera de la página visible) e **Historial** (`historial.png`), y añadirlas al README en sus secciones. El primer intento salió mal: en Servidores el desplazamiento cortaba la cabecera, y en Historial a 1280 px se veía el fallo de abajo.
+- ~~Capturas de Servidores e Historial~~: hechas el 04/10, junto con las del comando, la biblioteca y el rendimiento.
 - Repetir `panel.png` con la página abierta 2 min antes, para que las minigráficas "2 MIN" salgan llenas.
-- Herramientas ya instaladas en `D:\dev-tools\`: `readme-tools\` (venv con Playwright, Pillow y httpx) y `ms-playwright\` (Chromium; usar `PLAYWRIGHT_BROWSERS_PATH=D:\dev-tools\ms-playwright`). Los scripts de captura están en `D:\dev-tools\readme-tools\capturas\`: `e_static.py` hace justo lo pendiente. Esperan los datos en `D:\dev-tools\arena-readme-tmp\`, que se borró, así que hay que recrear esa carpeta. Usan el servidor en 8190, agentes simulados en 9201/9202 vía `sim_agent.py` (desplaza los llama simulados a 18181/18182) y GGUF falsos de `make_gguf.py` montados con `subst M:`.
+- Herramientas ya instaladas en `D:\dev-tools\`: `readme-tools\` (venv con Playwright, Pillow y httpx) y `ms-playwright\` (Chromium; usar `PLAYWRIGHT_BROWSERS_PATH=D:\dev-tools\ms-playwright`). Los scripts de captura están en `D:\dev-tools\readme-tools\capturas\`: `e_static.py` hace justo lo pendiente. Esperan los datos en `D:\dev-tools\arena-readme-tmp\`, que se borró, así que hay que recrear esa carpeta. El 04/10 se recreó y se volvió a borrar al terminar. El agente simulado necesita un `agent.json` con `"model_dirs": ["M:/"]` (y un `llama_server` ficticio para el comando). Usan el servidor en 8190, agentes simulados en 9201/9202 vía `sim_agent.py` (desplaza los llama simulados a 18181/18182) y GGUF falsos de `make_gguf.py` montados con `subst M:`.
 
 Detalles visuales vistos al capturar (sin arreglar):
-- Calculadora GGUF: los veredictos usan punto decimal ("Necesita 9.2 GiB de RAM") y el resto coma ("9,7 GiB"). El rótulo y el campo "Slots (-np)" quedan más altos que los de contexto y caché KV.
+- ~~Calculadora GGUF: punto decimal en los veredictos y «Slots (-np)» desalineado~~ (arreglados el 03/10 y el 04/10).
 - Resumen del run: "temperatura reposo → máx 52 → 52 °C (+-1)" muestra "+-1". En la columna de la GPU, las unidades (`W`, `(+30)`) bajan a otra línea.
 - Prompt libre en marcha: la fase marca "carga · 0 s" y "0 peticiones" aunque ya lleguen tokens. Estrés en marcha: "Peticiones (4)" en la tabla frente a "6 peticiones" en la tarjeta (cuenta las que están en curso).
 - Servidor sin respuesta: "sin datos por slot × sin datos slots (total sin datos)"; mejor un solo "sin datos". La tarjeta se mueve unos 12 px al cambiar de estado (aparece o desaparece "Probar").
 - Eje Y de velocidad: "0,0" y "5,0" frente a enteros en el resto de gráficas.
 - Minigráficas "2 MIN" del Panel: empiezan vacías al abrir la página (no cargan el histórico).
 - **A 1280 px de ancho**, la franja de dispositivos pasa a dos filas (RAM sola abajo) y ocupa media pantalla. La tabla del Historial se corta por la derecha (la columna de energía no se ve).
-- Si se elige un contexto mayor que el entrenado (p. ej. 131.072 en un modelo de 32.768), no aparece ningún aviso.
+- Si se elige un contexto mayor que el entrenado (p. ej. 131.072 en un modelo de 32.768), no aparece ningún aviso. Desde el 04/10 el aviso sale en el comando propuesto, pero todavía no en el veredicto.
 
 ## Entorno y avisos
 
