@@ -198,3 +198,31 @@ def test_aviso_si_el_contexto_por_slot_supera_el_entrenado():
     assert any("supera el de entrenamiento" in n and "131.072" in n for n in out["notes"])
     out = build(gpu_verdict(True, False), e=est(ctx=65536, parallel=2), model={"context_length": 32768})
     assert not any("entrenamiento" in n for n in out["notes"])
+
+
+def test_la_spec_del_agente_reproduce_el_comando_mostrado():
+    """Lo que se lanza desde la GUI (spec) y lo que se copia (args) son la misma línea de comandos."""
+    from pathlib import Path
+
+    from agent.launcher import parse_spec
+
+    casos = [
+        build(gpu_verdict(True, True), e=est(kv_type="q8_0", parallel=2, ubatch=256)),
+        build({"verdict": "split", "ngl": 28, "gpus": []}),
+        build(
+            {"verdict": "ram", "ngl": 12, "gpus": []},
+            e=est(n_layers=40),
+            inf=info(gpus=(("nvidia:A", 0, "nvidia"),)),
+            g=gpus(9000)[:1],
+        ),
+        build({"verdict": "cpu"}),
+    ]
+    visto = 0
+    for out in casos:
+        assert out["available"]
+        for opt in out["options"]:
+            spec = parse_spec(opt["spec"], lambda raw: Path(raw))
+            assert spec.argv(Path("llama-server"))[1:] == opt["args"]
+            assert spec.env() == opt["env"]
+            visto += 1
+    assert visto >= 5

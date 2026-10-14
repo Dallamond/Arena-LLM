@@ -210,3 +210,9 @@ code {
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
 }
+
+.btn--lg {
+  padding: 9px 22px;
+  font-size: 15px;
+  font-weight: 600;
+}

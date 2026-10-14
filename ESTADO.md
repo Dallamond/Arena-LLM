@@ -218,3 +218,13 @@ Pedido por Lucas: GUI más moderna, minimalista y fácil de leer, centrada en gr
 - **Panel**: cifras grandes (clase `.num`, Inter tabular) y tres gráficas de 2 min por GPU (temperatura con límite crítico, potencia con su límite, uso + VRAM), más CPU y RAM (`LiveGpu.vue`, `LiveSystem.vue`). En el Panel la franja de equipo se oculta porque ya es la propia página; en el resto de pantallas sigue arriba, con las mismas cifras grandes.
 - `LineChart` con relleno degradado (`area`), etiquetas de eje configurables (`xFormat`) y sin marco; `Sparkline` con relleno.
 - Pendiente: ajustar Ajustes → Apariencia (las opciones de rejilla y croquis ya no hacen nada) y actualizar `docs/GUI-DISENO.md` §3.
+
+## Servidores: lanzar desde la GUI y tarjetas más grandes (14/10/2026)
+
+Pedido por Lucas (como en LocalHarness): elegir la GPU y lanzar el modelo directamente, ordenar por tamaño o B de parámetros y ver las características en grande. **Cambia el principio 4 de CLAUDE.md** (antes la GUI solo detectaba).
+
+- **Agente** (`agent/launcher.py`): `POST /launch`, `POST /launch/stop`, `GET /launched`. Lista cerrada de flags validados, modelo dentro de `model_dirs`, `--host 127.0.0.1`, puerto libre, sin shell, rechaza `Origin`; solo para lo que lanzó él. Registro de cada servidor en `%TEMP%arena-llama-<puerto>.log` y últimas líneas en `/launched`. Equipos simulados: no lanzan (`capabilities.launch = false`).
+- **Servidor**: `POST /api/hosts/{id}/launch` recalcula el encaje con la memoria libre de ahora y envía solo la `spec` de la opción elegida; `/launch/stop` y `/launched`. Cada opción de `server/launch.py` lleva ahora `spec` y `device_id`; el comando copiable incluye `--host 127.0.0.1` y un test comprueba que la spec del agente reproduce exactamente ese comando.
+- **Web** (`GgufList.vue`): fichas de GPU destino («Automático» o cada GPU con su memoria libre), botón **Lanzar en <GPU>** (desactivado con el motivo si no cabe entero ahí), **Parar** para lo lanzado desde Arena, estado «arrancando / cargando / en marcha :puerto» con el registro mientras carga, orden por Tamaño · Parámetros (B) · Nombre · Encaje (asc/desc, se recuerda). Tarjetas con cifras grandes (parámetros, cuantización, tamaño, contexto, capas), veredicto y barra de encaje más grandes. «Copiar comando» sigue como botón secundario.
+- Probado de verdad: Qwen3.5-0.8B Q8_0 lanzado en la Tesla M40 (`-dev CUDA0`, orden PCI) desde la GUI, detectado como cargando y parado; la VRAM volvió al valor inicial. Tests: 8 del lanzador del agente y 1 de coherencia spec ↔ comando.
+- Pendiente: probar `Repartido` (`-ts`) con las dos GPU libres, y mostrar los lanzados en la pestaña «En marcha».

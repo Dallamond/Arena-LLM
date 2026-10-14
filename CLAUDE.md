@@ -22,14 +22,14 @@ Esta carpeta está dentro del vault de Lucas: antes de tocar nada fuera de ella,
 1. **Independiente del hardware.** Prohibido escribir en el código nombres de GPU, índices, puertos, rutas, cantidades de VRAM/RAM, umbrales de temperatura o modelos concretos. Todo se **autodetecta** o se **configura** y se guarda. El PC de Lucas (RTX 3060 + Tesla M40 + Ryzen 5 3600) es solo el primer equipo de pruebas.
 2. **Proveedores de telemetría enchufables** (interfaz común; v1: NVIDIA y CPU/RAM; un proveedor nulo para equipos sin GPU). Añadir AMD/Intel/Apple no debe tocar el resto del código.
 3. **Reproducible y comparable.** Cada prueba tiene versión y hash de contenido; el perfil estándar fija semilla, temperatura 0, `cache_prompt` desactivado y los mismos prompts en cualquier equipo. Cada run guarda **su foto de configuración completa** (equipo, dispositivos, servidor detectado, modelo con hash de cabecera GGUF, versión de prueba, parámetros). Al comparar, mostrar la insignia **Comparables / Parcialmente / No comparables** con los motivos.
-4. **La GUI detecta, no controla.** Lucas lanza `llama-server` por su cuenta; Arena detecta modelo, contexto y flags (`/props`, `/slots`, línea de comandos del proceso, cabecera del GGUF) y los guarda. Arrancar/parar servidores está en el backlog. Excepción: el agente lanza `llama-bench` (un solo uso).
+4. **Detectar siempre; lanzar solo lo pedido.** Arena detecta modelo, contexto y flags de cualquier `llama-server` (`/props`, `/slots`, línea de comandos del proceso, cabecera del GGUF) y los guarda, lo haya lanzado quien lo haya lanzado. Desde 14/10/2026, a petición de Lucas, la GUI también **lanza y para `llama-server`** en la GPU elegida (Servidores → GGUF en disco) y puede copiar el comando. Solo para y modifica los que lanzó Arena. El agente también lanza `llama-bench`.
 5. **No inventar datos.** Un valor no disponible es `null` y se muestra como "sin datos", nunca 0. Estimaciones (encaje, ancho de banda efectivo, potencia de placa) llevan el sello `ESTIMADO`.
 6. **Parar y preguntar** si algo de la hoja de ruta choca con la realidad (campo ausente, flag distinto en esa build de llama.cpp…) o si falta un dato que solo tiene Lucas.
 
 ## Seguridad
 
 - El agente escucha en `127.0.0.1` por defecto; fuera de localhost **exige token**.
-- El agente **no es una shell remota**: solo ejecuta `llama-bench` con lista cerrada de flags y rutas permitidas por su configuración local.
+- El agente **no es una shell remota**: solo ejecuta `llama-bench` y `llama-server` (los de su configuración local) con lista cerrada de flags validados uno a uno, modelos dentro de `model_dirs`, `llama-server` siempre en `127.0.0.1`, sin shell y sin aceptar peticiones con cabecera `Origin`. La GUI envía una `spec` estructurada, nunca una línea de comandos libre; solo puede parar procesos que el agente lanzó.
 - El código generado por los modelos se ejecuta **siempre aislado** (subproceso, timeout, sin stdin, directorio temporal, sin red). Nunca `exec()` en el servidor.
 - No subir al repositorio: base de datos, resultados reales, modelos, rutas personales, tokens.
 

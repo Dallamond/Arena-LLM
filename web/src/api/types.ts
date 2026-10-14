@@ -463,13 +463,31 @@ export interface FitResponse {
   command?: LaunchCommand;
 }
 
-/** Comando de llama-server propuesto para un GGUF (ESTIMADO; Arena no lo ejecuta). */
+/** Opción de arranque de llama-server para un GGUF (ESTIMADO). Se copia o se lanza desde la GUI. */
 export interface LaunchOption {
   id: string;
   label: string;
+  device_id: string | null; // GPU concreta (null: reparto, RAM o CPU)
   args: string[];
   env: Record<string, string>;
   shells: Record<string, string>;
+}
+
+/** llama-server lanzado por el agente a petición de Arena. */
+export interface LaunchedServer {
+  pid: number;
+  port: number;
+  model: string;
+  argv: string[];
+  started_at: number;
+  alive: boolean;
+  returncode: number | null;
+  log_tail: string[];
+}
+
+export interface LaunchedResponse {
+  launched: LaunchedServer[];
+  available: boolean;
 }
 
 export type LaunchCommand =

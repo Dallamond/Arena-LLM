@@ -26,6 +26,8 @@ from agent import __version__, gguf
 from agent.bench import BenchError, BenchRunner, SimBenchRunner, parse_spec
 from agent.config import AgentConfig
 from agent.gguf import GgufInfo
+from agent.launcher import LaunchError, NoLauncher, ServerLauncher
+from agent.launcher import parse_spec as parse_launch_spec
 from agent.model import AGENT_API, HostInfo, to_jsonable
 from agent.processes import ServerDetector
 from agent.sampler import Sampler
@@ -72,6 +74,7 @@ class AgentApp:
         detector: ServerDetector | None = None,
         config: AgentConfig | None = None,
         bench: BenchRunner | None = None,
+        launcher: ServerLauncher | None = None,
     ):
         self.host = host
         self.config = config or AgentConfig()
@@ -91,10 +94,13 @@ class AgentApp:
             "/gguf": self.gguf,
             "/bench": self.bench_status,
             "/bench/devices": self.bench_devices,
+            "/launched": self.launched,
         }
         self.post_routes: dict[str, Callable[[dict[str, str], Any], dict[str, Any]]] = {
             "/bench": self.bench_start,
             "/bench/cancel": self.bench_cancel,
+            "/launch": self.launch_start,
+            "/launch/stop": self.launch_stop,
         }
         if bench is None:
             if simulated and self.config.llama_bench is None:
@@ -109,6 +115,9 @@ class AgentApp:
             else:
                 bench = BenchRunner(self.config.llama_bench)
         self.bench = bench
+        self.launcher = launcher or (
+            NoLauncher() if simulated else ServerLauncher(lambda: self.config.llama_server_path())
+        )
 
     def health(self, query: dict[str, str] | None = None) -> dict[str, Any]:
         return {"status": "ok", "uptime_s": round(time.time() - self.started, 3), "simulated": self.simulated}
@@ -121,7 +130,7 @@ class AgentApp:
             "devices": devices,
             "providers": [p.name for p in self.sampler.providers],
             "errors": errors,
-            "capabilities": {"bench": self.bench.available},
+            "capabilities": {"bench": self.bench.available, "launch": self.launcher.available},
             "tools": {"llama_server": _path_or_none(self.config.llama_server_path())},
         }
 
@@ -254,6 +263,24 @@ class AgentApp:
         except BenchError as exc:
             raise ApiError(HTTPStatus(exc.status), exc.code, exc.message) from exc
 
+    # --- llama-server (lanzar y parar) -----------------------------------------
+
+    def launched(self, query: dict[str, str] | None = None) -> dict[str, Any]:
+        return {"launched": self.launcher.status(), "available": self.launcher.available}
+
+    def launch_start(self, query: dict[str, str], body: Any) -> dict[str, Any]:
+        try:
+            spec = parse_launch_spec(body, self.config.allowed_model)
+            return {"launch": self.launcher.launch(spec)}
+        except LaunchError as exc:
+            raise ApiError(HTTPStatus(exc.status), exc.code, exc.message) from exc
+
+    def launch_stop(self, query: dict[str, str], body: Any) -> dict[str, Any]:
+        try:
+            return {"launch": self.launcher.stop(body.get("pid") if isinstance(body, dict) else None)}
+        except LaunchError as exc:
+            raise ApiError(HTTPStatus(exc.status), exc.code, exc.message) from exc
+
     def authorize(self, headers: Any) -> None:
         if self.token:
             given = headers.get("X-Token") or ""
@@ -265,9 +292,7 @@ class AgentApp:
         if not is_loopback(hostname):
             raise ApiError(HTTPStatus.FORBIDDEN, "host", "Sin token solo se aceptan peticiones a localhost")
 
-    def handle(
-        self, method: str, path: str, headers: Any, body: bytes = b""
-    ) -> tuple[HTTPStatus, dict[str, Any]]:
+    def handle(self, method: str, path: str, headers: Any, body: bytes = b"") -> tuple[HTTPStatus, dict[str, Any]]:
         try:
             self.authorize(headers)
             route_path = urlsplit(path).path.rstrip("/") or "/"

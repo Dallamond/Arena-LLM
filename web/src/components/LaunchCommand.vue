@@ -67,7 +67,7 @@ async function copy() {
       <div class="head">
         <h4 class="label">Comando de llama-server</h4>
         <Stamp text="estimado" tone="warn" :tilt="0" />
-        <span class="dim small">{{ EXE_SOURCE[cmd.exe_source] }} · Arena no lo lanza: cópialo y ejecútalo tú.</span>
+        <span class="dim small">{{ EXE_SOURCE[cmd.exe_source] }} · para ejecutarlo a mano, en otro equipo o con otros flags.</span>
       </div>
 
       <div v-if="cmd.options.length > 1" class="seg" role="radiogroup" aria-label="Dónde cargarlo">

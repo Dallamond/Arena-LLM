@@ -8,7 +8,7 @@ Ejemplo:
     {"model_dirs": ["D:/modelos"], "llama_bench": "D:/dev-tools/llama.cpp/llama-bench.exe"}
 
 `llama_server` es opcional: si falta, se busca `llama-server` junto a `llama-bench`.
-Solo se usa para proponer el comando de arranque; el agente nunca lo ejecuta.
+Se usa para proponer el comando de arranque y para lanzarlo desde la GUI (`agent/launcher.py`).
 """
 
 import json

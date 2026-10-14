@@ -1,7 +1,8 @@
 """Comando de `llama-server` propuesto para un GGUF a partir de la calculadora de encaje.
 
-Arena no lanza servidores (la GUI detecta, no controla): solo compone el comando
-para copiarlo. Todo sale de lo detectado (equipo, GPU, binario, servidores en
+Compone el comando para copiarlo y, con cada opción, su `spec` estructurada: es lo
+único que se envía al agente para lanzarlo (nunca una línea de comandos libre).
+Todo sale de lo detectado (equipo, GPU, binario, servidores en
 marcha) y del veredicto ESTIMADO de `server.fit`; nada es específico de un PC.
 
 Orden de dispositivos: con `CUDA_DEVICE_ORDER=PCI_BUS_ID`, `CUDA0, CUDA1…` coinciden
@@ -112,17 +113,46 @@ def build(
         base += ["-ctk", p["kv_type"], "-ctv", p["kv_type"]]
     if p["ubatch"] != 512:
         base += ["-ub", str(p["ubatch"])]
-    tail = ["-fa", "on", "--port", str(port)]
+    tail = ["-fa", "on", "--host", "127.0.0.1", "--port", str(port)]
 
     reserve = p["reserve_mib"] * MIB
     compute = est.get("compute") or 0
     ngl = verdict.get("ngl")
     options: list[dict[str, Any]] = []
 
-    def option(oid: str, label: str, extra: list[str], env: dict[str, str] | None = None) -> None:
+    def option(
+        oid: str,
+        label: str,
+        ngl: int,
+        dev: str | None = None,
+        ts: list[str] | None = None,
+        device_id: str | None = None,
+    ) -> None:
+        extra = ["-ngl", str(ngl), *(["-dev", dev] if dev else []), *(["-ts", ",".join(ts)] if ts else [])]
         args = [*base, *extra, *tail]
+        env = DEVICE_ORDER_ENV if (ts or (dev and dev != "none")) else {}
+        spec = {
+            "model": path,
+            "ctx": p["ctx"],
+            "parallel": p["parallel"],
+            "kv_type": p["kv_type"],
+            "ubatch": p["ubatch"],
+            "ngl": ngl,
+            "flash_attn": "on",
+            "port": port,
+            "dev": dev,
+            "ts": [float(v) for v in ts] if ts else None,
+        }
         options.append(
-            {"id": oid, "label": label, "args": args, "env": env or {}, **render(exe, args, env or {}, windows)}
+            {
+                "id": oid,
+                "label": label,
+                "device_id": device_id,
+                "args": args,
+                "env": env,
+                "spec": spec,
+                **render(exe, args, env, windows),
+            }
         )
 
     if v == "gpu":
@@ -132,9 +162,9 @@ def build(
             m = next((x for x in mapped if x["device_id"] == g["device_id"]), None)
             name = g.get("name") or g["device_id"]
             if len(gpus) > 1 and m:
-                option(m["dev"], f"Solo en {name}", ["-ngl", str(ngl), "-dev", m["dev"]], DEVICE_ORDER_ENV)
+                option(m["dev"], f"Solo en {name}", ngl, dev=m["dev"], device_id=g["device_id"])
             else:
-                option(g["device_id"], f"En {name}", ["-ngl", str(ngl)])
+                option(g["device_id"], f"En {name}", ngl, device_id=g["device_id"])
         if len(fitting) > 1:
             notes.append(
                 "Cabe en varias GPU: elige cuál; la de más memoria libre va primero, no necesariamente la más rápida."
@@ -142,16 +172,14 @@ def build(
     elif v in ("split", "ram"):
         label = "Repartido entre GPU" if v == "split" else f"{ngl} de {est['n_layers']} capas en GPU, el resto en RAM"
         if len(mapped) > 1 and all_mapped:
-            option(
-                v, label, ["-ngl", str(ngl), "-ts", ",".join(_ts_values(mapped, reserve, compute))], DEVICE_ORDER_ENV
-            )
+            option(v, label, ngl, ts=_ts_values(mapped, reserve, compute))
             notes.append(
                 "`-ts` reparte según la memoria libre ahora (ESTIMADO); ajústalo si cambia lo que hay cargado."
             )
         else:
-            option(v, label, ["-ngl", str(ngl)])
+            option(v, label, ngl)
     else:  # cpu
-        option("cpu", "Solo CPU", ["-ngl", "0", *(["-dev", "none"] if gpus else [])])
+        option("cpu", "Solo CPU", 0, dev="none" if gpus else None)
 
     ctx_train = model.get("context_length")
     if isinstance(ctx_train, int) and p["ctx"] // max(p["parallel"], 1) > ctx_train:

@@ -43,6 +43,18 @@ class BattleIn(BaseModel):
     sides: list[BattleSideIn]
 
 
+class LaunchIn(BaseModel):
+    path: str
+    option: str  # id de una opción del comando propuesto (GPU, reparto o CPU)
+    ctx: int = 8192
+    parallel: int = 1
+    kv_type: str = "f16"
+
+
+class StopIn(BaseModel):
+    pid: int
+
+
 class RunIn(BaseModel):
     suite: str
     endpoint_id: int
@@ -201,19 +213,7 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
     async def host_bench_devices(request: Request, host_id: int) -> dict[str, Any]:
         return await proxy(request, host_id, "/bench/devices", timeout=BENCH_DEVICES_TIMEOUT_S)
 
-    @app.get("/api/hosts/{host_id}/fit")
-    async def host_fit(
-        request: Request,
-        host_id: int,
-        path: str,
-        ctx: int = 8192,
-        parallel: int = 1,
-        kv_type: str = "f16",
-        ubatch: int = 512,
-        reserve_mib: int = 512,
-    ) -> dict[str, Any]:
-        """Encaje ESTIMADO de un GGUF frente a la memoria libre del equipo ahora mismo."""
-        params = FitParams(ctx=ctx, parallel=parallel, kv_type=kv_type, ubatch=ubatch, reserve_mib=reserve_mib)
+    async def compute_fit(request: Request, host_id: int, path: str, params: FitParams) -> dict[str, Any]:
         try:
             params.validate()
         except FitError as exc:
@@ -236,6 +236,54 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
         )
         est.pop("layer_cost", None)
         return {"path": path, "estimated": True, "model": model, "estimate": est, "fit": verdict, "command": command}
+
+    @app.get("/api/hosts/{host_id}/fit")
+    async def host_fit(
+        request: Request,
+        host_id: int,
+        path: str,
+        ctx: int = 8192,
+        parallel: int = 1,
+        kv_type: str = "f16",
+        ubatch: int = 512,
+        reserve_mib: int = 512,
+    ) -> dict[str, Any]:
+        """Encaje ESTIMADO de un GGUF frente a la memoria libre del equipo ahora mismo."""
+        params = FitParams(ctx=ctx, parallel=parallel, kv_type=kv_type, ubatch=ubatch, reserve_mib=reserve_mib)
+        return await compute_fit(request, host_id, path, params)
+
+    @app.get("/api/hosts/{host_id}/launched")
+    async def host_launched(request: Request, host_id: int) -> dict[str, Any]:
+        return await proxy(request, host_id, "/launched")
+
+    async def agent_post(request: Request, host_id: int, path: str, body: dict[str, Any]) -> dict[str, Any]:
+        state = state_or_404(request, host_id)
+        try:
+            return await monitor(request).agent.post(state, path, body)
+        except AgentError as exc:
+            raise HTTPException(403 if exc.status == "unauthorized" else 502, exc.message) from exc
+
+    @app.post("/api/hosts/{host_id}/launch", status_code=201)
+    async def host_launch(request: Request, host_id: int, body: LaunchIn) -> dict[str, Any]:
+        """Lanza llama-server en el equipo con una opción del comando propuesto (GPU, reparto o CPU).
+
+        La web solo elige la opción: la `spec` se vuelve a calcular aquí con la memoria libre de ahora
+        y es lo único que se envía al agente, que la valida con su lista cerrada de flags.
+        """
+        params = FitParams(ctx=body.ctx, parallel=body.parallel, kv_type=body.kv_type)
+        fitted = await compute_fit(request, host_id, body.path, params)
+        command = fitted["command"]
+        if not command.get("available"):
+            raise HTTPException(409, command.get("reason") or "No se puede lanzar este modelo")
+        option = next((o for o in command["options"] if o["id"] == body.option), None)
+        if option is None:
+            raise HTTPException(409, "Esa opción ya no está disponible con la memoria libre de ahora: recalcula")
+        out = await agent_post(request, host_id, "/launch", option["spec"])
+        return {**out, "option": {"id": option["id"], "label": option["label"], "port": option["spec"]["port"]}}
+
+    @app.post("/api/hosts/{host_id}/launch/stop")
+    async def host_launch_stop(request: Request, host_id: int, body: StopIn) -> dict[str, Any]:
+        return await agent_post(request, host_id, "/launch/stop", {"pid": body.pid})
 
     # --- ajustes -------------------------------------------------------------
 

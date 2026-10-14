@@ -149,7 +149,7 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
   <div class="page">
     <div class="head">
       <h2 class="title">Servidores</h2>
-      <span class="dim small">Arena detecta los <code>llama-server</code> que lanzas; no los arranca ni los para.</span>
+      <span class="dim small">Arena detecta los <code>llama-server</code> en marcha y, en «GGUF en disco», lanza y para los suyos.</span>
       <div class="head__actions">
         <button class="btn" type="button" :aria-expanded="adding" @click="adding ? (adding = false) : openAdd()">＋ Añadir a mano</button>
         <button class="btn" type="button" :disabled="detecting" @click="detect">{{ detecting ? "Detectando…" : "Detectar ahora" }}</button>
