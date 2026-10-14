@@ -54,47 +54,47 @@ const ariaText = computed(() =>
 <style scoped>
 .bwo__track {
   display: flex;
-  height: 10px;
-  border: 1px solid var(--line);
-  background: rgba(10, 17, 28, 0.6);
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--panel-raised);
 }
 .bwo--thin .bwo__track {
-  height: 6px;
+  height: 5px;
 }
 .bwo__track--nodata {
-  border-style: dashed;
+  background: repeating-linear-gradient(90deg, var(--line) 0 4px, transparent 4px 8px);
 }
 .bwo__cap {
   height: 100%;
 }
 .bwo__used {
   height: 100%;
+  border-radius: 999px;
   background: var(--bar-color);
   transition: width 0.4s ease;
 }
 .bwo__over {
   height: 100%;
-  border-left: 1px solid var(--ink-dim);
   background: repeating-linear-gradient(-45deg, var(--dev-ram) 0 2px, transparent 2px 6px);
 }
 .bwo__dim {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 3px;
-  font-size: 10px;
+  margin-top: 4px;
+  font-size: 11px;
   color: var(--ink-faint);
 }
 .tick {
   width: 1px;
-  height: 7px;
+  height: 6px;
   background: var(--ink-faint);
 }
 .rule {
   flex: 1;
   height: 1px;
-  background: var(--ink-faint);
-  opacity: 0.6;
+  background: var(--line-strong);
 }
 .dim-label {
   white-space: nowrap;

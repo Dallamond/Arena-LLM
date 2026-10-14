@@ -46,14 +46,14 @@ function onSelect(e: Event) {
     <div class="topbar__left">
       <StatusChip label="agente" :state="agentChip.state" :text="agentChip.text" :title="agentChip.title" />
       <StatusChip label="servidor" :state="serverChip.state" :text="serverChip.text" />
-      <label v-if="hostList.length > 1" class="hostsel mono">
+      <label v-if="hostList.length > 1" class="hostsel">
         <span class="label">equipo</span>
         <select :value="host?.id" @change="onSelect">
           <option v-for="h in hostList" :key="h.id" :value="h.id">{{ h.name }}</option>
         </select>
       </label>
     </div>
-    <h1 class="topbar__title mono">ARENA&nbsp;LLM</h1>
+    <h1 class="topbar__title">Arena <span>LLM</span></h1>
     <div class="topbar__right">
       <StatusChip
         v-if="warnings"
@@ -74,7 +74,8 @@ function onSelect(e: Event) {
   height: var(--topbar-h);
   padding: 0 var(--gap);
   border-bottom: 1px solid var(--line);
-  background: var(--panel);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -90,8 +91,9 @@ function onSelect(e: Event) {
   justify-content: flex-end;
 }
 .topbar__title {
-  font-size: 14px;
-  letter-spacing: 0.3em;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--ink);
 }
 .hostsel {
@@ -100,10 +102,11 @@ function onSelect(e: Event) {
   gap: 6px;
 }
 .hostsel select {
-  background: var(--bg);
-  border: 1px solid var(--line);
-  padding: 2px 6px;
+  padding: 3px 8px;
   font-size: 12px;
+}
+.topbar__title span {
+  color: var(--accent);
 }
 @media (max-width: 1180px) {
   .topbar {

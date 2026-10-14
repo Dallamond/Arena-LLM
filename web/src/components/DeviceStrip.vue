@@ -52,7 +52,7 @@ const statusText = computed(() => {
 <template>
   <section class="strip" :class="{ 'strip--folded': folded }" aria-label="Estado del equipo">
     <header class="strip__head">
-      <h2 class="label">
+      <h2 class="label strip__title">
         Equipo<span v-if="host"> · {{ host.name }}</span>
       </h2>
       <Stamp v-if="host?.simulated" :text="`simulado: ${host.simulated}`" tone="info" />
@@ -97,31 +97,34 @@ const statusText = computed(() => {
 
 <style scoped>
 .strip {
-  padding: 12px var(--gap) 14px;
+  padding: 16px var(--gap) 18px;
   border-bottom: 1px solid var(--line);
-  background: rgba(10, 17, 28, 0.85);
-  backdrop-filter: blur(2px);
+  background: var(--bg);
 }
 .strip__head {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
+  max-width: 1600px;
+  margin-inline: auto;
 }
 .strip__status {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--warn);
 }
 .strip__fold {
   margin-left: auto;
-  padding: 3px 10px;
-  font-size: 11px;
+  padding: 3px 12px;
+  font-size: 12px;
 }
 .strip__cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  max-width: 1600px;
+  margin-inline: auto;
 }
 .strip--folded .strip__cards {
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

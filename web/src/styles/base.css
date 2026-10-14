@@ -16,22 +16,10 @@ body {
 
 body {
   background-color: var(--bg);
-  /* Rejilla de plano: menor 16 px, mayor 80 px */
-  background-image:
-    linear-gradient(var(--grid-major) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
-    linear-gradient(var(--grid-minor) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px);
-  background-size:
-    80px 80px,
-    80px 80px,
-    16px 16px,
-    16px 16px;
-  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -40,12 +28,12 @@ h2,
 h3 {
   margin: 0;
   font-weight: 600;
-  letter-spacing: 0.005em;
+  letter-spacing: -0.005em;
 }
 
 /* Títulos de página */
 h2.title {
-  font-size: 20px;
+  font-size: 22px;
   color: var(--ink);
 }
 
@@ -55,9 +43,25 @@ a {
 
 button,
 select,
-input {
+input,
+textarea {
   font: inherit;
   color: inherit;
+}
+
+select,
+input:not([type="radio"]):not([type="checkbox"]):not([type="range"]),
+textarea {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+}
+
+select:focus,
+input:focus,
+textarea:focus {
+  border-color: var(--accent);
 }
 
 input[type="radio"],
@@ -68,12 +72,14 @@ input[type="checkbox"] {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /*
  * Jerarquía de texto:
- * - Texto fijo (títulos, rótulos, nombres de campo, botones): Inter.
- * - Datos que cambian (cifras, rutas, flags): JetBrains Mono con cifras tabulares (`.mono` / `.data`).
+ * - Texto fijo (títulos, rótulos, botones): Inter.
+ * - Cifras grandes que cambian en vivo: `.num` (Inter con cifras tabulares, sin saltos de ancho).
+ * - Datos pequeños, rutas y flags: JetBrains Mono (`.mono` / `.data`).
  */
 .mono,
 .data {
@@ -85,6 +91,24 @@ input[type="checkbox"] {
   color: var(--data-ink);
 }
 
+.num {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "cv11" 1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--data-ink);
+}
+
+.num .unit {
+  font-size: 0.5em;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ink-dim);
+  margin-left: 0.2em;
+}
+
 /* Los nombres de campo son texto fijo aunque estén dentro de un bloque de datos */
 dt,
 .mono dt,
@@ -94,17 +118,16 @@ dt,
 
 .label {
   font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--ink-dim);
 }
 
 /* Rótulo de sección dentro de una página (encima de un grupo de tarjetas) */
 h3.label,
 h4.label {
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--ink);
 }
 
@@ -112,23 +135,36 @@ h4.label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid var(--line-strong);
-  background: transparent;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--panel-raised);
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
 }
 
-.btn:hover {
-  background: rgba(108, 180, 255, 0.08);
+.btn:hover:not(:disabled) {
+  background: var(--line-strong);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .btn--primary {
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.1);
 }
 
 .sr-only {
@@ -140,20 +176,12 @@ h4.label {
   white-space: nowrap;
 }
 
-/* Efecto croquis: se aplica solo a bordes destacados y ejes, nunca a texto ni datos */
+/* El antiguo efecto croquis ya no existe: la clase se conserva sin efecto para no tocar cada vista */
 .sketch {
-  filter: url(#sketch);
-}
-
-:root[data-sketch="off"] .sketch,
-:root[data-contrast="alto"] .sketch {
   filter: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sketch {
-    filter: none;
-  }
   *,
   *::before,
   *::after {
@@ -163,7 +191,7 @@ h4.label {
 }
 
 /* Datos de un agente caído: se ven (último valor conocido) pero atenuados */
-.is-stale > :not(header):not(.reg) {
+.is-stale > :not(header) {
   opacity: 0.45;
 }
 
@@ -175,4 +203,10 @@ code {
 /* Las cifras en vivo destacan sobre el texto fijo */
 .mono {
   color: var(--data-ink);
+}
+
+/* Barras de scroll discretas */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
 }

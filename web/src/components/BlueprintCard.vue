@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Lámina de plano: borde de 1 px, marcas de registro en las esquinas y título destacado.
+// Tarjeta: fondo suave, borde fino y esquinas redondeadas. El color del dispositivo es un punto junto al título.
 defineProps<{
   title?: string;
   color?: string; // color del dispositivo (var CSS)
@@ -14,10 +14,6 @@ defineProps<{
     :class="[level && `card--${level}`, { 'card--dense': dense }]"
     :style="color ? { '--card-color': color } : undefined"
   >
-    <span class="reg reg--tl" aria-hidden="true" />
-    <span class="reg reg--tr" aria-hidden="true" />
-    <span class="reg reg--bl" aria-hidden="true" />
-    <span class="reg reg--br" aria-hidden="true" />
     <header v-if="title || $slots.actions" class="card__head">
       <h3 class="card__title">
         <span v-if="color" class="card__swatch" aria-hidden="true" />
@@ -34,69 +30,27 @@ defineProps<{
   --card-color: var(--line-strong);
   position: relative;
   background: var(--panel);
-  border: 1px solid var(--line);
-  border-top: 2px solid var(--card-color);
-  padding: 14px 16px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 18px 20px 20px;
   min-width: 0;
 }
 .card--dense {
-  padding: 10px 12px 12px;
+  padding: 14px 16px 16px;
 }
 .card--warn {
-  border-color: var(--warn);
-  background-image: repeating-linear-gradient(
-    -45deg,
-    rgba(255, 224, 102, 0.05) 0 6px,
-    transparent 6px 12px
-  );
+  border-color: color-mix(in srgb, var(--warn) 55%, var(--line));
 }
 .card--crit {
   border-color: var(--crit);
-  background-image: repeating-linear-gradient(
-    -45deg,
-    rgba(255, 107, 107, 0.09) 0 6px,
-    transparent 6px 12px
-  );
-}
-.reg {
-  position: absolute;
-  width: 9px;
-  height: 9px;
-  border-color: var(--line-strong);
-  border-style: solid;
-  border-width: 0;
-  pointer-events: none;
-}
-.reg--tl {
-  top: -5px;
-  left: -5px;
-  border-top-width: 1px;
-  border-left-width: 1px;
-}
-.reg--tr {
-  top: -5px;
-  right: -5px;
-  border-top-width: 1px;
-  border-right-width: 1px;
-}
-.reg--bl {
-  bottom: -5px;
-  left: -5px;
-  border-bottom-width: 1px;
-  border-left-width: 1px;
-}
-.reg--br {
-  bottom: -5px;
-  right: -5px;
-  border-bottom-width: 1px;
-  border-right-width: 1px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--crit) 35%, transparent);
 }
 .card__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .card__title {
   display: flex;
@@ -106,24 +60,23 @@ defineProps<{
   font-family: var(--font-sans);
   font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.01em;
 }
 .card__name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--ink);
 }
 .card__swatch {
   flex-shrink: 0;
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
   background: var(--card-color);
-}
-.card__name {
-  color: var(--ink);
 }
 .card__actions {
   display: flex;
+  align-items: center;
   gap: 6px;
   flex-shrink: 0;
 }

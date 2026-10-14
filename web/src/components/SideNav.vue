@@ -43,7 +43,7 @@ const snap = currentSnapshot;
     <div class="nav__foot">
       <template v-if="!collapsed">
         <div v-for="d in gpuList" :key="d.device_id" class="mini">
-          <div class="mini__head mono">
+          <div class="mini__head">
             <span :style="{ color: deviceColor(d) }">{{ shortName(d.name) }}</span>
           </div>
           <BarWithOverflow
@@ -54,7 +54,7 @@ const snap = currentSnapshot;
             :dimension="false"
             thin
           />
-          <div class="mini__val mono">
+          <div class="mini__val">
             VRAM {{ gibPair(gpuSample(snap, d.device_id)?.mem_used_mib, d.memory_total_mib) }}
           </div>
         </div>
@@ -92,7 +92,7 @@ const snap = currentSnapshot;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--line);
-  background: var(--panel);
+  background: var(--bg);
   position: sticky;
   top: var(--topbar-h);
   height: calc(100vh / var(--zoom) - var(--topbar-h));
@@ -106,33 +106,36 @@ const snap = currentSnapshot;
   padding: 10px 6px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   overflow-y: auto;
 }
 .nav__link {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 10px;
+  padding: 8px 12px;
   color: var(--ink-dim);
   text-decoration: none;
-  border-left: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
 }
 .nav__link:hover {
   color: var(--ink);
-  background: rgba(108, 180, 255, 0.05);
+  background: rgba(255, 255, 255, 0.05);
 }
 .nav__link.router-link-active {
   color: var(--ink);
-  border-left-color: var(--accent);
-  background: rgba(108, 180, 255, 0.08);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.nav__link.router-link-active :deep(svg) {
+  color: var(--accent);
 }
 .nav--collapsed .nav__text {
   display: none;
 }
 .nav__phase {
   margin-left: auto;
-  font-size: 9px;
+  font-size: 10px;
   color: var(--ink-faint);
 }
 .nav__foot {
@@ -144,14 +147,14 @@ const snap = currentSnapshot;
   gap: 10px;
 }
 .mini__head {
-  font-size: 10px;
+  font-size: 12px;
   margin-bottom: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .mini__val {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--ink-faint);
   margin-top: 2px;
 }

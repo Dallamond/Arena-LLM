@@ -1,40 +1,38 @@
 <script setup lang="ts">
-// Sello de estado: ESTIMADO, ABORTADO, SIN DATOS, CONFIG CAMBIADA, SIMULADO…
+// Etiqueta de estado: ESTIMADO, ABORTADO, SIN DATOS, CONFIG CAMBIADA, SIMULADO…
+// `tilt` se conserva por compatibilidad con las vistas; ya no inclina nada.
 withDefaults(defineProps<{ text: string; tone?: "info" | "warn" | "crit" | "dim"; tilt?: number }>(), {
   tone: "info",
-  tilt: -1,
+  tilt: 0,
 });
 </script>
 
 <template>
-  <span class="stamp mono" :class="`stamp--${tone}`" :style="{ transform: `rotate(${tilt}deg)` }">{{ text }}</span>
+  <span class="stamp" :class="`stamp--${tone}`">{{ text }}</span>
 </template>
 
 <style scoped>
 .stamp {
   display: inline-block;
-  padding: 1px 6px;
-  border: 1px dashed currentColor;
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
   white-space: nowrap;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
 }
 .stamp--info {
-  color: var(--accent);
+  --tone: var(--accent);
 }
 .stamp--warn {
-  color: var(--warn);
+  --tone: var(--warn);
 }
 .stamp--crit {
-  color: var(--crit);
+  --tone: var(--crit);
 }
 .stamp--dim {
-  color: var(--ink-faint);
-}
-@media (prefers-reduced-motion: reduce) {
-  .stamp {
-    transform: none !important;
-  }
+  --tone: var(--ink-dim);
 }
 </style>

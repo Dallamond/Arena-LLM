@@ -209,3 +209,12 @@ Detalles visuales vistos al capturar (sin arreglar):
 - Datos curiosos de PowerShell 5.1:
   - `ConvertFrom-Json` con un array muestra filas vacías al pasarlo a `Select-Object`.
   - curl en Git Bash rompe el UTF-8 del cuerpo de la petición; para eso usar Python/httpx.
+
+## Rediseño visual minimalista (14/10/2026)
+
+Pedido por Lucas: GUI más moderna, minimalista y fácil de leer, centrada en gráficas en vivo y cifras claras.
+
+- **Estilo** alineado con el hub del homelab (iOS monocromo): fondo negro, superficies `#1c1c1e`, esquinas de 16 px, botones en cápsula, sin rejilla ni marcas de registro ni efecto croquis; color solo para estado y para identificar cada dispositivo. Acento por defecto blanco (configurable en Ajustes).
+- **Panel**: cifras grandes (clase `.num`, Inter tabular) y tres gráficas de 2 min por GPU (temperatura con límite crítico, potencia con su límite, uso + VRAM), más CPU y RAM (`LiveGpu.vue`, `LiveSystem.vue`). En el Panel la franja de equipo se oculta porque ya es la propia página; en el resto de pantallas sigue arriba, con las mismas cifras grandes.
+- `LineChart` con relleno degradado (`area`), etiquetas de eje configurables (`xFormat`) y sin marco; `Sparkline` con relleno.
+- Pendiente: ajustar Ajustes → Apariencia (las opciones de rejilla y croquis ya no hacen nada) y actualizar `docs/GUI-DISENO.md` §3.

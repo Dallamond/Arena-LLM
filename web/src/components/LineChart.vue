@@ -48,8 +48,10 @@ const props = withDefaults(
     xName?: string; // nombre de la variable X en la lectura
     xMin?: number;
     dots?: boolean; // marcar cada punto (series cortas, p. ej. barridos)
+    area?: boolean; // relleno suave bajo cada línea (gráficas en vivo)
+    xFormat?: (v: number) => string; // etiqueta del eje X (por defecto número + unidad)
   }>(),
-  { bands: () => [], lines: () => [], markers: () => [], digits: 0, height: 150, xUnit: "s", xName: "t", xMin: 0, dots: false },
+  { bands: () => [], lines: () => [], markers: () => [], digits: 0, height: 150, xUnit: "s", xName: "t", xMin: 0, dots: false, area: false },
 );
 
 // Ancho real en píxeles (ResizeObserver): el SVG se dibuja 1:1 y el texto no se deforma.
@@ -62,7 +64,8 @@ onMounted(() => {
   ro.observe(figRef.value);
 });
 onBeforeUnmount(() => ro?.disconnect());
-const PAD = { l: 44, r: 12, t: 10, b: 22 };
+const PAD = { l: 40, r: 8, t: 8, b: 22 };
+const uid = Math.random().toString(36).slice(2, 8);
 
 const xs = computed(() => props.series.flatMap((s) => s.points.map((p) => p.x)));
 const ys = computed(() => props.series.flatMap((s) => s.points.map((p) => p.y)).filter(isNum));
@@ -119,7 +122,13 @@ const paths = computed(() =>
       cur += `${cur ? "L" : "M"}${px(p.x).toFixed(1)},${py(p.y).toFixed(1)}`;
     }
     if (cur) segs.push(cur);
-    return { ...s, segs };
+    const areas = segs.map((d) => {
+      const pts = d.match(/-?[d.]+,-?[d.]+/g) ?? [];
+      if (pts.length < 2) return "";
+      const base = (H.value - PAD.b).toFixed(1);
+      return `${d}L${pts[pts.length - 1]!.split(",")[0]},${base}L${pts[0]!.split(",")[0]},${base}Z`;
+    });
+    return { ...s, segs, areas };
   }),
 );
 
@@ -139,6 +148,7 @@ function onMove(e: MouseEvent) {
   const x = props.xMin + ((sx - PAD.l) / (W.value - PAD.l - PAD.r)) * (xMaxV.value - props.xMin);
   hoverX.value = x >= props.xMin && x <= xMaxV.value ? x : null;
 }
+const xLabel = (v: number) => (props.xFormat ? props.xFormat(v) : `${fmt(v, 0)}${props.xUnit ? " " + props.xUnit : ""}`);
 const hoverValues = computed(() => {
   const x = hoverX.value;
   if (x === null) return null;
@@ -155,7 +165,7 @@ const hoverValues = computed(() => {
   <figure ref="figRef" class="chart">
     <figcaption class="chart__head">
       <span class="label">{{ title }}</span>
-      <span class="legend mono">
+      <span class="legend">
         <span v-for="s in series" :key="s.id" class="legend__item">
           <span class="swatch" :class="{ 'swatch--dash': s.dash }" :style="{ background: s.color }" aria-hidden="true" />
           {{ s.label }} <b>{{ fmt(lastValue(s), digits, unit) }}</b>
@@ -187,20 +197,27 @@ const hoverValues = computed(() => {
       <g class="grid">
         <line v-for="v in yTicks" :key="'y' + v" :x1="PAD.l" :x2="W - PAD.r" :y1="py(v)" :y2="py(v)" />
       </g>
-      <g class="axes sketch">
-        <rect :x="PAD.l" :y="PAD.t" :width="W - PAD.l - PAD.r" :height="H - PAD.t - PAD.b" class="frame" />
-      </g>
+      <line :x1="PAD.l" :x2="W - PAD.r" :y1="H - PAD.b" :y2="H - PAD.b" class="baseline" />
       <text v-for="v in yTicks" :key="'yt' + v" :x="PAD.l - 6" :y="py(v) + 3" class="tick tick--y">
         {{ fmt(v, digits > 0 && v < 10 ? 1 : 0) }}
       </text>
-      <text v-for="v in xTicks" :key="'xt' + v" :x="px(v)" :y="H - 6" class="tick tick--x">{{ fmt(v, 0) }}{{ xUnit ? " " + xUnit : "" }}</text>
+      <text v-for="v in xTicks" :key="'xt' + v" :x="px(v)" :y="H - 6" class="tick tick--x">{{ xLabel(v) }}</text>
       <!-- umbrales -->
       <g v-for="l in lines" :key="'l' + l.label">
         <line :x1="PAD.l" :x2="W - PAD.r" :y1="py(l.y)" :y2="py(l.y)" :stroke="l.color" class="hline" />
         <text :x="W - PAD.r - 4" :y="py(l.y) + 12" class="hline__label" :fill="l.color">{{ l.label }}</text>
       </g>
       <!-- series -->
+      <defs v-if="area">
+        <linearGradient v-for="s in paths" :id="`fill-${uid}-${s.id}`" :key="s.id" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" :stop-color="s.color" stop-opacity="0.28" />
+          <stop offset="100%" :stop-color="s.color" stop-opacity="0" />
+        </linearGradient>
+      </defs>
       <g v-for="s in paths" :key="s.id">
+        <template v-if="area">
+          <path v-for="(d, i) in s.areas" :key="'a' + i" :d="d" :fill="`url(#fill-${uid}-${s.id})`" class="area" />
+        </template>
         <path v-for="(d, i) in s.segs" :key="i" :d="d" :stroke="s.color" class="line" :class="{ 'line--dash': s.dash }" />
         <template v-if="dots">
           <circle
@@ -220,8 +237,8 @@ const hoverValues = computed(() => {
       </g>
       <line v-if="hoverX !== null" :x1="px(hoverX)" :x2="px(hoverX)" :y1="PAD.t" :y2="H - PAD.b" class="cursor" />
     </svg>
-    <div v-if="hoverValues" class="readout mono" aria-hidden="true">
-      {{ xName }} = {{ fmt(hoverX, 0) }}{{ xUnit ? " " + xUnit : "" }}
+    <div v-if="hoverValues" class="readout" aria-hidden="true">
+      {{ xName ? xName + " = " : "" }}{{ xLabel(hoverX as number) }}
       <span v-for="v in hoverValues" :key="v.label" :style="{ color: v.color }">· {{ v.label }} {{ fmt(v.y, digits, unit) }}</span>
     </div>
   </figure>
@@ -238,13 +255,14 @@ const hoverValues = computed(() => {
   align-items: baseline;
   gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 .legend {
+  font-variant-numeric: tabular-nums;
   display: flex;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-dim);
 }
 .legend b {
@@ -254,11 +272,12 @@ const hoverValues = computed(() => {
 .legend__item {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 .swatch {
   width: 14px;
   height: 3px;
+  border-radius: 2px;
   display: inline-block;
 }
 .swatch--dash {
@@ -268,8 +287,7 @@ const hoverValues = computed(() => {
   width: 100%;
   display: block;
 }
-.frame {
-  fill: none;
+.baseline {
   stroke: var(--line-strong);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
@@ -277,13 +295,13 @@ const hoverValues = computed(() => {
 .grid line {
   stroke: var(--line);
   stroke-width: 1;
-  stroke-dasharray: 2 4;
   vector-effect: non-scaling-stroke;
-  opacity: 0.6;
+  opacity: 0.7;
 }
 .tick {
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
   fill: var(--ink-faint);
 }
 .tick--y {
@@ -296,16 +314,15 @@ const hoverValues = computed(() => {
   fill: transparent;
 }
 .band--reposo {
-  fill: rgba(147, 168, 200, 0.06);
+  fill: rgba(163, 173, 191, 0.07);
 }
 .band--enfriamiento {
-  fill: rgba(110, 231, 183, 0.05);
+  fill: rgba(95, 220, 168, 0.06);
 }
 .band__label {
-  font-family: var(--font-mono);
-  font-size: 9px;
+  font-family: var(--font-sans);
+  font-size: 10px;
   fill: var(--ink-faint);
-  text-transform: uppercase;
 }
 .hline {
   stroke-width: 1;
@@ -314,8 +331,8 @@ const hoverValues = computed(() => {
 }
 .hline__label,
 .marker__label {
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-sans);
+  font-size: 11px;
   text-anchor: end;
 }
 .marker__label {
@@ -323,30 +340,36 @@ const hoverValues = computed(() => {
 }
 .line {
   fill: none;
-  stroke-width: 1.8;
+  stroke-width: 2.25;
   vector-effect: non-scaling-stroke;
   stroke-linejoin: round;
+  stroke-linecap: round;
 }
 .line--dash {
   stroke-dasharray: 5 4;
+}
+.area {
+  stroke: none;
 }
 .marker {
   stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
 }
 .cursor {
-  stroke: var(--ink-dim);
+  stroke: var(--ink-faint);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 .readout {
+  font-variant-numeric: tabular-nums;
   position: absolute;
-  top: 0;
-  right: 0;
-  font-size: 11px;
+  top: 24px;
+  right: 8px;
+  font-size: 12px;
   background: var(--panel-raised);
   border: 1px solid var(--line);
-  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  padding: 3px 9px;
   pointer-events: none;
 }
 </style>

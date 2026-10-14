@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { live, type Point } from "../api/live";
 import type { DeviceInfo, GpuSample } from "../api/types";
 import { deviceColor, shortName } from "../lib/devices";
-import { fmt, gibPair, throttleReasons } from "../lib/format";
+import { fmt, gibPair, isNum, throttleReasons } from "../lib/format";
 import { gpuHealth, thresholdsFor } from "../lib/thresholds";
 import BarWithOverflow from "./BarWithOverflow.vue";
 import BlueprintCard from "./BlueprintCard.vue";
@@ -24,8 +24,9 @@ const limits = computed(() => thresholdsFor(props.device, live.thresholds));
 const s = computed(() => props.sample);
 const memTotal = computed(() => s.value?.mem_total_mib ?? props.device.memory_total_mib);
 const throttling = computed(() => throttleReasons(s.value?.throttle));
-const temps = computed(() => props.history.map((p) => p.temp));
 const utils = computed(() => props.history.map((p) => p.util));
+/** Cifra grande sin unidad (la unidad se pinta aparte, más pequeña). */
+const big = (v: number | null | undefined) => (isNum(v) ? fmt(v, 0) : "sin datos");
 const levelIcon = computed(() => (health.value.level === "crit" ? "✕" : health.value.level === "warn" ? "▲" : ""));
 </script>
 
@@ -43,66 +44,46 @@ const levelIcon = computed(() => (health.value.level === "crit" ? "✕" : health
       <Stamp v-else-if="throttling.length" text="throttling" tone="warn" />
     </template>
 
-    <div v-if="folded" class="line mono">
-      <span :class="`lvl-${health.level}`">{{ levelIcon }} {{ fmt(s?.temp_c, 0, "°C") }}</span>
-      <span>{{ fmt(s?.power_w, 0, "W") }}</span>
+    <div v-if="folded" class="line">
+      <span :class="`lvl-${health.level}`">{{ levelIcon }} {{ fmt(s?.temp_c, 0, '°C') }}</span>
+      <span>{{ fmt(s?.power_w, 0, 'W') }}</span>
       <span>{{ gibPair(s?.mem_used_mib, memTotal) }}</span>
     </div>
 
     <template v-else>
-      <div class="big mono">
-        <span class="temp" :class="`lvl-${health.level}`">
-          <span v-if="levelIcon" aria-hidden="true">{{ levelIcon }} </span>{{ fmt(s?.temp_c, 0, "°C") }}
-        </span>
-        <span class="power">
-          {{ fmt(s?.power_w, 0, "W") }}
-          <span class="dim" v-if="s?.power_limit_w">/ {{ fmt(s?.power_limit_w, 0) }}</span>
-        </span>
+      <div class="hero">
+        <div class="stat">
+          <span class="label">Temperatura</span>
+          <span class="num big" :class="`lvl-${health.level}`">
+            <span v-if="levelIcon" aria-hidden="true">{{ levelIcon }} </span>{{ big(s?.temp_c) }}<span v-if="isNum(s?.temp_c)" class="unit">°C</span>
+          </span>
+        </div>
+        <div class="stat">
+          <span class="label">Potencia</span>
+          <span class="num big">{{ big(s?.power_w) }}<span v-if="isNum(s?.power_w)" class="unit">W</span></span>
+          <span v-if="s?.power_limit_w" class="sub">de {{ fmt(s?.power_limit_w, 0, 'W') }}</span>
+        </div>
+        <div class="stat">
+          <span class="label">Uso</span>
+          <span class="num big">{{ big(s?.util_gpu_pct) }}<span v-if="isNum(s?.util_gpu_pct)" class="unit">%</span></span>
+        </div>
       </div>
 
-      <div class="row">
+      <div class="vram">
         <span class="label">VRAM</span>
-        <span class="mono val">{{ gibPair(s?.mem_used_mib, memTotal) }}</span>
+        <span class="num val">{{ gibPair(s?.mem_used_mib, memTotal) }}</span>
       </div>
-      <BarWithOverflow :used="s?.mem_used_mib" :total="memTotal" :color="color" label="VRAM" />
+      <BarWithOverflow :used="s?.mem_used_mib" :total="memTotal" :color="color" label="VRAM" :dimension="false" />
 
-      <dl class="grid mono">
-        <div>
-          <dt class="label">uso</dt>
-          <dd>{{ fmt(s?.util_gpu_pct, 0, "%") }}</dd>
-        </div>
-        <div>
-          <dt class="label">reloj</dt>
-          <dd>{{ fmt(s?.clock_sm_mhz, 0, "MHz") }}</dd>
-        </div>
-        <div>
-          <dt class="label">vent.</dt>
-          <dd>{{ fmt(s?.fan_pct, 0, "%") }}</dd>
-        </div>
-        <div>
-          <dt class="label">estado</dt>
-          <dd>{{ s?.pstate ?? "sin datos" }}</dd>
-        </div>
-      </dl>
+      <Sparkline class="spark" :values="utils" :min="0" :max="100" :color="color" :height="34" label="Uso de GPU, últimos 2 minutos" />
 
-      <div class="sparks">
-        <div>
-          <span class="label">°C · 2 min</span>
-          <Sparkline :values="temps" :min="20" :max="Math.max(limits.crit + 5, 60)" :color="color" label="Temperatura, últimos 2 minutos" />
-        </div>
-        <div>
-          <span class="label">uso · 2 min</span>
-          <Sparkline :values="utils" :min="0" :max="100" :color="color" label="Uso de GPU, últimos 2 minutos" />
-        </div>
-      </div>
-
-      <p v-if="health.reasons.length && !stale" class="reasons mono" :class="`lvl-${health.level}`">
-        {{ health.reasons.join(" · ") }}
+      <p class="extra">
+        {{ fmt(s?.clock_sm_mhz, 0, 'MHz') }} · vent. {{ fmt(s?.fan_pct, 0, '%') }} · {{ s?.pstate ?? 'sin datos' }}
       </p>
-      <p class="limits mono">
-        aviso {{ limits.warn }} °C · crítico {{ limits.crit }} °C
-        <span class="dim">({{ limits.source }})</span>
+      <p v-if="health.reasons.length && !stale" class="reasons" :class="`lvl-${health.level}`">
+        {{ health.reasons.join(' · ') }}
       </p>
+      <p class="limits">aviso {{ limits.warn }} °C · crítico {{ limits.crit }} °C <span>({{ limits.source }})</span></p>
     </template>
   </BlueprintCard>
 </template>
@@ -111,65 +92,56 @@ const levelIcon = computed(() => (health.value.level === "crit" ? "✕" : health
 .line {
   display: flex;
   gap: 14px;
-  font-size: 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.hero {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 .big {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.temp {
-  font-size: 24px;
-  font-weight: 600;
-}
-.power {
-  font-size: 15px;
-}
-.dim {
-  color: var(--ink-faint);
-  font-size: 12px;
-}
-.row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 4px;
-}
-.val {
-  font-size: 12px;
-}
-.grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 4px 8px;
-  margin: 10px 0 8px;
-  font-size: 12px;
-}
-.grid dt {
-  font-size: 9px;
-}
-.grid dd {
-  margin: 0;
+  font-size: 30px;
   white-space: nowrap;
 }
-.sparks {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+.sub {
+  font-size: 11px;
+  color: var(--ink-faint);
 }
-.sparks .label {
-  font-size: 9px;
+.vram {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.val {
+  font-size: 13px;
+  font-weight: 500;
+}
+.spark {
+  margin-top: 14px;
+}
+.extra {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
 }
 .reasons {
-  margin: 8px 0 0;
-  font-size: 11px;
+  margin: 6px 0 0;
+  font-size: 12px;
 }
 .limits {
-  margin: 6px 0 0;
-  font-size: 10px;
+  margin: 4px 0 0;
+  font-size: 11px;
   color: var(--ink-faint);
 }
 .lvl-warn {

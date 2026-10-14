@@ -1,19 +1,24 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { cpu, cpuSample, currentHost, currentSnapshot, gpus, gpuSample, live, staleness } from "../api/live";
+import { cpu, cpuSample, currentHost, currentSnapshot, gpus, gpuSample, historyKey, live, staleness } from "../api/live";
 import type { DetectedServer, ServersResponse } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
-import RadialGauge from "../components/RadialGauge.vue";
+import LiveGpu from "../components/LiveGpu.vue";
+import LiveSystem from "../components/LiveSystem.vue";
 import Stamp from "../components/Stamp.vue";
 import StatusChip from "../components/StatusChip.vue";
 import { deviceColor, shortName } from "../lib/devices";
-import { ago, fmt, gib, gibPair, isNum, ratio } from "../lib/format";
-import { gpuHealth, thresholdsFor } from "../lib/thresholds";
+import { ago, fmt, gib } from "../lib/format";
 
 const host = currentHost;
 const snap = currentSnapshot;
 const gpuList = computed(() => gpus(host.value));
 const cpuDev = computed(() => cpu(host.value));
+const STALE_AFTER_S = 5;
+const stale = computed(
+  () => !host.value || host.value.status !== "online" || staleness.value === null || staleness.value > STALE_AFTER_S,
+);
+const hist = (id: string) => (host.value ? live.history[historyKey(host.value.id, id)] ?? [] : []);
 
 // --- servidores detectados (el agente cachea 2 s; aquí se piden cada 5 s)
 const SERVERS_EVERY_MS = 5000;
@@ -90,94 +95,26 @@ const expanded = ref<Record<number, boolean>>({});
     </div>
 
     <template v-else>
-      <!-- Ficha del equipo -->
-      <BlueprintCard :title="host.host?.hostname ?? host.name">
-        <template #actions>
-          <Stamp v-if="host.simulated" :text="`simulado · ${host.simulated}`" />
-        </template>
-        <dl class="specs mono">
-          <div><dt class="label">sistema</dt><dd>{{ host.host?.os_version ?? "sin datos" }}</dd></div>
-          <div><dt class="label">cpu</dt><dd>{{ host.host?.cpu_model ?? "sin datos" }}</dd></div>
-          <div>
-            <dt class="label">núcleos / hilos</dt>
-            <dd>{{ host.host?.cpu_cores ?? "sin datos" }} / {{ host.host?.cpu_threads ?? "sin datos" }}</dd>
-          </div>
-          <div><dt class="label">ram</dt><dd>{{ gib(host.host?.ram_total_mib) }}</dd></div>
-          <div v-for="d in gpuList" :key="d.device_id">
-            <dt class="label" :style="{ color: deviceColor(d) }">gpu {{ d.index ?? "" }}</dt>
-            <dd>
-              {{ d.name ?? "sin datos" }} · {{ gib(d.memory_total_mib, 0) }} · driver {{ d.driver ?? "sin datos" }}
-              <span v-if="d.driver_model"> · {{ d.driver_model }}</span>
-              <span v-if="d.compute_capability"> · CC {{ d.compute_capability }}</span>
-            </dd>
-          </div>
-          <div>
-            <dt class="label">agente</dt>
-            <dd>{{ host.agent_url }} · v{{ host.agent_version ?? "?" }} · {{ host.providers.join(", ") }}</dd>
-          </div>
-        </dl>
-      </BlueprintCard>
-
-      <!-- Medidores -->
-      <BlueprintCard title="Medidores" class="gap">
-        <div class="gauges">
-          <template v-for="d in gpuList" :key="d.device_id">
-            <div class="gauge-group" :style="{ '--g': deviceColor(d) }">
-              <span class="label group-title" :style="{ color: deviceColor(d) }">{{ shortName(d.name) }}</span>
-              <div class="gauge-row">
-                <RadialGauge
-                  label="VRAM"
-                  :value="ratio(gpuSample(snap, d.device_id)?.mem_used_mib, d.memory_total_mib)"
-                  :readout="fmt((ratio(gpuSample(snap, d.device_id)?.mem_used_mib, d.memory_total_mib) ?? NaN) * 100, 0, '%')"
-                  :sub="gibPair(gpuSample(snap, d.device_id)?.mem_used_mib, d.memory_total_mib)"
-                  :tag="d.provider.toUpperCase()"
-                  :color="deviceColor(d)"
-                />
-                <RadialGauge
-                  label="Temperatura"
-                  :value="
-                    isNum(gpuSample(snap, d.device_id)?.temp_c)
-                      ? (gpuSample(snap, d.device_id)!.temp_c as number) / thresholdsFor(d, live.thresholds).crit
-                      : null
-                  "
-                  :readout="fmt(gpuSample(snap, d.device_id)?.temp_c, 0, '°C')"
-                  :sub="fmt(gpuSample(snap, d.device_id)?.power_w, 0, 'W')"
-                  :tag="`crítico ${thresholdsFor(d, live.thresholds).crit} °C`"
-                  :color="deviceColor(d)"
-                  :level="gpuHealth(d, gpuSample(snap, d.device_id), live.thresholds).level"
-                />
-                <RadialGauge
-                  label="Uso GPU"
-                  :value="isNum(gpuSample(snap, d.device_id)?.util_gpu_pct) ? gpuSample(snap, d.device_id)!.util_gpu_pct! / 100 : null"
-                  :readout="fmt(gpuSample(snap, d.device_id)?.util_gpu_pct, 0, '%')"
-                  :sub="fmt(gpuSample(snap, d.device_id)?.clock_sm_mhz, 0, 'MHz')"
-                  :color="deviceColor(d)"
-                />
-              </div>
-            </div>
-          </template>
-          <div class="gauge-group">
-            <span class="label group-title">Sistema</span>
-            <div class="gauge-row">
-              <RadialGauge
-                v-if="cpuDev"
-                label="CPU"
-                :value="isNum(cpuSample(snap, cpuDev.device_id)?.util_pct) ? cpuSample(snap, cpuDev.device_id)!.util_pct! / 100 : null"
-                :readout="fmt(cpuSample(snap, cpuDev.device_id)?.util_pct, 0, '%')"
-                :tag="cpuDev.threads ? `${cpuDev.threads} hilos` : undefined"
-                color="var(--dev-cpu)"
-              />
-              <RadialGauge
-                label="RAM"
-                :value="ratio(snap?.ram?.used_mib, snap?.ram?.total_mib)"
-                :readout="fmt((ratio(snap?.ram?.used_mib, snap?.ram?.total_mib) ?? NaN) * 100, 0, '%')"
-                :sub="gibPair(snap?.ram?.used_mib, snap?.ram?.total_mib)"
-                color="var(--dev-ram)"
-              />
-            </div>
-          </div>
-        </div>
-      </BlueprintCard>
+      <!-- En vivo: cifras grandes y gráficas de los últimos 2 minutos -->
+      <div class="live">
+        <LiveGpu
+          v-for="d in gpuList"
+          :key="d.device_id"
+          :device="d"
+          :sample="gpuSample(snap, d.device_id)"
+          :history="hist(d.device_id)"
+          :stale="stale"
+        />
+        <LiveSystem
+          :cpu="cpuDev"
+          :cpu-sample="cpuDev ? cpuSample(snap, cpuDev.device_id) : undefined"
+          :cpu-history="cpuDev ? hist(cpuDev.device_id) : []"
+          :ram="snap?.ram"
+          :ram-history="hist('ram')"
+          :stale="stale"
+        />
+        <p v-if="!gpuList.length && host.status === 'online'" class="dim">Sin GPU detectada en este equipo: solo CPU y RAM.</p>
+      </div>
 
       <!-- Servidores detectados -->
       <BlueprintCard title="Servidores detectados" class="gap">
@@ -230,6 +167,34 @@ const expanded = ref<Record<number, boolean>>({});
         </ul>
         <p v-else class="dim">Detectando…</p>
       </BlueprintCard>
+
+      <!-- Ficha del equipo -->
+      <BlueprintCard :title="host.host?.hostname ?? host.name" class="gap">
+        <template #actions>
+          <Stamp v-if="host.simulated" :text="`simulado · ${host.simulated}`" />
+        </template>
+        <dl class="specs mono">
+          <div><dt class="label">sistema</dt><dd>{{ host.host?.os_version ?? "sin datos" }}</dd></div>
+          <div><dt class="label">cpu</dt><dd>{{ host.host?.cpu_model ?? "sin datos" }}</dd></div>
+          <div>
+            <dt class="label">núcleos / hilos</dt>
+            <dd>{{ host.host?.cpu_cores ?? "sin datos" }} / {{ host.host?.cpu_threads ?? "sin datos" }}</dd>
+          </div>
+          <div><dt class="label">ram</dt><dd>{{ gib(host.host?.ram_total_mib) }}</dd></div>
+          <div v-for="d in gpuList" :key="d.device_id">
+            <dt class="label" :style="{ color: deviceColor(d) }">gpu {{ d.index ?? "" }}</dt>
+            <dd>
+              {{ d.name ?? "sin datos" }} · {{ gib(d.memory_total_mib, 0) }} · driver {{ d.driver ?? "sin datos" }}
+              <span v-if="d.driver_model"> · {{ d.driver_model }}</span>
+              <span v-if="d.compute_capability"> · CC {{ d.compute_capability }}</span>
+            </dd>
+          </div>
+          <div>
+            <dt class="label">agente</dt>
+            <dd>{{ host.agent_url }} · v{{ host.agent_version ?? "?" }} · {{ host.providers.join(", ") }}</dd>
+          </div>
+        </dl>
+      </BlueprintCard>
     </template>
   </div>
 </template>
@@ -239,13 +204,14 @@ const expanded = ref<Record<number, boolean>>({});
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
 }
 .page__title {
-  font-size: 20px;
+  font-size: 28px;
+  letter-spacing: -0.02em;
 }
 .gap {
-  margin-top: 18px;
+  margin-top: 20px;
 }
 .specs {
   display: grid;
@@ -259,23 +225,10 @@ const expanded = ref<Record<number, boolean>>({});
   color: var(--ink);
   overflow-wrap: anywhere;
 }
-.gauges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px 32px;
-}
-.gauge-group {
+.live {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-.group-title {
-  font-size: 10px;
-}
-.gauge-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 20px;
 }
 .empty {
   border: 1px dashed var(--line-strong);

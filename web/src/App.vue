@@ -5,19 +5,12 @@ import TopBar from "./components/TopBar.vue";
 </script>
 
 <template>
-  <!-- Filtro de trazo "croquis" (desplazamiento ≈ 1 px). Se desactiva con reducción de movimiento. -->
-  <svg width="0" height="0" style="position: absolute" aria-hidden="true">
-    <filter id="sketch">
-      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="3" />
-      <feDisplacementMap in="SourceGraphic" scale="1.6" />
-    </filter>
-  </svg>
   <a class="skip sr-only" href="#main">Saltar al contenido</a>
   <TopBar />
   <div class="layout">
     <SideNav />
     <div class="content">
-      <DeviceStrip />
+      <DeviceStrip v-if="$route.path !== '/'" />
       <main id="main" class="main" tabindex="-1">
         <RouterView />
       </main>
@@ -37,7 +30,10 @@ import TopBar from "./components/TopBar.vue";
   flex-direction: column;
 }
 .main {
-  padding: 20px var(--gap) 40px;
+  padding: 24px var(--gap) 48px;
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
   outline: none;
 }
 .skip:focus {

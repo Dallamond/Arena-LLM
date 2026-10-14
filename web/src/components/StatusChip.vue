@@ -13,7 +13,7 @@ const icon = computed(() => ({ ok: "●", warn: "▲", crit: "✕", pending: "�
 </script>
 
 <template>
-  <span class="chip mono" :class="`chip--${state}`" :title="title">
+  <span class="chip" :class="`chip--${state}`" :title="title">
     <span class="chip__label">{{ label }}</span>
     <span class="chip__icon" aria-hidden="true">{{ icon }}</span>
     <span class="chip__text">{{ text }}</span>
@@ -25,30 +25,32 @@ const icon = computed(() => ({ ok: "●", warn: "▲", crit: "✕", pending: "�
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 8px;
-  border: 1px solid var(--line);
-  font-size: 11px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: var(--panel-raised);
+  font-size: 12px;
   white-space: nowrap;
   color: var(--ink-dim);
 }
 .chip__label {
   color: var(--ink-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+}
+.chip__icon {
+  font-size: 9px;
 }
 .chip--ok .chip__icon,
 .chip--ok .chip__text {
   color: var(--ok);
 }
 .chip--warn {
-  border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
 }
 .chip--warn .chip__icon,
 .chip--warn .chip__text {
   color: var(--warn);
 }
 .chip--crit {
-  border-color: var(--crit);
+  background: color-mix(in srgb, var(--crit) 14%, transparent);
 }
 .chip--crit .chip__icon,
 .chip--crit .chip__text {

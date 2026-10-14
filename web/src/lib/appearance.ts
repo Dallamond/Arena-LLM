@@ -7,12 +7,12 @@ import type { Appearance } from "../api/types";
 import { api, live } from "../api/live";
 
 export const ACCENTS: { id: string; label: string; value: string }[] = [
-  { id: "azul", label: "Azul plano", value: "#6cb4ff" },
+  { id: "blanco", label: "Blanco (por defecto)", value: "#f2f2f7" },
+  { id: "azul", label: "Azul", value: "#6cb4ff" },
   { id: "cian", label: "Cian", value: "#4dd8e6" },
   { id: "ambar", label: "Ámbar", value: "#ffb347" },
   { id: "verde", label: "Verde", value: "#7ee787" },
   { id: "violeta", label: "Violeta", value: "#c4a7ff" },
-  { id: "blanco", label: "Blanco", value: "#e8f0ff" },
 ];
 
 export const SCALES = [

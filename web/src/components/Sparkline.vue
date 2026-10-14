@@ -45,6 +45,17 @@ const paths = computed(() => {
   if (cur) segs.push(cur);
   return segs;
 });
+
+/** Relleno suave bajo cada tramo continuo. */
+const areas = computed(() =>
+  paths.value.map((d) => {
+    const pts = d.match(/[d.]+,[d.]+/g) ?? [];
+    if (pts.length < 2) return "";
+    const first = pts[0]!.split(",")[0];
+    const last = pts[pts.length - 1]!.split(",")[0];
+    return `${d}L${last},${props.height}L${first},${props.height}Z`;
+  }),
+);
 </script>
 
 <template>
@@ -56,7 +67,7 @@ const paths = computed(() => {
     role="img"
     :aria-label="label"
   >
-    <line class="axis" x1="0" :y1="height - 0.5" :x2="W" :y2="height - 0.5" />
+    <path v-for="(d, i) in areas" :key="'a' + i" :d="d" :fill="color" class="area" />
     <path v-for="(d, i) in paths" :key="i" :d="d" :stroke="color" class="line" />
   </svg>
 </template>
@@ -66,15 +77,15 @@ const paths = computed(() => {
   display: block;
   width: 100%;
 }
-.axis {
-  stroke: var(--line);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
+.area {
+  opacity: 0.12;
+  stroke: none;
 }
 .line {
   fill: none;
-  stroke-width: 1.5;
+  stroke-width: 2;
   vector-effect: non-scaling-stroke;
   stroke-linejoin: round;
+  stroke-linecap: round;
 }
 </style>

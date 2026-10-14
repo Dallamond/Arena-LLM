@@ -52,7 +52,7 @@ const stroke = computed(() =>
       />
     </svg>
     <div class="center">
-      <span class="readout mono">{{ readout }}</span>
+      <span class="readout num">{{ readout }}</span>
       <span v-if="tag" class="label tag">{{ tag }}</span>
     </div>
     <figcaption>
@@ -80,16 +80,17 @@ svg {
 }
 .track {
   fill: none;
-  stroke: var(--line);
-  stroke-width: 6;
+  stroke: var(--panel-raised);
+  stroke-width: 7;
+  stroke-linecap: round;
 }
 .track--nodata {
   stroke-dasharray: 3 4 !important;
 }
 .val {
   fill: none;
-  stroke-width: 6;
-  stroke-linecap: butt;
+  stroke-width: 7;
+  stroke-linecap: round;
   transition: stroke-dasharray 0.5s ease;
 }
 .center {
@@ -102,8 +103,7 @@ svg {
   gap: 2px;
 }
 .readout {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 20px;
 }
 .tag {
   font-size: 9px;
