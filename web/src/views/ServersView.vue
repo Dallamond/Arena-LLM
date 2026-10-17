@@ -299,8 +299,11 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
             <div>
               <dt>contexto</dt>
               <dd>
-                {{ fmt(ep.snapshot?.derived?.n_ctx_slot) }} por slot × {{ fmt(ep.snapshot?.derived?.total_slots) }} slots
-                <span class="dim">(total {{ fmt(ep.snapshot?.derived?.n_ctx_total) }})</span>
+                <template v-if="ep.snapshot?.derived?.n_ctx_slot != null || ep.snapshot?.derived?.total_slots != null">
+                  {{ fmt(ep.snapshot?.derived?.n_ctx_slot) }} por slot × {{ fmt(ep.snapshot?.derived?.total_slots) }} slots
+                  <span class="dim">(total {{ fmt(ep.snapshot?.derived?.n_ctx_total) }})</span>
+                </template>
+                <template v-else>{{ NO_DATA }}</template>
               </dd>
             </div>
             <div>

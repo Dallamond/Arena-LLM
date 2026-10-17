@@ -203,6 +203,13 @@ function runOf(f: ModelFile) {
   const mine = launched.value.find((l) => l.alive && samePath(l.model, f.path)) ?? null;
   return { ep: ep ?? null, port: port ?? mine?.port ?? null, mine };
 }
+/** Aviso si el contexto por slot elegido supera el de entrenamiento del modelo. */
+function ctxWarning(r: { model: { context_length: number | null } }): string | null {
+  const train = r.model.context_length;
+  const perSlot = Math.floor(params.ctx / Math.max(params.parallel, 1));
+  if (!isNum(train) || train <= 0 || perSlot <= train) return null;
+  return `El contexto por slot (${fmt(perSlot)}) supera el de entrenamiento (${fmt(train)}): la calidad puede caer.`;
+}
 const busy = reactive<Record<string, boolean>>({});
 const launchError = reactive<Record<string, string | undefined>>({});
 
@@ -403,6 +410,7 @@ function elapsed(l: LaunchedServer): string {
             </div>
           </div>
           <p v-else class="dim fit">{{ r!.estimate.notes[0] }}</p>
+          <p v-if="ctxWarning(r!)" class="ctxwarn" role="note">▲ {{ ctxWarning(r!) }}</p>
 
           <div v-if="r!.estimate.kind === 'model'" class="actions">
             <template v-if="runOf(f).mine || runOf(f).ep">
@@ -655,6 +663,11 @@ function elapsed(l: LaunchedServer): string {
   gap: 18px;
   flex-wrap: wrap;
   margin: 0;
+}
+.ctxwarn {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--warn);
 }
 .verdict {
   font-size: 15px;

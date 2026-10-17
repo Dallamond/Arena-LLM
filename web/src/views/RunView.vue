@@ -13,6 +13,12 @@ import { NO_DATA, RUN_STATUS, fmt, fmtDate, fmtDuration, gib, isNum, suiteLabel 
 import { itemsToRows } from "../lib/compare";
 import { findByText } from "../lib/library";
 
+/** Diferencia con signo: «+3», «−1», «0»; sin dato, «sin datos». */
+function signed(v: number | null | undefined): string {
+  if (!isNum(v)) return NO_DATA;
+  return `${v > 0 ? "+" : v < 0 ? "−" : ""}${fmt(Math.abs(v), 0)}`;
+}
+
 const props = defineProps<{ id: string }>();
 const router = useRouter();
 const runId = computed(() => Number(props.id));
@@ -495,7 +501,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
             <dl v-if="sum.devices[id]" class="mono">
               <div>
                 <dt>temperatura reposo → máx</dt>
-                <dd>{{ fmt(sum.devices[id].temp_idle_c, 0) }} → {{ fmt(sum.devices[id].temp_max_c, 0, "°C") }} (+{{ fmt(sum.devices[id].temp_rise_c, 0) }})</dd>
+                <dd>{{ fmt(sum.devices[id].temp_idle_c, 0, "°C") }} → {{ fmt(sum.devices[id].temp_max_c, 0, "°C") }} ({{ signed(sum.devices[id].temp_rise_c) }})</dd>
               </div>
               <div>
                 <dt>potencia reposo · media · máx</dt>

@@ -199,7 +199,7 @@ const hoverValues = computed(() => {
       </g>
       <line :x1="PAD.l" :x2="W - PAD.r" :y1="H - PAD.b" :y2="H - PAD.b" class="baseline" />
       <text v-for="v in yTicks" :key="'yt' + v" :x="PAD.l - 6" :y="py(v) + 3" class="tick tick--y">
-        {{ fmt(v, digits > 0 && v < 10 ? 1 : 0) }}
+        {{ fmt(v, digits > 0 && !Number.isInteger(v) ? 1 : 0) }}
       </text>
       <text v-for="v in xTicks" :key="'xt' + v" :x="px(v)" :y="H - 6" class="tick tick--x">{{ xLabel(v) }}</text>
       <!-- umbrales -->
