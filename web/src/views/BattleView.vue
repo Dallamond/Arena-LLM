@@ -249,9 +249,9 @@ const paramText = (p: Record<string, unknown>) =>
             <RouterLink v-if="c.run" :to="`/pruebas/${c.run.id}`">run #{{ c.run.id }}</RouterLink>
           </p>
           <Sparkline v-if="c.hist.length > 1" :values="c.hist" :color="c.color" :height="34" :capacity="Math.max(60, c.hist.length)" label="t/s en vivo" />
-          <details v-if="c.reasoning && showThink" class="think" open>
+          <details v-if="c.reasoning && showThink" class="think">
             <summary class="small">
-              <span class="pulse" aria-hidden="true" /> Pensando… ({{ c.reasoning.length }} car.)
+              <span class="pulse" aria-hidden="true" /> Pensando… ({{ c.reasoning.length }} car.) · pulsa para ver
             </summary>
             <pre class="think__text">{{ c.reasoning }}</pre>
           </details>
@@ -448,7 +448,7 @@ const paramText = (p: Record<string, unknown>) =>
   font-size: 12px;
   line-height: 1.5;
   color: var(--ink-dim);
-  max-height: 24vh;
+  max-height: 18vh;
   overflow-y: auto;
   margin: 6px 0 0;
 }
