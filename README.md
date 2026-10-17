@@ -1,157 +1,190 @@
 # Arena LLM
 
-Banco de pruebas **independiente del hardware** para modelos de IA locales (llama.cpp). Es una web local para **medir, enfrentar y comparar modelos** en cualquier equipo y tarjeta, con la telemetría del equipo (cada GPU, CPU y RAM) siempre a la vista.
+Banco de pruebas **independiente del hardware** para modelos de IA locales (llama.cpp). Es una web local que **mide, enfrenta y compara modelos** en cualquier equipo y tarjeta, con la telemetría del equipo (cada GPU, CPU y RAM) siempre a la vista.
 
-![Panel de Arena LLM: dos GPU, CPU y RAM en vivo, con medidores y aviso de throttling](docs/img/panel.png)
+Resuelve un problema concreto: comparar dos modelos, dos cuantizaciones o dos tarjetas suele acabar en cifras sueltas que no se pueden comparar. Arena detecta cada `llama-server` y su configuración, lo prueba con el mismo perfil en cualquier equipo, guarda la foto de configuración con cada run y dice si dos resultados son **comparables** y por qué.
 
-> Estado: F1–F6 hechas, más **Batalla** (F8) y gran parte de **Comparar** (F9): telemetría, detección de servidores, calculadora de encaje con comando de arranque, estrés, prompt libre con biblioteca, rendimiento por componente con `llama-bench`, batallas entre modelos y comparación de runs con lectura de todas las respuestas. Ver [`ESTADO.md`](ESTADO.md) y [`docs/HOJA-DE-RUTA.md`](docs/HOJA-DE-RUTA.md).
->
-> Todas las capturas están hechas con el **modo simulado** (perfiles `nvidia2` y `cpu-only`, `llama-server` simulados y GGUF falsos): no hay datos ni rutas reales.
+![Panel de Arena LLM: dos GPU, CPU y RAM en vivo, con medidores y avisos](docs/img/panel.png)
 
-## Qué hace
+> Todas las capturas y animaciones están hechas con el **modo simulado** (perfil `nvidia2`, `llama-server` simulados y GGUF falsos): no hay datos, rutas ni modelos reales. Los nombres de GPU ("GPU simulada 12 GB") son del simulador.
 
-1. **Muestra siempre el estado del equipo** (cada GPU, CPU y RAM) para ver de un vistazo que no pasa nada raro.
-2. **Detecta sola** qué modelo, contexto y flags tiene cada `llama-server` y lo guarda con cada prueba.
-3. **Prueba y compara**: estrés, prompt libre, rendimiento por componente, batallas A contra B y comparación de resultados. En próximas fases llegarán las pruebas de calidad con corrección automática.
+## Índice
 
-## Funcionalidades
+- [Funciones](#funciones): Panel, Servidores, Calidad, Rendimiento, Batalla, Historial, Comparar, Ajustes y exportación.
+- [Novedades recientes de la interfaz](#novedades-recientes-de-la-interfaz)
+- [Instalación y arranque](#instalación-y-arranque)
+- [Principios](#principios), [componentes](#componentes), [estado por fases](#estado-por-fases) y [documentación](#documentación)
 
-### Telemetría en vivo
+## Funciones
 
-Temperatura, potencia, VRAM, uso, relojes, ventilador, estado P y throttling de cada GPU, más CPU y RAM, cada segundo por SSE. Cada tarjeta conserva su color en toda la interfaz, y los avisos salen de los umbrales de cada dispositivo.
+El menú lateral tiene ocho secciones: Panel, Servidores, Calidad, Rendimiento, Batalla, Historial, Comparar y Ajustes. La franja del equipo (una tarjeta por GPU, CPU y RAM) está arriba en todas las pantallas y se puede plegar con **Plegar**.
+
+### Panel y telemetría en vivo
+
+Temperatura, potencia, uso, VRAM, relojes, ventilador, estado P y throttling de cada GPU, más CPU y RAM, cada segundo por SSE, con gráficas de los últimos 2 minutos. Cada dispositivo conserva su color en toda la interfaz y los avisos salen de los umbrales de cada uno (autodetectados o configurados en Ajustes). Abajo se listan los servidores detectados y la ficha del equipo.
 
 ![Panel en vivo: las GPU pasan de reposo a carga y suben temperatura, potencia y uso](docs/img/panel-telemetria.gif)
 
-<sub>Acelerado ×2.</sub>
+<sub>Acelerado ×3.</sub>
 
-### Detección de servidores
+### Servidores
 
-Arena detecta los `llama-server` que lanzas tú (proceso, `/props`, `/slots`, `/v1/models`): modelo, cuantización, contexto por slot, flags y en qué GPU corre. Cada 5 s vuelve a mirar y registra cualquier cambio de configuración con su diff.
+Dos pestañas: **En marcha** y **GGUF en disco**.
 
-![Página Servidores con los llama-server detectados y su configuración](docs/img/servidores.png)
+**En marcha.** Arena detecta los `llama-server` del equipo (proceso, `/props`, `/slots`, `/v1/models`): modelo, cuantización, contexto por slot, flags, build y en qué GPU corre, y los vuelve a mirar cada 5 s anotando cualquier cambio de configuración con su diff. Se puede **dar de alta un endpoint a mano** (otra máquina, un contenedor), **asignar GPU a mano**, ponerle alias y pulsar **▶ Probar** para ir a Calidad con ese servidor elegido.
 
-![Un servidor se cae, vuelve a cargar con otro contexto y Arena anota el cambio](docs/img/deteccion-servidores.gif)
+![Servidores en marcha: configuración detectada, flags y cambios](docs/img/servidores.png)
 
-<sub>Acelerado ×1,5. El servidor se para ("sin respuesta"), vuelve a arrancar con otro contexto y el cambio queda registrado con su diff.</sub>
+**GGUF en disco.** Lee la cabecera de cada GGUF de las carpetas permitidas y estima pesos por capa, caché KV, búfer de cómputo y reserva por GPU. Con el contexto, los slots y el tipo de caché KV que elijas, el veredicto se compara con la VRAM y la RAM **libres ahora**: cabe en una GPU, cabe repartido, necesita RAM (con el `-ngl` sugerido), solo CPU o no cabe. Todo lleva el sello `ESTIMADO`, y **Ver desglose** enseña cada partida.
 
-También se pueden **dar de alta endpoints a mano** (por ejemplo, un servidor que el agente no ve como proceso) y **asignar GPU a mano** cuando la detección no puede.
-
-### Calculadora de encaje de GGUF
-
-Pestaña **GGUF en disco**: lee la cabecera de cada GGUF de las carpetas permitidas y estima pesos por capa, caché KV, búfer de cómputo y reserva por GPU. El veredicto se compara con la VRAM y la RAM **libres ahora**: cabe en una GPU, cabe repartido, necesita RAM (con el `-ngl` sugerido), solo CPU o no cabe. Todo lleva el sello `ESTIMADO`.
+![Calculadora de encaje: cada GGUF contra la memoria libre, con GPU destino, contexto, slots y caché KV](docs/img/servidores-gguf.png)
 
 ![Cambiar contexto, slots y caché KV recalcula al momento el encaje de cada modelo](docs/img/calculadora-gguf.gif)
 
-### Comando de `llama-server` listo para copiar
+**Lanzar y parar `llama-server` desde la GUI.** Eliges la GPU destino arriba (**Lanzar en**: automático, que usa la recomendada, o una GPU concreta) y **Lanzar** arranca ese modelo con el contexto, los slots y la caché KV elegidos; mientras carga se ve su registro, y **Parar** lo detiene. Arena solo para los servidores que lanzó ella. El agente es quien ejecuta el binario, con una lista cerrada de flags validados, siempre en `127.0.0.1` y con modelos de las carpetas permitidas. Necesita `llama_server` (o un `llama-server` junto a `llama_bench`) en la configuración del agente.
 
-En cada GGUF que cabe, **Ver comando** compone la línea para arrancarlo con lo que ha calculado la calculadora: binario detectado, `-m`, `-c`, `-ngl` sugerido, `-np`, tipo de caché KV, `-fa on` y un `--port` que no usa ningún servidor detectado. Si cabe en varias GPU, eliges en cuál (`-dev`); si va repartido, añade `-ts` según la memoria libre. Sale en la sintaxis de cmd y PowerShell en Windows, o de bash en Linux. Arena no lo lanza: lo copias y lo ejecutas tú.
+> No he podido capturar un lanzamiento real: el agente simulado no tiene un `llama-server` que ejecutar. Los botones se ven en la captura de arriba.
 
-![Comando de llama-server propuesto para un GGUF, con la GPU a elegir y pestañas cmd y PowerShell](docs/img/comando-llama-server.png)
+**Comando copiable.** **Copiar comando** compone la línea equivalente para ejecutarla a mano, en otro equipo o con otros flags: binario, `-m`, `-c`, `-ngl` sugerido, `-np`, tipo de caché KV, `-fa on` y un `--port` libre. Si cabe en varias GPU eliges en cuál (`-dev`); si va repartido añade `-ts`. Sale en la sintaxis de cmd y PowerShell en Windows, o de bash en Linux, con `CUDA_DEVICE_ORDER=PCI_BUS_ID` cuando fija dispositivo.
 
-El binario sale de la configuración del agente (`llama_server`, o el `llama-server` que haya junto a `llama_bench`). Si no está, sale del último `llama-server` detectado y, si tampoco hay, se supone en el `PATH`, con un aviso. Con `-dev` o `-ts` el comando fija `CUDA_DEVICE_ORDER=PCI_BUS_ID` para que `CUDA0, CUDA1…` coincidan con el orden de `nvidia-smi`.
+![Comando de llama-server propuesto para un GGUF, con la GPU a elegir](docs/img/comando-llama-server.png)
 
-### Prueba de estrés
+### Calidad
 
-Peticiones largas en bucle durante el tiempo elegido, con fases de reposo, carga y enfriamiento. Gráficas de t/s, temperatura, potencia de placa y reloj sincronizadas, y aborto automático si una GPU llega a su umbral crítico.
+Pruebas sobre el servidor que elijas, con los parámetros comunes de generación (el perfil estándar fija temperatura 0, semilla 42 y caché de prompt desactivada; cambiarlos hace que el run deje de ser comparable con los del perfil).
+
+- **Estrés GPU/VRAM**: peticiones largas en bucle durante el tiempo elegido, con fases de reposo, carga y enfriamiento. Aborta solo si una GPU llega a su umbral crítico.
+- **Prompt libre**: uno o varios prompts con repeticiones, midiendo TTFT, t/s del cliente y del servidor y tokens.
+
+![Calidad y estrés: elección de servidor, estrés y prompt libre](docs/img/calidad.png)
+
+El estrés muestra en vivo t/s, temperatura, potencia de placa y reloj sincronizados:
 
 ![Run de estrés en marcha: velocidad, temperatura, potencia y reloj en vivo](docs/img/estres-en-vivo.gif)
 
-<sub>Acelerado ×4.</sub>
+<sub>Acelerado ×3.</sub>
 
 Al terminar queda el resultado completo: resumen (mediana de t/s, TTFT, degradación, energía y tokens por Wh, throttling), la **foto de configuración** guardada con el run (servidor, flags, modelo y parámetros) y cada petición.
 
-![Resultado de un run de estrés con resumen, gráficas, configuración guardada y peticiones](docs/img/resultado-run.png)
+![Resultado de un run de estrés con gráficas, resumen y configuración guardada](docs/img/resultado-run.png)
 
-### Prompt libre en streaming y biblioteca de prompts
-
-Uno o varios prompts propios con repeticiones. La respuesta llega en streaming y se miden TTFT, t/s del cliente y del servidor, y tokens.
-
-![Se escribe un prompt, se lanza y la respuesta llega en streaming con sus métricas](docs/img/prompt-libre-streaming.gif)
-
-La **biblioteca** trae 28 prompts en 7 categorías: lógica, tipo test de CI, matemáticas, código, seguir instrucciones, redacción y explicar. Se añaden con un clic, uno a uno o por categorías. Los que tienen respuesta objetiva llevan `ref`, y en el run se ve la **respuesta de referencia** junto a la del modelo.
+**Biblioteca de prompts.** 28 prompts en 7 categorías (lógica, tipo test de CI, matemáticas, código, seguir instrucciones, redacción y explicar), que se añaden con un clic, uno a uno o por categorías. Los que llevan `ref` traen **respuesta de referencia**, que se ve junto a la del modelo. La biblioteca es un fichero de datos ([`server/catalog/prompts.json`](server/catalog/prompts.json)); para añadir los tuyos sin tocar el repositorio, crea un `prompts.json` con la misma forma en la carpeta de datos (`data/` o `ARENA_DATA_DIR`). Un `id` repetido sustituye al de la base.
 
 ![Biblioteca de prompts en Prompt libre, con categorías y prompts seleccionados](docs/img/prompt-biblioteca.png)
 
-La biblioteca es un fichero de datos ([`server/catalog/prompts.json`](server/catalog/prompts.json)). Para añadir los tuyos sin tocar el repositorio, crea un `prompts.json` con la misma forma en la carpeta de datos (`data/` o `ARENA_DATA_DIR`). Un `id` repetido sustituye al de la base.
+La sección también anuncia las pruebas que llegan en F7 (razonamiento, código con ejecución aislada, contexto largo, concurrencia); aún no existen.
 
-### Rendimiento por componente (`llama-bench`)
+### Rendimiento (`llama-bench`)
 
-La página **Rendimiento** lanza `llama-bench` desde el agente con un perfil estándar (pp512, tg128, 3 repeticiones). Hay cuatro pruebas:
+Lanza `llama-bench` desde el agente, sin necesidad de un `llama-server` cargado (mejor que no lo haya, porque ocupa la tarjeta). Perfil estándar (pp512, tg128, 3 repeticiones) y cuatro pruebas:
 
-- **Un dispositivo**.
+- **Un dispositivo**: una GPU con todas las capas, o la CPU sin GPU.
 - **Solo CPU/RAM**, con barrido de hilos.
-- **Curva `-ngl`**: t/s según cuántas capas van en la GPU.
-- **Reparto `-ts`** entre GPU.
+- **Híbrido · curva de la RAM** (`-ngl`): cuánto se pierde por cada capa que pasa de la VRAM a la RAM.
+- **Reparto entre GPU** (`-ts`): cómo repartir un modelo entre varias tarjetas (necesita 2 GPU o más).
 
-El run muestra la curva, una tabla con el % de capas en GPU y el ancho de banda efectivo (`ESTIMADO`), con la telemetría y el aborto térmico de siempre. El agente solo ejecuta el `llama-bench` de su configuración, con una lista cerrada de flags.
+Antes de lanzar, Arena avisa si un servidor ocupa la tarjeta o si el modelo no cabe (**Lanzar igualmente** lo permite).
 
-![Resultado de una curva -ngl con llama-bench: t/s de generación y de procesado de prompt según las capas en GPU](docs/img/rendimiento.png)
+![Preparar una prueba de llama-bench: tipo de prueba, modelo, dispositivo y parámetros](docs/img/rendimiento-preparacion.png)
+
+El run muestra la curva de t/s frente a las capas en GPU, una tabla con el % de capas en GPU y el ancho de banda efectivo (`ESTIMADO`), con la telemetría y el aborto térmico de siempre.
+
+![Resultado de una curva -ngl: t/s de generación y de procesado de prompt según las capas en GPU](docs/img/rendimiento.png)
 
 ### Batalla
 
 Los mismos prompts contra 2–6 servidores (lados), **en paralelo** (cada lado en su servidor, por ejemplo uno por GPU) o **uno detrás de otro** (vale con un solo servidor, por ejemplo para variar solo la temperatura).
 
-- **Común a todos los lados**: prompts (con la biblioteca), semilla, repeticiones y fases.
-- **Por lado**: temperatura, tokens máximos, `top_k/top_p/min_p`, penalización, caché de prompt, prompt de sistema y JSON `extra`, con «Copiar A →».
-- **En vivo**: una columna por lado con la respuesta en streaming, t/s, TTFT, tokens, temperatura de su GPU y minigráfica.
-- **Al terminar**: el **marcador** (más rápido, responde antes, más frío, más eficiente) y las respuestas de todos los lados, prompt a prompt.
+- **Común a todos los lados**: prompts (con la biblioteca), semilla, temperatura y tokens máximos por defecto, repeticiones y fases.
+- **Por lado**: servidor, etiqueta, temperatura, tokens máximos, `top_k/top_p/min_p`, penalización, caché de prompt, prompt de sistema y JSON `extra`, con «Copiar A →».
 
-![Batalla terminada: dos lados con sus cifras y el marcador con veredictos y métricas](docs/img/batalla.png)
+![Preparación de una batalla: prompts de la biblioteca, lados A y B y modo de lanzamiento](docs/img/batalla-preparacion.png)
+
+**En vivo**, la batalla ocupa la pantalla con una columna por lado: modelo, GPU que usa, **cronómetro**, **prompts contestados** (n / total), t/s, TTFT, tokens, temperatura máxima de su GPU, minigráfica y la respuesta en streaming. Si el modelo razona, el **razonamiento** sale en vivo («Pensando…») y se puede ocultar con «ver razonamiento». Se puede **Detener** en cualquier momento.
+
+![Batalla en vivo: dos modelos contestando, con cronómetro, prompts contestados y razonamiento](docs/img/batalla-en-vivo.gif)
+
+<sub>Acelerado ×1,3, de 40 s reales. Las respuestas son texto fijo del `llama-server` simulado, no responden al prompt.</sub>
+
+Al terminar quedan las cifras de cada lado, el **marcador** (más rápido, responde antes, más frío, más eficiente, con su margen) y la tabla de métricas, más las respuestas de todos los lados prompt a prompt. Botones: **Ver en Comparar**, **Repetir** y **Borrar**.
+
+![Batalla terminada: cifras de cada lado](docs/img/batalla.png)
+
+![Marcador y tabla de métricas de la batalla, con la insignia de comparabilidad](docs/img/batalla-marcador.png)
 
 ### Comparar
 
-Elige runs en el Historial (bandeja «Comparar (N)»), desde una batalla o en la propia página. Se pueden comparar hasta 12.
+Elige runs en el Historial (bandeja «Comparar (N)»), desde una batalla o en la propia página (hasta 12; con uno solo sirve para leer sus respuestas). Arriba, la **insignia de comparabilidad** con sus motivos:
 
-- **Insignia de comparabilidad** con sus motivos:
-  - *No comparables*: es otra prueba u otra versión de la prueba.
-  - *Parcialmente*: prompts distintos, algún run incompleto o cambian varias cosas a la vez (por ejemplo, modelo y GPU).
-  - *Comparables*: cambia como mucho un factor, justo el que se compara.
-- **Veredictos** con su margen, **métricas** con el mejor valor marcado (▲), **gráficas superpuestas** (t/s, °C, W) y **diff de configuración**. La temperatura, la potencia y la energía son solo las de la GPU de cada run.
-- **Exportar**: Markdown para el vault (frontmatter YAML, tablas y respuestas completas), CSV y JSON.
+- *No comparables*: es otra prueba u otra versión de la prueba.
+- *Parcialmente*: prompts distintos, algún run incompleto o cambian varias cosas a la vez (por ejemplo, modelo y GPU).
+- *Comparables*: cambia como mucho un factor, justo el que se compara.
 
-![Comparar dos runs: insignia, veredictos y tabla de métricas con el mejor valor resaltado](docs/img/comparar.png)
+Cuatro pestañas:
 
-### Leer todas las respuestas
+- **Resumen**: veredictos con su margen y los datos principales con el mejor valor marcado (▲).
 
-Para revisar si un modelo redacta bien o se equivoca, todas las respuestas se pueden leer **prompt a prompt**: en la vista de cada run (sección «Respuestas»), en la batalla y en Comparar, con una columna por run. Cada respuesta lleva:
+  ![Comparar, pestaña Resumen: insignia, veredictos y datos principales](docs/img/comparar-resumen.png)
 
-- La respuesta de referencia de la biblioteca, cuando la hay.
-- Tokens, palabras, t/s y TTFT.
-- El aviso «cortada por tokens máximos» cuando llega al límite.
-- El razonamiento, opcional.
+- **Prompts**: las respuestas de todos los runs, prompt a prompt, una columna por run. Cada respuesta lleva la referencia de la biblioteca (si la hay), tokens, palabras, t/s y TTFT, el aviso «cortada por tokens máximos», un buscador, razonamiento opcional y desplegar/plegar todo.
 
-Además hay un buscador.
+  ![Comparar, pestaña Prompts: respuestas lado a lado con la respuesta de referencia](docs/img/comparar-prompts.png)
 
-![Respuestas por prompt de dos modelos, lado a lado, con la respuesta de referencia](docs/img/respuestas.png)
+- **Métricas**: todas las métricas, con el mejor valor marcado, y el **diff de configuración** (≠ cuando cambia entre runs). La temperatura, la potencia y la energía son solo las de la GPU de cada run.
+
+  ![Comparar, pestaña Métricas](docs/img/comparar-metricas.png)
+
+- **Gráficas**: el **visor de gráficas** (desde el inicio de la carga). Eliges magnitud (velocidad, temperatura, potencia de placa), disposición (runs superpuestos o una gráfica por run), qué runs ver y el aspecto (eje Y desde 0, relleno bajo la línea, marcar puntos y alto).
+
+  ![Comparar, pestaña Gráficas con el visor](docs/img/comparar-graficas.png)
+
+  ![Cambiar magnitudes, disposición y aspecto en el visor de gráficas](docs/img/comparar-visor-graficas.gif)
 
 ### Historial
 
-Todos los runs guardados, con su servidor, modelo, suite (versión y hash) y métricas principales. Se marcan con casillas para compararlos («Ver respuestas» con uno solo), y los lados de una batalla enlazan a ella.
+Todos los runs guardados, con su servidor, modelo, suite (versión y hash) y métricas principales (t/s, tokens, temperatura máxima, energía, duración). Hay buscador por suite, etiqueta, modelo o estado. Se marcan con casillas para compararlos («Ver respuestas» con uno solo), y los lados de una batalla enlazan a ella.
 
-![Historial de runs](docs/img/historial.png)
+![Historial de runs con dos runs marcados para comparar](docs/img/historial.png)
 
 ### Ajustes
 
-Apariencia (color de acento, contraste, tamaño de la interfaz, rejilla y efecto croquis), equipos, umbrales térmicos por dispositivo y datos.
+Cuatro apartados:
+
+- **Apariencia**: color de acento, contraste, tamaño de la interfaz, rejilla de fondo y efecto croquis (se apaga con «reducir movimiento» del sistema).
+- **Equipos (agentes)**: añadir o quitar equipos con su URL y token (obligatorio fuera de localhost).
+- **Umbrales térmicos** por dispositivo, de aviso y de aborto, o «Automático».
+- **Datos**: runs guardados, servidores conocidos y dónde está la base de datos. Importar/exportar todo está previsto para F9.
 
 ![Ajustes de apariencia](docs/img/ajustes-apariencia.png)
 
-## Principios
+![Umbrales térmicos por dispositivo](docs/img/ajustes-umbrales.png)
 
-- **Independiente del hardware.** Nada cableado: ni nombres de GPU, ni puertos, ni rutas, ni VRAM, ni umbrales. Todo se autodetecta o se configura. Los proveedores de telemetría son enchufables (v1: NVIDIA y CPU/RAM; un equipo solo con CPU también funciona).
-- **Detecta, no controla.** Tú lanzas `llama-server` como siempre (Arena te propone el comando) y Arena lo detecta y guarda su configuración. Arrancar y parar servidores desde la web está en el backlog. La única excepción es `llama-bench`, que lanza el agente.
-- **No inventa datos.** Lo que no se puede medir sale como "sin datos", nunca como 0. Las estimaciones (encaje, comando propuesto, ancho de banda, potencia de placa…) llevan el sello `ESTIMADO`.
-- **Reproducible y comparable.** Cada prueba tiene versión y hash. El perfil estándar fija semilla, temperatura 0 y `cache_prompt` desactivado, y cada run guarda su foto de configuración completa.
+### Exportación
 
-## Componentes
+En Comparar, el apartado **Exportar** (debajo de las pestañas): **Copiar Markdown para el vault** (frontmatter YAML de tipo proyecto, tablas y respuestas completas), **Descargar .md**, **CSV** (con `;`) y **JSON**.
 
-| Carpeta | Qué es | Requisitos |
-|---|---|---|
-| `agent/` | Agente por equipo: telemetría (GPU, CPU, RAM), detección de `llama-server`, cabeceras GGUF y `llama-bench` | Python 3.11+, **solo biblioteca estándar** (+ `nvidia-smi` si hay GPU NVIDIA) |
-| `server/` | API, sondeo de agentes, eventos en vivo (SSE), runner de pruebas, calculadora y base de datos SQLite | Python 3.11+, FastAPI, uvicorn, httpx |
-| `web/` | Interfaz en Vue 3 + Vite + TypeScript, con gráficas propias en SVG | Node 20+ (solo para compilarla) |
+![Exportar una comparación: Markdown para el vault, .md, CSV y JSON](docs/img/comparar-exportar.png)
 
-## Puesta en marcha
+## Novedades recientes de la interfaz
+
+- **Menú lateral plegado** que se abre al pasar el cursor (o al enfocarlo con el teclado). Las opciones cercanas a la que tocas se desplazan en **ola** según su distancia, y al abrirse enseña la VRAM y la RAM de cada dispositivo. «Desplegar» lo deja fijo.
+
+  ![El menú lateral se abre al pasar el cursor y las opciones se mueven en ola](docs/img/menu-ola.gif)
+
+  ![Menú lateral abierto, con la opción activa y la VRAM por dispositivo](docs/img/menu-lateral.png)
+
+- **Efectos hover** en botones y tarjetas.
+
+  ![Efectos al pasar el cursor por botones y tarjetas](docs/img/hover-efectos.gif)
+
+- **Los servidores detectados que se paran desaparecen de la lista** (sus runs conservan su propia foto de configuración). Los dados de alta a mano se quedan hasta que se quitan.
+
+  > Sin captura: el agente simulado mantiene siempre su lista de procesos, así que no hay forma de reproducirlo en el modo simulado.
+
+- **Batalla a pantalla completa** con modelo, GPU, cronómetro, prompts contestados y razonamiento en vivo, y **Comparar en pestañas** con visor de gráficas (ver arriba).
+- **Lanzar y parar `llama-server`** desde Servidores → GGUF en disco, con GPU destino y orden de modelos.
+
+## Instalación y arranque
 
 ### 1. Instalar (una vez)
 
@@ -159,6 +192,8 @@ Apariencia (color de acento, contraste, tamaño de la interfaz, rejilla y efecto
 scripts\setup.bat          :: crea .venv (Python 3.12 por defecto; scripts\setup.bat 3.11 para otra versión)
 scripts\build-web.bat      :: compila la web en web\dist (repetir tras cambios en web\)
 ```
+
+En Linux, los mismos scripts terminan en `.sh`. Instala Python, Node y los entornos en un disco con espacio (en este PC, `D:`).
 
 ### 2. Configurar el agente (una vez por equipo)
 
@@ -172,9 +207,9 @@ Crea `%APPDATA%\ArenaLLM\agent.json` en Windows, o `~/.config/arena-llm/agent.js
 }
 ```
 
-- `model_dirs`: carpetas cuyos GGUF puede leer el agente (calculadora y `llama-bench`). Sin esta clave, el agente funciona pero no lee GGUF.
+- `model_dirs`: carpetas cuyos GGUF puede leer el agente (calculadora, lanzador y `llama-bench`). Sin esta clave, el agente funciona pero no lee GGUF.
 - `llama_bench`: para la página Rendimiento.
-- `llama_server`: opcional. Si falta, se usa el `llama-server` que haya junto a `llama-bench`. Solo sirve para proponer el comando; el agente nunca lo ejecuta.
+- `llama_server`: para lanzar desde la GUI y para el comando propuesto. Si falta, se usa el `llama-server` que haya junto a `llama-bench`.
 
 La configuración se busca, por este orden, en `--config <fichero>`, en la variable `ARENA_AGENT_CONFIG` y en la ruta de arriba.
 
@@ -185,16 +220,7 @@ scripts\start-agent.bat    :: agente en 127.0.0.1:9100 (déjalo abierto)
 scripts\start-server.bat --agent http://127.0.0.1:9100    :: servidor en http://127.0.0.1:8090
 ```
 
-Abre `http://127.0.0.1:8090`. Después:
-
-1. **Servidores → GGUF en disco**: elige contexto y slots, mira si el modelo cabe y pulsa **Ver comando**.
-2. Copia el comando y ejecútalo en una terminal. Arena detecta el servidor en unos 5 s, y cuando aparece como **listo** ya se puede probar.
-3. **Calidad**: elige el servidor y lanza **Prompt libre** (con prompts de la biblioteca) o **Estrés**.
-4. **Batalla**: elige prompts, un servidor por lado y lanza. Para enfrentar dos modelos a la vez, lanza dos `llama-server` (uno por GPU, en puertos distintos). Con uno solo, usa «uno detrás de otro».
-5. **Comparar** o **Historial**: marca runs y compáralos, o abre uno y baja a «Respuestas» para leerlas todas.
-6. **Rendimiento**: `llama-bench` por componente, sin necesidad de tener un `llama-server` cargado. Es mejor que no lo haya, porque ocupa la tarjeta.
-
-`scripts\stop.bat` para todo lo de Arena, pero no toca los `llama-server` que hayas lanzado tú. En Linux, los mismos scripts terminan en `.sh`.
+Abre `http://127.0.0.1:8090`. Después: **Servidores → GGUF en disco** para lanzar un modelo (o copiar su comando), **Calidad**, **Rendimiento** o **Batalla** para probarlo, y **Historial / Comparar** para revisar y comparar. `scripts\stop.bat` para todo lo de Arena, pero no toca los `llama-server` que hayas lanzado tú.
 
 ### Demo sin GPU
 
@@ -202,7 +228,7 @@ Abre `http://127.0.0.1:8090`. Después:
 scripts\demo.bat D:\modelos    :: agente real + agente simulado (2 GPU, 2 llama-server simulados) + servidor, y abre el navegador
 ```
 
-### Por piezas
+### Por piezas y perfiles simulados
 
 ```bash
 # Agente (cada equipo con GPU). Solo escucha en localhost salvo que haya token.
@@ -223,7 +249,23 @@ npm run dev --prefix web
 pytest && npm test --prefix web
 ```
 
-En Windows, `python` es el de `.venv\Scripts\python.exe` (los scripts `.bat` ya lo usan).
+Los perfiles simulados son `nvidia2` (dos GPU NVIDIA con servidores simulados), `cpu-only` (sin GPU) y `partial` (una GPU que no expone ventilador, potencia ni throttling, para probar los "sin datos"). En Windows, `python` es el de `.venv\Scripts\python.exe` (los scripts `.bat` ya lo usan).
+
+## Principios
+
+- **Independiente del hardware.** Nada cableado: ni nombres de GPU, ni puertos, ni rutas, ni VRAM, ni umbrales. Todo se autodetecta o se configura. Los proveedores de telemetría son enchufables (v1: NVIDIA y CPU/RAM; un equipo solo con CPU también funciona).
+- **Reproducible y comparable.** Cada prueba tiene versión y hash. El perfil estándar fija semilla, temperatura 0 y `cache_prompt` desactivado, y cada run guarda su foto de configuración completa y la insignia Comparables / Parcialmente / No comparables al compararlos.
+- **Detecta siempre, lanza solo lo pedido.** Arena detecta cualquier `llama-server` lo haya lanzado quien lo haya lanzado. Desde la GUI solo lanza y para los que ella arrancó, y el agente lanza `llama-bench`.
+- **No inventa datos.** Lo que no se puede medir sale como "sin datos", nunca como 0. Las estimaciones (encaje, comando propuesto, ancho de banda, potencia de placa…) llevan el sello `ESTIMADO`.
+- **Seguridad.** El agente escucha en `127.0.0.1` y, fuera de localhost, exige token. No es una shell remota: solo ejecuta `llama-bench` y `llama-server` de su configuración, con flags validados, modelos dentro de `model_dirs` y sin aceptar peticiones con cabecera `Origin`. No se suben al repositorio la base de datos, los resultados reales, los modelos, las rutas personales ni los tokens.
+
+## Componentes
+
+| Carpeta | Qué es | Requisitos |
+|---|---|---|
+| `agent/` | Agente por equipo: telemetría (GPU, CPU, RAM), detección y lanzador de `llama-server`, cabeceras GGUF y `llama-bench` | Python 3.11+, **solo biblioteca estándar** (+ `nvidia-smi` si hay GPU NVIDIA) |
+| `server/` | API, sondeo de agentes, eventos en vivo (SSE), runner de pruebas, calculadora y base de datos SQLite | Python 3.11+, FastAPI, uvicorn, httpx |
+| `web/` | Interfaz en Vue 3 + Vite + TypeScript, con gráficas propias en SVG | Node 20+ (solo para compilarla) |
 
 ## Estado por fases
 
@@ -231,7 +273,7 @@ En Windows, `python` es el de `.venv\Scripts\python.exe` (los scripts `.bat` ya 
 |---|---|---|
 | F1 | Esqueleto y agente (telemetría, detección, perfiles simulados) | ✅ |
 | F2 | GUI base y plano del equipo | ✅ |
-| F3 | Servidores, modelos y detección (calculadora de encaje, comando de arranque, alta manual) | Casi: falta un criterio con un servidor real |
+| F3 | Servidores, modelos y detección (calculadora de encaje, comando de arranque, lanzar y parar, alta manual) | Casi: falta un criterio con un servidor real |
 | F4 | Runner núcleo (prompt libre y biblioteca de prompts) | ✅ |
 | F5 | Telemetría sincronizada, resumen y estrés | ✅ salvo la prueba real de 5 min |
 | F6 | Rendimiento por componente (`llama-bench`) | ✅ (reparto `-ts` probado solo en simulado) |
@@ -251,3 +293,4 @@ La base de datos vive en `data/` o en la ruta de `ARENA_DATA_DIR`. `data/` está
 - [`docs/PLAN-CONSTRUCCION.md`](docs/PLAN-CONSTRUCCION.md): módulos, contrato entre agente y servidor, e hitos.
 - [`docs/GUI-DISENO.md`](docs/GUI-DISENO.md): interfaz.
 - [`docs/VIABILIDAD.md`](docs/VIABILIDAD.md): riesgos, métricas y datasets de pruebas.
+- [`ESTADO.md`](ESTADO.md): estado actual y cierre de cada sesión.
