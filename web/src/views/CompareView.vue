@@ -95,6 +95,48 @@ function chart(key: "tps" | "temp" | "power"): ChartSeries[] {
 }
 const hasSeries = (key: "tps" | "temp" | "power") => (data.value?.series ?? []).some((s) => s[key].length > 1);
 
+// --- pestañas ---------------------------------------------------------------
+type Tab = "resumen" | "prompts" | "metricas" | "graficas";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "resumen", label: "Resumen" },
+  { id: "prompts", label: "Prompts" },
+  { id: "metricas", label: "Métricas" },
+  { id: "graficas", label: "Gráficas" },
+];
+const tab = ref<Tab>("resumen");
+function onTabKey(e: KeyboardEvent) {
+  const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+  if (!d) return;
+  const i = TABS.findIndex((t) => t.id === tab.value);
+  tab.value = TABS[(i + d + TABS.length) % TABS.length].id;
+  (e.currentTarget as HTMLElement).querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
+  e.preventDefault();
+}
+
+// Resumen: solo lo crítico (velocidad, latencia, temperatura, potencia, energía)
+const SUMMARY_KEYS = ["tps", "ttft", "pp", "degradation", "temp_max", "throttling", "power_mean", "vram_peak", "tokens_per_wh"];
+const summaryMetrics = computed(() => (data.value?.metrics ?? []).filter((m) => SUMMARY_KEYS.includes(m.key)));
+
+// --- visor de gráficas --------------------------------------------------------
+type SeriesKey = "tps" | "temp" | "power";
+const CHARTS: { key: SeriesKey; title: string; unit: string; digits: number }[] = [
+  { key: "tps", title: "Velocidad", unit: "t/s", digits: 1 },
+  { key: "temp", title: "Temperatura (GPU del run)", unit: "°C", digits: 0 },
+  { key: "power", title: "Potencia de placa (GPU del run)", unit: "W", digits: 0 },
+];
+const viz = ref({
+  shown: { tps: true, temp: true, power: true } as Record<SeriesKey, boolean>,
+  layout: "superpuestas" as "superpuestas" | "separadas",
+  height: 260,
+  fromZero: false,
+  area: false,
+  dots: false,
+});
+const hiddenRuns = ref<number[]>([]);
+const toggleRun = (id: number) =>
+  (hiddenRuns.value = hiddenRuns.value.includes(id) ? hiddenRuns.value.filter((x) => x !== id) : [...hiddenRuns.value, id]);
+const visibleCharts = computed(() => CHARTS.filter((c) => viz.value.shown[c.key] && hasSeries(c.key)));
+const visibleSeries = (key: SeriesKey) => chart(key).filter((s) => !hiddenRuns.value.includes(Number(s.id)));
 const columns = computed(() =>
   (data.value?.runs ?? []).map((r, i) => ({ title: r.title, sub: r.label, color: color(i) })),
 );
@@ -183,81 +225,191 @@ async function copyMarkdown() {
         </ul>
       </div>
 
-      <!-- Veredictos -->
-      <div v-if="data.verdicts.length" class="verdicts">
-        <BlueprintCard v-for="v in data.verdicts" :key="v.key" dense :title="v.title">
-          <div class="verdict__run" :style="{ color: color(v.run_index) }">■ {{ data.runs[v.run_index].title }}</div>
-          <div class="big mono">
-            {{ fmt(v.value, v.key === "ttft" ? 2 : v.key === "tps" ? 1 : 0, data.metrics.find((m) => m.key === v.key)?.unit ?? "") }}
-          </div>
-          <div class="dim small">
-            {{ v.margin_pct !== null ? `${fmt(v.margin_pct, 0, "%")} mejor que el segundo` : "" }}
-          </div>
-        </BlueprintCard>
+      <!-- Pestañas -->
+      <div class="tabs" role="tablist" aria-label="Apartados de la comparación" @keydown="onTabKey">
+        <button
+          v-for="t in TABS"
+          :id="`tab-${t.id}`"
+          :key="t.id"
+          role="tab"
+          type="button"
+          class="tab"
+          :aria-selected="tab === t.id"
+          :aria-controls="`panel-${t.id}`"
+          :tabindex="tab === t.id ? 0 : -1"
+          @click="tab = t.id"
+        >
+          {{ t.label }}
+          <span v-if="t.id === 'prompts'" class="count">{{ data.items.length }}</span>
+        </button>
       </div>
 
-      <!-- Métricas -->
-      <BlueprintCard title="Métricas" class="gap">
-        <div class="scroll">
-          <table class="tbl mono">
-            <thead>
-              <tr>
-                <th>métrica</th>
-                <th v-for="(r, i) in data.runs" :key="r.id"><span class="swatch" :style="{ background: color(i) }" aria-hidden="true" /> #{{ r.id }}{{ r.side ? ` · ${r.side}` : "" }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="m in data.metrics" :key="m.key">
-                <td class="sans">{{ m.label }}<span v-if="m.better" class="dim"> ({{ m.better === "high" ? "más es mejor" : "menos es mejor" }})</span></td>
-                <td v-for="(v, i) in m.values" :key="i" :class="{ best: m.best.includes(i) }">
-                  {{ fmt(v, m.digits, m.unit) }}<span v-if="m.best.includes(i)" class="best__mark" title="Mejor valor"> ▲</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      <!-- RESUMEN -->
+      <section v-show="tab === 'resumen'" id="panel-resumen" role="tabpanel" aria-labelledby="tab-resumen">
+        <div v-if="data.verdicts.length" class="verdicts">
+          <BlueprintCard v-for="v in data.verdicts" :key="v.key" dense :title="v.title">
+            <div class="verdict__run" :style="{ color: color(v.run_index) }">■ {{ data.runs[v.run_index].title }}</div>
+            <div class="big mono">
+              {{ fmt(v.value, v.key === "ttft" ? 2 : v.key === "tps" ? 1 : 0, data.metrics.find((m) => m.key === v.key)?.unit ?? "") }}
+            </div>
+            <div class="dim small">
+              {{ v.margin_pct !== null ? `${fmt(v.margin_pct, 0, "%")} mejor que el segundo` : "" }}
+            </div>
+          </BlueprintCard>
         </div>
-        <p class="dim small">▲ = mejor valor. Temperatura, potencia y energía solo de las GPU de cada run (ESTIMADO en la potencia: es la de placa).</p>
-      </BlueprintCard>
 
-      <!-- Gráficas superpuestas -->
-      <BlueprintCard v-if="hasSeries('tps') || hasSeries('temp')" title="Gráficas superpuestas (desde el inicio de la carga)" class="gap">
-        <div class="charts">
-          <LineChart v-if="hasSeries('tps')" title="Velocidad" unit="t/s" :series="chart('tps')" :digits="1" />
-          <LineChart v-if="hasSeries('temp')" title="Temperatura (GPU del run)" unit="°C" :series="chart('temp')" />
-          <LineChart v-if="hasSeries('power')" title="Potencia de placa (GPU del run)" unit="W" :series="chart('power')" />
-        </div>
-      </BlueprintCard>
+        <BlueprintCard title="Datos principales" class="gap">
+          <div class="scroll">
+            <table class="tbl mono">
+              <thead>
+                <tr>
+                  <th>métrica</th>
+                  <th v-for="(r, i) in data.runs" :key="r.id"><span class="swatch" :style="{ background: color(i) }" aria-hidden="true" /> #{{ r.id }}{{ r.side ? ` · ${r.side}` : "" }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="m in summaryMetrics" :key="m.key">
+                  <td class="sans">{{ m.label }}</td>
+                  <td v-for="(v, i) in m.values" :key="i" :class="{ best: m.best.includes(i) }">
+                    {{ fmt(v, m.digits, m.unit) }}<span v-if="m.best.includes(i)" class="best__mark" title="Mejor valor"> ▲</span>
+                  </td>
+                </tr>
+                <tr v-if="!summaryMetrics.length">
+                  <td :colspan="data.runs.length + 1" class="dim sans">Estos runs no tienen métricas comparables.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="dim small">▲ = mejor valor. Todas las métricas están en la pestaña «Métricas».</p>
+        </BlueprintCard>
+      </section>
 
-      <!-- Diff de configuración -->
-      <BlueprintCard title="Configuración" class="gap">
-        <template #actions>
-          <label class="check small"><input v-model="onlyDiff" type="checkbox" /> solo lo que cambia</label>
+      <!-- PROMPTS -->
+      <section v-show="tab === 'prompts'" id="panel-prompts" role="tabpanel" aria-labelledby="tab-prompts">
+        <BlueprintCard v-if="data.items.length" :title="`Respuestas por prompt (${data.items.length})`">
+          <ResponsesMatrix :rows="data.items" :columns="columns" />
+        </BlueprintCard>
+        <p v-else class="dim">Estos runs no tienen prompts que comparar.</p>
+      </section>
+
+      <!-- MÉTRICAS -->
+      <section v-show="tab === 'metricas'" id="panel-metricas" role="tabpanel" aria-labelledby="tab-metricas">
+        <BlueprintCard title="Todas las métricas">
+          <div class="scroll">
+            <table class="tbl mono">
+              <thead>
+                <tr>
+                  <th>métrica</th>
+                  <th v-for="(r, i) in data.runs" :key="r.id"><span class="swatch" :style="{ background: color(i) }" aria-hidden="true" /> #{{ r.id }}{{ r.side ? ` · ${r.side}` : "" }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="m in data.metrics" :key="m.key">
+                  <td class="sans">{{ m.label }}<span v-if="m.better" class="dim"> ({{ m.better === "high" ? "más es mejor" : "menos es mejor" }})</span></td>
+                  <td v-for="(v, i) in m.values" :key="i" :class="{ best: m.best.includes(i) }">
+                    {{ fmt(v, m.digits, m.unit) }}<span v-if="m.best.includes(i)" class="best__mark" title="Mejor valor"> ▲</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="dim small">▲ = mejor valor. Temperatura, potencia y energía solo de las GPU de cada run (ESTIMADO en la potencia: es la de placa).</p>
+        </BlueprintCard>
+
+        <BlueprintCard title="Configuración" class="gap">
+          <template #actions>
+            <label class="check small"><input v-model="onlyDiff" type="checkbox" /> solo lo que cambia</label>
+          </template>
+          <div class="scroll">
+            <table class="tbl mono">
+              <thead>
+                <tr>
+                  <th>clave</th>
+                  <th v-for="(r, i) in data.runs" :key="r.id"><span class="swatch" :style="{ background: color(i) }" aria-hidden="true" /> #{{ r.id }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in diffRows" :key="row.key" :class="{ changed: !row.same }">
+                  <td class="sans">{{ keyLabel(row.key) }}<span v-if="!row.same" class="warn" title="Cambia entre runs"> ≠</span></td>
+                  <td v-for="(v, i) in row.values" :key="i">{{ val(v) }}</td>
+                </tr>
+                <tr v-if="!diffRows.length">
+                  <td :colspan="data.runs.length + 1" class="dim sans">Ninguna diferencia de configuración.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </BlueprintCard>
+      </section>
+
+      <!-- GRÁFICAS: visor con opciones -->
+      <section v-show="tab === 'graficas'" id="panel-graficas" role="tabpanel" aria-labelledby="tab-graficas">
+        <BlueprintCard title="Visor de gráficas (desde el inicio de la carga)">
+          <div class="viz">
+            <fieldset class="viz__group">
+              <legend>Magnitud</legend>
+              <label v-for="c in CHARTS" :key="c.key" class="check small" :class="{ dim: !hasSeries(c.key) }">
+                <input v-model="viz.shown[c.key]" type="checkbox" :disabled="!hasSeries(c.key)" /> {{ c.title.split(" (")[0] }}
+              </label>
+            </fieldset>
+            <fieldset class="viz__group">
+              <legend>Disposición</legend>
+              <label class="check small"><input v-model="viz.layout" type="radio" value="superpuestas" /> Runs superpuestos</label>
+              <label class="check small"><input v-model="viz.layout" type="radio" value="separadas" /> Una gráfica por run</label>
+            </fieldset>
+            <fieldset class="viz__group">
+              <legend>Runs</legend>
+              <label v-for="(r, i) in data.runs" :key="r.id" class="check small">
+                <input type="checkbox" :checked="!hiddenRuns.includes(r.id)" @change="toggleRun(r.id)" />
+                <span class="swatch" :style="{ background: color(i) }" aria-hidden="true" /> #{{ r.id }}
+              </label>
+            </fieldset>
+            <fieldset class="viz__group">
+              <legend>Aspecto</legend>
+              <label class="check small"><input v-model="viz.fromZero" type="checkbox" /> Eje Y desde 0</label>
+              <label class="check small"><input v-model="viz.area" type="checkbox" /> Relleno bajo la línea</label>
+              <label class="check small"><input v-model="viz.dots" type="checkbox" /> Marcar puntos</label>
+              <label class="check small">
+                Alto
+                <input v-model.number="viz.height" type="range" min="160" max="560" step="20" aria-label="Alto de las gráficas" />
+                <span class="mono">{{ viz.height }}px</span>
+              </label>
+            </fieldset>
+          </div>
+        </BlueprintCard>
+
+        <p v-if="!visibleCharts.length" class="dim gap">No hay series que mostrar con esta selección.</p>
+        <template v-for="c in visibleCharts" :key="c.key">
+          <BlueprintCard v-if="viz.layout === 'superpuestas'" :title="c.title" class="gap">
+            <LineChart
+              :title="c.title"
+              :unit="c.unit"
+              :series="visibleSeries(c.key)"
+              :digits="c.digits"
+              :height="viz.height"
+              :y-min="viz.fromZero ? 0 : undefined"
+              :area="viz.area"
+              :dots="viz.dots"
+            />
+          </BlueprintCard>
+          <BlueprintCard v-else :title="c.title" class="gap">
+            <div class="charts">
+              <LineChart
+                v-for="s in visibleSeries(c.key)"
+                :key="s.id"
+                :title="s.label"
+                :unit="c.unit"
+                :series="[s]"
+                :digits="c.digits"
+                :height="viz.height"
+                :y-min="viz.fromZero ? 0 : undefined"
+                :area="viz.area"
+                :dots="viz.dots"
+              />
+            </div>
+          </BlueprintCard>
         </template>
-        <div class="scroll">
-          <table class="tbl mono">
-            <thead>
-              <tr>
-                <th>clave</th>
-                <th v-for="(r, i) in data.runs" :key="r.id"><span class="swatch" :style="{ background: color(i) }" aria-hidden="true" /> #{{ r.id }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in diffRows" :key="row.key" :class="{ changed: !row.same }">
-                <td class="sans">{{ keyLabel(row.key) }}<span v-if="!row.same" class="warn" title="Cambia entre runs"> ≠</span></td>
-                <td v-for="(v, i) in row.values" :key="i">{{ val(v) }}</td>
-              </tr>
-              <tr v-if="!diffRows.length">
-                <td :colspan="data.runs.length + 1" class="dim sans">Ninguna diferencia de configuración.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </BlueprintCard>
-
-      <!-- Respuestas por prompt -->
-      <BlueprintCard v-if="data.items.length" :title="`Respuestas por prompt (${data.items.length})`" class="gap">
-        <ResponsesMatrix :rows="data.items" :columns="columns" />
-      </BlueprintCard>
+      </section>
 
       <!-- Exportar -->
       <BlueprintCard title="Exportar" class="gap">
@@ -463,5 +615,73 @@ select {
 .btn.tiny {
   padding: 1px 8px;
   font-size: 11px;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-top: 18px;
+  overflow-x: auto;
+}
+.tab {
+  background: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  color: var(--ink-dim);
+  padding: 8px 16px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s;
+}
+.tab:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.05);
+}
+.tab[aria-selected="true"] {
+  color: var(--ink);
+  border-color: var(--line);
+  background: var(--panel);
+  margin-bottom: -1px;
+  font-weight: 600;
+}
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 6px;
+}
+[role="tabpanel"] {
+  margin-top: 18px;
+}
+.viz {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 28px;
+}
+.viz__group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.viz__group legend {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  padding: 0 0 4px;
 }
 </style>
