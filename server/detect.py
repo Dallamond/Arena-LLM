@@ -264,10 +264,11 @@ class EndpointDetector:
             }
             out.append(self._record(state, m["base_url"], probe, snapshot))
         if agent_ok:
+            # Un servidor detectado que ya no está en marcha desaparece de la lista (las pruebas
+            # guardan su propia foto); los dados de alta a mano se quedan hasta que se borren.
             for ep in self.db.list_endpoints(state.pk):
-                if ep["id"] not in seen and not ep["manual"] and ep["status"] != "detenido":
-                    self.db.set_endpoint_status(ep["id"], "detenido")
-                    self._change(ep, "detenido", None, None)
+                if ep["id"] not in seen and not ep["manual"]:
+                    self.db.delete_endpoint(ep["id"])
         self.hub.publish("endpoints", {"host": state.pk, "endpoints": self.db.list_endpoints(state.pk)})
         return out
 
