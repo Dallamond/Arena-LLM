@@ -89,6 +89,7 @@ class ActiveRun:
     workers: list[asyncio.Task] = field(default_factory=list)
     task: asyncio.Task | None = None
     live_text: str = ""
+    live_reasoning: str = ""
     live_dirty: bool = False
     max_temp: dict[str, float] = field(default_factory=dict)
 
@@ -541,11 +542,16 @@ class RunManager:
         started = time.time()
         if live:
             ar.live_text = ""
+            ar.live_reasoning = ""
 
         def on_text(kind: str, text: str) -> None:
             ar.tokens += 1
             if live and kind == "content" and len(ar.live_text) < LIVE_TEXT_MAX:
                 ar.live_text += text
+                ar.live_dirty = True
+            elif live and kind == "reasoning":
+                # del razonamiento interesa lo último que se está pensando
+                ar.live_reasoning = (ar.live_reasoning + text)[-LIVE_TEXT_MAX:]
                 ar.live_dirty = True
 
         result: ChatResult | None = None
@@ -662,6 +668,7 @@ class RunManager:
             payload["tps"] = tps
         if ar.live_dirty:
             payload["text"] = ar.live_text
+            payload["reasoning"] = ar.live_reasoning
             ar.live_dirty = False
         self.hub.publish("run_live", payload)
 

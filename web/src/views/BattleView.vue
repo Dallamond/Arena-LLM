@@ -19,6 +19,10 @@ const battle = ref<BattleDetail | null>(null);
 const cmp = ref<CompareResponse | null>(null);
 const error = ref<string | null>(null);
 const busy = ref(false);
+// Reloj para los contadores de tiempo (un tic por segundo mientras haya algo en marcha)
+const now = ref(Date.now() / 1000);
+const clock = window.setInterval(() => (now.value = Date.now() / 1000), 1000);
+const showThink = ref(true);
 const tpsHist = ref<Record<number, number[]>>({});
 const ttfts = ref<Record<number, number[]>>({});
 
@@ -60,11 +64,21 @@ onMounted(() => {
 onBeforeUnmount(() => {
   offs.forEach((f) => f());
   window.clearTimeout(timer);
+  window.clearInterval(clock);
 });
 watch(bid, () => {
   cmp.value = null;
   load();
 });
+
+function clock_(sec: number | null): string {
+  if (sec === null || !isFinite(sec) || sec < 0) return "—";
+  const t = Math.floor(sec);
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return h ? `${h}:${pad(m)}:${pad(t % 60)}` : `${pad(m)}:${pad(t % 60)}`;
+}
 
 function median(xs: number[] | undefined): number | null {
   if (!xs?.length) return null;
@@ -98,6 +112,8 @@ const columns = computed(() =>
       url: snap?.base_url ?? null,
       gpus: gpus.join(" + "),
       live: st === "running" ? lv : undefined,
+      elapsed: run?.started_at ? ((st === "running" ? now.value : (run.finished_at ?? now.value)) - run.started_at) : null,
+      reasoning: st === "running" ? (lv?.reasoning ?? "") : "",
       tps: st === "running" ? (lv?.tps ?? null) : (summary?.tps_client?.median ?? null),
       ttft: summary?.ttft_s?.median ?? (run ? median(ttfts.value[run.id]) : null),
       tokens: st === "running" ? (lv?.tokens ?? null) : (summary?.completion_tokens ?? null),
@@ -190,6 +206,7 @@ const paramText = (p: Record<string, unknown>) =>
           </p>
         </div>
         <div class="actions">
+          <label class="check small"><input v-model="showThink" type="checkbox" /> ver razonamiento</label>
           <Stamp :text="`${statusInfo.icon} ${statusInfo.text}`" :tone="statusInfo.tone" />
           <button v-if="running" class="btn" type="button" :disabled="busy" @click="stop">■ Detener</button>
           <template v-else>
@@ -202,16 +219,26 @@ const paramText = (p: Record<string, unknown>) =>
       <p v-if="battle.error" class="error mono" role="alert">✕ {{ battle.error }}</p>
 
       <!-- Columnas por lado -->
-      <div class="cols" :style="{ gridTemplateColumns: `repeat(${Math.min(columns.length, 3)}, minmax(0, 1fr))` }">
+      <div class="cols" :style="{ gridTemplateColumns: `repeat(${Math.min(columns.length, 4)}, minmax(0, 1fr))` }">
         <section v-for="c in columns" :key="c.side.side" class="col" :style="{ borderTopColor: c.color }">
           <header class="col__head">
-            <div>
+            <div class="col__id">
               <h3 class="col__title" :style="{ color: c.color }">■ {{ c.title }}<span v-if="c.side.label" class="dim"> · {{ c.side.label }}</span></h3>
-              <p class="dim small mono">{{ c.model ?? "—" }} · {{ c.url ?? "" }} · {{ c.gpus || "GPU sin asociar" }}</p>
-              <p class="dim small mono">{{ paramText(c.params) }}</p>
+              <p class="col__model mono">{{ c.model ?? "—" }}</p>
+              <p class="col__gpu"><span class="swatch" :style="{ background: c.color }" aria-hidden="true" /> {{ c.gpus || "GPU sin asociar" }}</p>
+              <p class="dim small mono">{{ c.url ?? "" }} · {{ paramText(c.params) }}</p>
             </div>
             <Stamp :text="RUN_STATUS[c.st]?.text ?? c.st" :tone="RUN_STATUS[c.st]?.tone ?? 'dim'" :tilt="0" />
           </header>
+          <div class="progress">
+            <div class="progress__nums">
+              <span class="clock mono" :aria-label="`Tiempo transcurrido: ${clock_(c.elapsed)}`"><span class="dim small">tiempo</span> {{ clock_(c.elapsed) }}</span>
+              <span class="answered mono"><span class="dim small">prompts contestados</span> {{ fmt(c.done) }}<span class="dim"> / {{ c.total || NO_DATA }}</span></span>
+            </div>
+            <div class="bar" role="progressbar" :aria-valuenow="c.done ?? 0" aria-valuemin="0" :aria-valuemax="c.total || 0">
+              <div class="bar__fill" :style="{ width: c.total ? Math.min(100, ((c.done ?? 0) / c.total) * 100) + '%' : '0%', background: c.color }" />
+            </div>
+          </div>
           <dl class="nums">
             <div><dt>t/s</dt><dd class="big mono">{{ fmt(c.tps, 1) }}</dd></div>
             <div><dt>TTFT</dt><dd class="big mono">{{ fmt(c.ttft, 2, "s") }}</dd></div>
@@ -219,10 +246,15 @@ const paramText = (p: Record<string, unknown>) =>
             <div><dt>temp. máx</dt><dd class="big mono">{{ fmt(c.temp, 0, "°C") }}</dd></div>
           </dl>
           <p class="dim small">
-            peticiones {{ fmt(c.done) }} / {{ c.total || NO_DATA }}
-            <RouterLink v-if="c.run" :to="`/pruebas/${c.run.id}`"> · run #{{ c.run.id }}</RouterLink>
+            <RouterLink v-if="c.run" :to="`/pruebas/${c.run.id}`">run #{{ c.run.id }}</RouterLink>
           </p>
           <Sparkline v-if="c.hist.length > 1" :values="c.hist" :color="c.color" :height="34" :capacity="Math.max(60, c.hist.length)" label="t/s en vivo" />
+          <details v-if="c.reasoning && showThink" class="think" open>
+            <summary class="small">
+              <span class="pulse" aria-hidden="true" /> Pensando… ({{ c.reasoning.length }} car.)
+            </summary>
+            <pre class="think__text">{{ c.reasoning }}</pre>
+          </details>
           <pre v-if="c.live" class="stream">{{ c.live.text || "…" }}</pre>
           <p v-else-if="c.st === 'pending'" class="dim small">En espera: va después del lado anterior.</p>
         </section>
@@ -313,6 +345,7 @@ const paramText = (p: Record<string, unknown>) =>
   }
 }
 .col {
+  border-radius: var(--radius);
   background: var(--panel);
   border: 1px solid var(--line);
   border-top: 3px solid var(--line-strong);
@@ -328,6 +361,96 @@ const paramText = (p: Record<string, unknown>) =>
 .col__head p {
   margin: 2px 0 0;
   overflow-wrap: anywhere;
+}
+.col__id {
+  min-width: 0;
+}
+.col__model {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 4px 0 2px;
+  overflow-wrap: anywhere;
+}
+.col__gpu {
+  font-size: 15px;
+  margin: 0 0 2px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.progress {
+  margin: 12px 0 4px;
+}
+.progress__nums {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.progress__nums .dim.small {
+  font-weight: 400;
+  margin-right: 6px;
+}
+.bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--panel-raised);
+  overflow: hidden;
+}
+.bar__fill {
+  height: 100%;
+  transition: width 0.4s ease;
+}
+.check {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--ink-dim);
+}
+.think {
+  margin-top: 8px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+}
+.think summary {
+  cursor: pointer;
+  color: var(--warn);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+.think__text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  max-height: 24vh;
+  overflow-y: auto;
+  margin: 6px 0 0;
 }
 .col__title {
   font-size: 15px;
@@ -349,15 +472,15 @@ const paramText = (p: Record<string, unknown>) =>
   margin: 0;
 }
 .big {
-  font-size: 22px;
+  font-size: clamp(24px, 2.2vw, 36px);
 }
 .stream {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 1.5;
-  max-height: 260px;
+  font-size: 14px;
+  line-height: 1.55;
+  max-height: 40vh;
   overflow-y: auto;
   border-top: 1px dotted var(--line);
   padding-top: 8px;

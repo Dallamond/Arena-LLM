@@ -11,7 +11,7 @@ import TopBar from "./components/TopBar.vue";
     <SideNav />
     <div class="content">
       <DeviceStrip v-if="$route.path !== '/'" />
-      <main id="main" class="main" tabindex="-1">
+      <main id="main" class="main" :class="{ 'main--wide': $route.path.startsWith('/batalla/') }" tabindex="-1">
         <RouterView />
       </main>
     </div>
@@ -35,6 +35,9 @@ import TopBar from "./components/TopBar.vue";
   width: 100%;
   margin: 0 auto;
   outline: none;
+}
+.main--wide {
+  max-width: none;
 }
 .skip:focus {
   position: fixed;

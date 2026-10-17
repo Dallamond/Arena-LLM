@@ -381,6 +381,7 @@ export interface RunLive {
   abort_reason: string | null;
   tps?: number;
   text?: string;
+  reasoning?: string;
   bench_rows?: number | null;
 }
 
