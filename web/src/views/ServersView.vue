@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // Servidores detectados: configuración completa, estado y cambios registrados.
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { api, hostList, live, now } from "../api/live";
-import type { ConfigChange, Endpoint } from "../api/types";
+import type { ConfigChange, Endpoint, LaunchedResponse, LaunchedServer } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import GgufList from "../components/GgufList.vue";
 import Stamp from "../components/Stamp.vue";
@@ -25,7 +25,43 @@ function openTab(t: "running" | "disk") {
   if (t === "disk") diskOpened.value = true;
 }
 
+// --- servidores lanzados desde Arena: solo esos se pueden parar desde aquí
+const launched = ref<Record<number, LaunchedServer[]>>({});
+const stopping = ref<Record<number, boolean>>({});
+async function loadLaunched() {
+  for (const h of hostList.value) {
+    try {
+      const r = await api<LaunchedResponse>(`/api/hosts/${h.id}/launched`);
+      launched.value[h.id] = r.launched.filter((l) => l.alive);
+    } catch {
+      launched.value[h.id] = []; // agente sin esta función o caído
+    }
+  }
+}
+const canStop = (ep: Endpoint) =>
+  ep.status !== "detenido" && ep.snapshot?.pid != null && (launched.value[ep.host_pk] ?? []).some((l) => l.pid === ep.snapshot?.pid);
+async function stopPid(hostId: number, pid: number, key: number) {
+  stopping.value[key] = true;
+  try {
+    await api(`/api/hosts/${hostId}/launch/stop`, { method: "POST", body: JSON.stringify({ pid }) });
+    await loadLaunched();
+    await api("/api/endpoints/detect", { method: "POST" }).catch(() => {});
+  } catch (e) {
+    actionError.value[key] = (e as Error).message;
+  } finally {
+    stopping.value[key] = false;
+  }
+}
+const stopServer = (ep: Endpoint) => stopPid(ep.host_pk, ep.snapshot!.pid!, ep.id);
+async function stopAll(hostId: number) {
+  for (const l of launched.value[hostId] ?? []) await stopPid(hostId, l.pid, -hostId);
+}
+let launchedPoll: number | undefined;
+onBeforeUnmount(() => window.clearInterval(launchedPoll));
+
 onMounted(async () => {
+  loadLaunched();
+  launchedPoll = window.setInterval(loadLaunched, 3000);
   history.value = await api<ConfigChange[]>("/api/changes?limit=200").catch(() => []);
 });
 
@@ -210,7 +246,19 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
 
     <div v-show="tab === 'running'">
     <template v-for="g in groups" :key="g.host.id">
-      <h3 class="label host">Equipo · {{ g.host.name }}</h3>
+      <div class="hosthead">
+        <h3 class="label host">Equipo · {{ g.host.name }}</h3>
+        <button
+          v-if="(launched[g.host.id] ?? []).length"
+          class="btn btn--danger"
+          type="button"
+          :disabled="stopping[-g.host.id]"
+          title="Para los llama-server que lanzó Arena en este equipo"
+          @click="stopAll(g.host.id)"
+        >
+          ■ Parar todos los de Arena ({{ launched[g.host.id].length }})
+        </button>
+      </div>
       <div v-if="!g.endpoints.length" class="empty">
         <p>Ningún servidor detectado en este equipo.</p>
         <p class="dim">Lanza <code>llama-server</code>; aparece aquí en unos 5 segundos con su configuración.</p>
@@ -232,6 +280,15 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
               <button class="btn" type="button" @click="confirmDelete = null">No</button>
             </template>
           </template>
+          <button
+            v-if="canStop(ep)"
+            class="btn btn--danger"
+            type="button"
+            :disabled="stopping[ep.id]"
+            @click="stopServer(ep)"
+          >
+            {{ stopping[ep.id] ? "Parando…" : "■ Parar" }}
+          </button>
           <RouterLink v-if="ep.status === 'listo'" class="btn btn--primary" :to="{ path: '/calidad', query: { endpoint: ep.id } }">▶ Probar</RouterLink>
         </template>
 
@@ -551,5 +608,12 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
 }
 code {
   font-family: var(--font-mono);
+}
+.hosthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 </style>

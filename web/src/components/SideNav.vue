@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { currentHost, currentSnapshot, gpus, gpuSample } from "../api/live";
 import { deviceColor, shortName } from "../lib/devices";
 import { gibPair } from "../lib/format";
@@ -9,7 +9,25 @@ import Icon from "./Icon.vue";
 
 // Menú plegado: se abre al pasar el cursor (o al enfocar con teclado) y las opciones
 // cercanas a la que tocas se desplazan en ola según su distancia.
-const open = ref(false);
+// «Fijado»: el menú queda desplegado y no depende del cursor (se recuerda entre visitas).
+const KEY = "arena.navPinned";
+function read(): boolean {
+  try {
+    return localStorage.getItem(KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+const pinned = ref(read());
+watch(pinned, (v) => {
+  try {
+    localStorage.setItem(KEY, v ? "1" : "0");
+  } catch {
+    /* sin almacenamiento */
+  }
+});
+const hover = ref(false);
+const open = computed(() => pinned.value || hover.value);
 const hovered = ref<number | null>(null);
 function dist(i: number): number {
   return hovered.value === null ? 99 : Math.abs(i - hovered.value);
@@ -20,15 +38,15 @@ const snap = currentSnapshot;
 </script>
 
 <template>
-  <div class="navslot">
+  <div class="navslot" :class="{ 'navslot--pinned': pinned }">
     <nav
       class="nav"
-      :class="{ 'nav--open': open }"
+      :class="{ 'nav--open': open, 'nav--pinned': pinned }"
       aria-label="Secciones"
-      @mouseenter="open = true"
-      @mouseleave="(open = false), (hovered = null)"
-      @focusin="open = true"
-      @focusout="open = false"
+      @mouseenter="hover = true"
+      @mouseleave="(hover = false), (hovered = null)"
+      @focusin="hover = true"
+      @focusout="hover = false"
     >
       <ul class="nav__list">
         <li
@@ -75,6 +93,17 @@ const snap = currentSnapshot;
           <div class="mini__val mono">{{ gibPair(snap?.ram?.used_mib, snap?.ram?.total_mib) }}</div>
         </div>
       </div>
+      <button
+        class="nav__pin btn"
+        type="button"
+        :aria-pressed="pinned"
+        :aria-label="pinned ? 'Plegar menú' : 'Dejar el menú desplegado'"
+        :title="pinned ? 'Plegar menú' : 'Dejar desplegado'"
+        @click="pinned = !pinned"
+      >
+        <Icon :name="pinned ? 'collapse' : 'expand'" :size="16" />
+        <span class="nav__text">{{ pinned ? "Plegar" : "Desplegar" }}</span>
+      </button>
     </nav>
   </div>
 </template>
@@ -88,6 +117,10 @@ const snap = currentSnapshot;
   top: var(--topbar-h);
   height: calc(100vh / var(--zoom) - var(--topbar-h));
   z-index: 20;
+}
+.navslot--pinned {
+  width: var(--nav-w);
+  transition: width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .nav {
   position: absolute;
@@ -103,6 +136,18 @@ const snap = currentSnapshot;
 .nav--open {
   width: var(--nav-w);
   box-shadow: 8px 0 32px rgba(0, 0, 0, 0.6);
+}
+/* Fijado: desplegado de forma estable, sin flotar ni sombra */
+.nav--pinned {
+  box-shadow: none;
+}
+.nav__pin {
+  margin: 0 6px 10px;
+  justify-content: flex-start;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-dim);
+  white-space: nowrap;
 }
 .nav__list {
   list-style: none;
