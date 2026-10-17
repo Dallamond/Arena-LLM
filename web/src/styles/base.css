@@ -156,6 +156,29 @@ h4.label {
   cursor: default;
 }
 
+/* Botones reactivos: se elevan al pasar el cursor y se hunden al pulsar */
+.btn {
+  transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s, filter 0.15s;
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  box-shadow: none;
+}
+
+/* Ventanas (tarjetas) reactivas: borde y sombra suaves al pasar el cursor */
+.card {
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.card:hover {
+  border-color: var(--line-strong);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  transform: translateY(-2px);
+}
+
 .btn--primary {
   background: var(--accent);
   color: #000;
