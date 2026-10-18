@@ -15,11 +15,14 @@ from typing import Any
 from server.db import Database
 from server.hub import EventHub
 from server.runs.manager import RunError, RunManager
+from server.runs.suites import SUITES
 
 log = logging.getLogger(__name__)
 
 MAX_SIDES = 6
 MODES = ("paralelo", "secuencial")
+#: Pruebas que se pueden enfrentar: libre (se leen las respuestas) y las que se corrigen solas.
+BATTLE_SUITES = ("libre", "qa", "codigo", "contexto")
 #: Lo que puede cambiar un lado. La semilla, los prompts y las fases son comunes.
 SIDE_KEYS = (
     "temperature",
@@ -41,12 +44,21 @@ def side_names(n: int) -> list[str]:
     return list(string.ascii_uppercase[:n])
 
 
-def side_params(prompts: list[str], common: dict[str, Any], own: dict[str, Any]) -> dict[str, Any]:
+def suite_keys(suite: str) -> set[str]:
+    """Opciones propias de la prueba que son comunes a todos los lados (preguntas, tamaños…)."""
+    return {f["key"] for f in SUITES[suite].fields if f["key"] not in SIDE_KEYS} if suite != "libre" else set()
+
+
+def side_params(
+    prompts: list[str], common: dict[str, Any], own: dict[str, Any], suite: str = "libre"
+) -> dict[str, Any]:
     """Parámetros del run de un lado: comunes + los propios del lado (solo SIDE_KEYS)."""
     bad = sorted(set(own) - set(SIDE_KEYS))
     if bad:
         raise RunError(422, f"Un lado no puede cambiar {', '.join(bad)}: es común a toda la batalla")
-    return {**{k: v for k, v in common.items() if k in COMMON_KEYS}, **own, "prompts": prompts}
+    allowed = {*COMMON_KEYS, *suite_keys(suite)}
+    merged = {**{k: v for k, v in common.items() if k in allowed}, **own}
+    return {**merged, "prompts": prompts} if suite == "libre" else merged
 
 
 class BattleManager:
@@ -64,15 +76,18 @@ class BattleManager:
         common: dict[str, Any],
         sides: list[dict[str, Any]],
         label: str | None,
+        suite: str = "libre",
     ) -> dict[str, Any]:
         if mode not in MODES:
             raise RunError(422, f"Modo desconocido: {mode}")
+        if suite not in BATTLE_SUITES:
+            raise RunError(422, f"Prueba no disponible en la Batalla: {suite}")
         prompts = [p.strip() for p in prompts if isinstance(p, str) and p.strip()]
-        if not prompts:
+        if suite == "libre" and not prompts:
             raise RunError(422, "Hace falta al menos un prompt")
         if not 2 <= len(sides) <= MAX_SIDES:
             raise RunError(422, f"Una batalla necesita entre 2 y {MAX_SIDES} lados")
-        bad = sorted(set(common) - set(COMMON_KEYS))
+        bad = sorted(set(common) - set(COMMON_KEYS) - suite_keys(suite))
         if bad:
             raise RunError(422, f"Parámetros comunes desconocidos: {', '.join(bad)}")
         endpoint_ids = [s.get("endpoint_id") for s in sides]
@@ -103,7 +118,7 @@ class BattleManager:
                     "label": (s.get("label") or "").strip() or None,
                     "params": own,
                     "run_id": None,
-                    "_full": side_params(prompts, common, own),
+                    "_full": side_params(prompts, common, own, suite),
                 }
             )
 
@@ -111,7 +126,7 @@ class BattleManager:
             label=(label or "").strip() or None,
             mode=mode,
             status="running",
-            params={"prompts": prompts, "common": common},
+            params={"suite": suite, "prompts": prompts, "common": common},
             sides=[{k: v for k, v in p.items() if k != "_full"} for p in plan],
         )
         bid = battle["id"]
@@ -135,7 +150,8 @@ class BattleManager:
         battle_label = (self.db.get_battle(bid) or {}).get("label")
         # El run ya lleva battle_id y side: la etiqueta solo guarda los nombres que puso Lucas
         label = " · ".join(x for x in (p["label"], battle_label) if x) or None
-        run = await self.runs.start("libre", p["endpoint_id"], p["_full"], label, battle_id=bid, side=p["side"])
+        suite = ((self.db.get_battle(bid) or {}).get("params") or {}).get("suite") or "libre"
+        run = await self.runs.start(suite, p["endpoint_id"], p["_full"], label, battle_id=bid, side=p["side"])
         p["run_id"] = run["id"]
         self.db.update_battle(bid, sides=[{k: v for k, v in x.items() if k != "_full"} for x in plan])
         self._publish(bid)

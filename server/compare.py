@@ -204,7 +204,11 @@ def run_metrics(run: dict[str, Any]) -> dict[str, Any]:
     energy = _sum([d.get("energy_wh") for d in own])
     tokens = s.get("completion_tokens")
     is_bench = run.get("kind") == "bench"
+    quality = s.get("quality") or {}
     return {
+        "accuracy": quality.get("accuracy_pct"),
+        "context_ok": quality.get("max_size_ok"),
+        "best_agg": quality.get("best_tps_aggregate"),
         "tps": (bench.get("best_tg") or {}).get("t_s") if is_bench else (s.get("tps_client") or {}).get("median"),
         "tps_server": None if is_bench else (s.get("tps_server") or {}).get("median"),
         "pp": (bench.get("best_pp") or {}).get("t_s") if is_bench else (s.get("pp_server") or {}).get("median"),
@@ -225,6 +229,9 @@ def run_metrics(run: dict[str, Any]) -> dict[str, Any]:
 
 #: (clave, rótulo, unidad, mejor: "high" | "low" | None, decimales)
 METRICS = (
+    ("accuracy", "aciertos (QA, código o contexto)", "%", "high", 0),
+    ("context_ok", "contexto más largo con todos los aciertos", "tokens", "high", 0),
+    ("best_agg", "t/s agregados máximos (concurrencia)", "t/s", "high", 1),
     ("tps", "t/s generación (mediana; bench: mejor tg)", "t/s", "high", 1),
     ("tps_server", "t/s según el servidor (mediana)", "t/s", "high", 1),
     ("pp", "t/s procesado de prompt", "t/s", "high", 0),
@@ -270,6 +277,7 @@ def metric_table(per_run: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 VERDICTS = (
+    ("accuracy", "Más aciertos", "high"),
     ("tps", "Más rápido", "high"),
     ("ttft", "Responde antes", "low"),
     ("temp_max", "Más frío", "low"),
@@ -299,6 +307,14 @@ def verdicts(per_run: list[dict[str, Any]]) -> list[dict[str, Any]]:
 # --- respuestas por prompt ----------------------------------------------------------
 
 
+def _eval_public(ev: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Nota de un ítem para la matriz de respuestas (sin el código ni el volcado de tests)."""
+    if not ev or ev.get("kind") == "concurrency":
+        return None
+    keys = ("kind", "correct", "expected", "got", "note", "status", "truncated", "format_ok", "failed")
+    return {k: ev[k] for k in keys if k in ev}
+
+
 def item_matrix(runs: list[dict[str, Any]], items: dict[int, list[dict[str, Any]]]) -> list[dict[str, Any]]:
     """Filas = (prompt, repetición), en el orden de aparición; columnas = runs."""
     order: list[tuple[str, int]] = []
@@ -322,6 +338,7 @@ def item_matrix(runs: list[dict[str, Any]], items: dict[int, list[dict[str, Any]
                 "tps": m.get("tps_client"),
                 "ttft": m.get("ttft_s"),
                 "finish": m.get("finish_reason"),
+                "eval": _eval_public(it.get("eval")),
             }
     return [{"prompt": p, "rep": rep, "cells": cells[(p, rep)]} for p, rep in order]
 

@@ -12,6 +12,7 @@ import asyncio
 import hashlib
 import json
 import time
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -34,6 +35,7 @@ class FakeLlama:
         loading_s: float = 0.0,
         build: str = "b0000-simulado",
         fail_prompt: str | None = None,
+        responder: Callable[[str], str] | None = None,
     ):
         self.tps = tps
         self.pp_tps = pp_tps
@@ -43,6 +45,7 @@ class FakeLlama:
         self.ready_at = time.monotonic() + loading_s
         self.build = build
         self.fail_prompt = fail_prompt
+        self.responder = responder  # prompt → texto completo (para probar la corrección automática)
         self.busy = 0
         self.requests = 0
         self.bodies: list[dict] = []  # peticiones recibidas (para los tests)
@@ -140,21 +143,27 @@ def create_fake_app(fake: FakeLlama | None = None) -> FastAPI:
                 await asyncio.sleep(prompt_n / fake.pp_tps)
                 prompt_ms = (time.perf_counter() - t0) * 1000
                 t1 = time.perf_counter()
-                for i in range(max_tokens):
-                    word = WORDS[(seed + i) % len(WORDS)]
-                    yield _sse({**base, "choices": [{"index": 0, "delta": {"content": word + " "}}]})
+                if fake.responder is not None:
+                    words = [w + " " for w in fake.responder(prompt).split(" ")]
+                    n_gen = len(words)
+                else:
+                    words = [WORDS[(seed + i) % len(WORDS)] + " " for i in range(max_tokens)]
+                    n_gen = max_tokens
+                for word in words:
+                    yield _sse({**base, "choices": [{"index": 0, "delta": {"content": word}}]})
                     await asyncio.sleep(1 / fake.tps)
                 predicted_ms = (time.perf_counter() - t1) * 1000
-                yield _sse({**base, "choices": [{"index": 0, "finish_reason": "length", "delta": {}}]})
+                finish = "stop" if fake.responder is not None else "length"
+                yield _sse({**base, "choices": [{"index": 0, "finish_reason": finish, "delta": {}}]})
                 yield _sse({
                     **base,
                     "choices": [],
-                    "usage": {"completion_tokens": max_tokens, "prompt_tokens": prompt_n,
-                              "total_tokens": prompt_n + max_tokens, "prompt_tokens_details": {"cached_tokens": 0}},
+                    "usage": {"completion_tokens": n_gen, "prompt_tokens": prompt_n,
+                              "total_tokens": prompt_n + n_gen, "prompt_tokens_details": {"cached_tokens": 0}},
                     "timings": {"cache_n": 0, "prompt_n": prompt_n, "prompt_ms": prompt_ms,
                                 "prompt_per_second": prompt_n / (prompt_ms / 1000),
-                                "predicted_n": max_tokens, "predicted_ms": predicted_ms,
-                                "predicted_per_second": max_tokens / (predicted_ms / 1000)},
+                                "predicted_n": n_gen, "predicted_ms": predicted_ms,
+                                "predicted_per_second": n_gen / (predicted_ms / 1000)},
                 })  # fmt: skip
                 yield "data: [DONE]\n\n"
             finally:

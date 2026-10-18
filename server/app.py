@@ -38,7 +38,8 @@ class BattleSideIn(BaseModel):
 class BattleIn(BaseModel):
     mode: str = "paralelo"
     label: str | None = None
-    prompts: list[str]
+    suite: str = "libre"  # libre | qa | codigo | contexto: las tres últimas se corrigen solas
+    prompts: list[str] = []
     common: dict[str, Any] = {}
     sides: list[BattleSideIn]
 
@@ -417,7 +418,7 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
     async def start_battle(request: Request, body: BattleIn) -> dict[str, Any]:
         try:
             return await request.app.state.battles.start(
-                body.mode, body.prompts, body.common, [s.model_dump() for s in body.sides], body.label
+                body.mode, body.prompts, body.common, [s.model_dump() for s in body.sides], body.label, body.suite
             )
         except RunError as exc:
             raise HTTPException(exc.status, exc.message) from exc

@@ -17,6 +17,8 @@ from server.agents import AgentError, AgentMonitor, HostState
 from server.db import Database
 from server.fit import FitError, FitParams, estimate, fit, gpus_from_state
 from server.hub import EventHub
+from server.quality import grading
+from server.quality.summary import quality_summary
 from server.runs import stats
 from server.runs.bench import (
     BENCH_SUITES,
@@ -31,7 +33,7 @@ from server.runs.bench import (
 )
 from server.runs.llm import ChatResult, stream_chat
 from server.runs.stats import CUT_MSG
-from server.runs.suites import SUITES, Suite, payload_for
+from server.runs.suites import SUITES, Case, Suite, SuiteParamError, concurrency_levels, payload_for
 from server.thresholds import thresholds_for
 
 log = logging.getLogger(__name__)
@@ -94,6 +96,10 @@ class ActiveRun:
     max_temp: dict[str, float] = field(default_factory=dict)
 
 
+def _stored(case: Case | None) -> str | None:
+    return case.stored_prompt if case else None
+
+
 def validate(suite: Suite, params: dict[str, Any]) -> dict[str, Any]:
     for key, (lo, hi) in LIMITS.items():
         if key in params and params[key] is not None:
@@ -104,7 +110,16 @@ def validate(suite: Suite, params: dict[str, Any]) -> dict[str, Any]:
             if not lo <= v <= hi:
                 raise RunError(422, f"'{key}' fuera de rango ({lo}–{hi})")
             params[key] = int(v) if key != "duration_s" else v
-    if suite.mode == "items":
+    try:
+        if suite.cases is not None:
+            suite.cases(params)  # valida opciones y comprueba que hay algo que ejecutar
+        elif suite.mode == "concurrency":
+            params["levels"] = concurrency_levels(params)
+            if not isinstance(params.get("prompt"), str) or not params["prompt"].strip():
+                raise SuiteParamError("Hace falta un prompt")
+    except SuiteParamError as exc:
+        raise RunError(422, str(exc)) from exc
+    if suite.mode == "items" and suite.cases is None:
         prompts = [p.strip() for p in params.get("prompts") or [] if isinstance(p, str) and p.strip()]
         if not prompts:
             raise RunError(422, "Hace falta al menos un prompt")
@@ -395,6 +410,8 @@ class RunManager:
                     ticker = asyncio.create_task(self._ticker(ar))
                     if ar.suite.mode == "items":
                         await self._run_items(ar)
+                    elif ar.suite.mode == "concurrency":
+                        await self._run_concurrency(ar)
                     else:
                         await self._run_duration(ar)
                 ar.load_end = time.time()
@@ -419,12 +436,13 @@ class RunManager:
                 status, error = "error", "Todas las peticiones fallaron (ver ítems)"
             elif status == "done" and ar.bench_error:
                 status, error = "error", ar.bench_error
-            summary = stats.run_summary(
-                self.db.list_items(ar.id),
-                self.db.list_tps(ar.id),
-                self.db.list_samples(ar.id),
-                (ar.load_start, ar.load_end),
-            )
+            items = self.db.list_items(ar.id)
+            samples = self.db.list_samples(ar.id)
+            summary = stats.run_summary(items, self.db.list_tps(ar.id), samples, (ar.load_start, ar.load_end))
+            if not isinstance(ar.suite, BenchSuite):
+                quality = quality_summary(ar.suite.id, items, samples)
+                if quality:
+                    summary["quality"] = quality
             summary["thresholds"] = ar.watch
             summary["phases"] = {"load_start": ar.load_start, "load_end": ar.load_end}
             if isinstance(ar.suite, BenchSuite):
@@ -441,15 +459,19 @@ class RunManager:
             self._publish_run(ar.id)
 
     async def _run_items(self, ar: ActiveRun) -> None:
-        prompts = ar.params["prompts"]
         repeats = int(ar.params.get("repeats") or 1)
+        cases = ar.suite.cases(ar.params) if ar.suite.cases else None
+        if cases is not None:
+            work = [(c.name, c.prompt, c) for c in cases]
+        else:
+            work = [(f"prompt {i + 1}", p, None) for i, p in enumerate(ar.params["prompts"])]
         idx = 0
         for r in range(repeats):
-            for i, prompt in enumerate(prompts):
+            for base, prompt, case in work:
                 if ar.stop.is_set():
                     return
-                name = f"prompt {i + 1}" + (f" · rep {r + 1}" if repeats > 1 else "")
-                task = asyncio.create_task(self._request(ar, idx, name, prompt, live=True))
+                name = base + (f" · rep {r + 1}" if repeats > 1 else "")
+                task = asyncio.create_task(self._request(ar, idx, name, prompt, live=True, case=case))
                 ar.workers = [task]
                 try:
                     await task
@@ -515,6 +537,21 @@ class RunManager:
         except TimeoutError:
             pass
 
+    async def _run_concurrency(self, ar: ActiveRun) -> None:
+        """Cada nivel lanza N peticiones iguales a la vez; el siguiente empieza cuando acaba el anterior."""
+        prompt = ar.params["prompt"]
+        idx = 0
+        for level in ar.params["levels"]:
+            if ar.stop.is_set():
+                return
+            tasks = []
+            for k in range(level):
+                case = Case(f"nivel {level} · {k + 1}", prompt, {"kind": "concurrency", "level": level})
+                tasks.append(asyncio.create_task(self._request(ar, idx, case.name, prompt, live=k == 0, case=case)))
+                idx += 1
+            ar.workers = tasks
+            await asyncio.gather(*tasks, return_exceptions=True)
+
     async def _run_duration(self, ar: ActiveRun) -> None:
         deadline = time.time() + float(ar.params["duration_s"])
         topics = ar.suite.prompts
@@ -537,7 +574,9 @@ class RunManager:
                 w.cancel()
             await asyncio.gather(*ar.workers, return_exceptions=True)
 
-    async def _request(self, ar: ActiveRun, idx: int, name: str, prompt: str, live: bool) -> None:
+    async def _request(
+        self, ar: ActiveRun, idx: int, name: str, prompt: str, live: bool, case: Case | None = None
+    ) -> None:
         payload = payload_for(ar.params, prompt)
         started = time.time()
         if live:
@@ -560,9 +599,40 @@ class RunManager:
                 self.client, ar.endpoint["base_url"], payload, on_text, float(ar.params["timeout_s"])
             )
         except asyncio.CancelledError:
-            self._save_item(ar, idx, name, prompt, None, started, CUT_MSG)
+            self._save_item(ar, idx, name, prompt, None, started, CUT_MSG, stored_prompt=_stored(case))
             raise
-        self._save_item(ar, idx, name, prompt, result, started, result.error)
+        verdict = None
+        if case is not None:
+            try:
+                verdict = await asyncio.to_thread(self._grade, ar, case, result)
+            except asyncio.CancelledError:
+                self._save_item(ar, idx, name, prompt, result, started, result.error, stored_prompt=_stored(case))
+                raise
+        self._save_item(ar, idx, name, prompt, result, started, result.error, verdict, _stored(case))
+
+    @staticmethod
+    def _grade(ar: ActiveRun, case: Case, res: ChatResult) -> dict[str, Any]:
+        """Nota automática de un ítem (se ejecuta en un hilo: el código va al sandbox)."""
+        kind = case.spec["kind"]
+        if kind == "concurrency":
+            return {"kind": kind, "level": case.spec["level"]}
+        if res.error:
+            base = {"kind": kind, "correct": False, "note": res.error, "failed": True, "level": case.spec.get("level")}
+            if kind == "needle":
+                base.update(expected=case.spec["expected"], size=case.spec["size"], depth=case.spec["depth"])
+            return base
+        if kind == "qa":
+            verdict = grading.grade_qa(case.spec, res.content)
+        elif kind == "needle":
+            verdict = grading.grade_needle(case.spec, res.content)
+        elif kind == "code":
+            verdict = grading.grade_code(case.spec, res.content, float(ar.params.get("code_timeout_s") or 10))
+            verdict["level"] = case.spec.get("level")
+        else:
+            return {"kind": kind}
+        if res.finish_reason == "length":
+            verdict["truncated"] = True
+        return verdict
 
     def _save_item(
         self,
@@ -573,6 +643,8 @@ class RunManager:
         res: ChatResult | None,
         started: float,
         error: str | None,
+        verdict: dict[str, Any] | None = None,
+        stored_prompt: str | None = None,
     ) -> None:
         metrics = res.metrics() if res else {}
         ar.requests_done += 1
@@ -582,10 +654,11 @@ class RunManager:
             ar.id,
             idx,
             name=name,
-            prompt=prompt,
+            prompt=stored_prompt or prompt,
             response=res.content if res else None,
             reasoning=(res.reasoning or None) if res else None,
             metrics=metrics,
+            **({"eval": verdict} if verdict is not None else {}),
             error=error,
             started_at=started,
             finished_at=time.time(),
