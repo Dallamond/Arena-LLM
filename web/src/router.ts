@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import BattleSetupView from "./views/BattleSetupView.vue";
+import SweepSetupView from "./views/SweepSetupView.vue";
+import SweepView from "./views/SweepView.vue";
 import BattleView from "./views/BattleView.vue";
 import BenchView from "./views/BenchView.vue";
 import CompareView from "./views/CompareView.vue";
@@ -22,6 +24,7 @@ export interface NavItem {
 export const NAV: NavItem[] = [
   { path: "/", label: "Panel", icon: "panel" },
   { path: "/servidores", label: "Servidores", icon: "servers" },
+  { path: "/asistente", label: "Asistente", icon: "wizard" },
   { path: "/calidad", label: "Calidad", icon: "quality" },
   { path: "/rendimiento", label: "Rendimiento", icon: "perf" },
   { path: "/batalla", label: "Batalla", icon: "battle" },
@@ -42,6 +45,8 @@ export const router = createRouter({
   routes: [
     { path: "/", component: PanelView, meta: { title: "Panel" } },
     { path: "/servidores", component: ServersView, meta: { title: "Servidores" } },
+    { path: "/asistente", component: SweepSetupView, meta: { title: "Asistente" } },
+    { path: "/asistente/:id", component: SweepView, props: true, meta: { title: "Asistente" } },
     { path: "/calidad", component: QualityView, meta: { title: "Calidad" } },
     { path: "/rendimiento", component: BenchView, meta: { title: "Rendimiento" } },
     { path: "/batalla", component: BattleSetupView, meta: { title: "Batalla" } },

@@ -276,15 +276,17 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
   *Hecho 18/10/2026 (primera versión): etiqueta «★ Mejor para tu hardware» / «★ Recomendado» en la lista de GGUF (Servidores → GGUF en disco) y orden «Recomendado». Entre los que caben enteros en GPU con margen del 10 %, gana el de más parámetros × calidad de cuantización (`web/src/lib/recommend.ts`). Falta: usar el ancho de banda medido en F6 para desempatar entre GPU lentas y rápidas, y el catálogo editable.*
 
 ### F7 — Pruebas de calidad
-- [ ] `qa` (12 preguntas), `contexto` (aguja en pajar + VRAM vs contexto), `concurrencia`, `codigo` (10 problemas con ejecución aislada), todas con opciones editables y semillas fijas.
-- [ ] Sandbox del código: subproceso, timeout, sin stdin, directorio temporal, sin red.
+- [x] `qa` (12 preguntas), `contexto` (aguja en pajar + VRAM vs contexto), `concurrencia`, `codigo` (10 problemas con ejecución aislada), todas con opciones editables y semillas fijas.
+- [x] Sandbox del código: subproceso, timeout, sin stdin, directorio temporal, sin red.
 **Criterio:** mismas semillas ⇒ mismos prompts; un código con bucle infinito o escritura de ficheros no bloquea ni daña el servidor.
+  *Cumplido 18/10/2026 con modelos simulados (`server/quality/`, `tests/server/test_quality*.py`): la solución de referencia de cada problema pasa y una vacía falla, un `while True` acaba en timeout, y escribir fuera del directorio temporal, borrar un fichero, abrir un socket o lanzar un proceso se bloquea sin tocar el sistema. Falta medir modelos reales con las cuatro pruebas.*
 
 ### F8 — Batalla
 - [x] 2+ lados (paralelo o secuencial) con parámetros editables por lado (muestreo, `max_tokens`, `cache_prompt`, `extra` JSON, prompt de sistema), copia A→B y "variar solo un parámetro".
   *Hecho 04/10/2026 (2–6 lados; semilla, prompts y fases comunes por diseño). "Variar solo un parámetro" se cubre con el modo secuencial en el mismo servidor y la insignia, que avisa si cambia más de un factor; falta un asistente dedicado.*
 - [x] Vista en columnas con respuesta en streaming, números grandes y mini-gráficas; marcador final (04/10/2026).
-- [ ] **Modo guiado** de barridos (§6).
+- [x] **Modo guiado** de barridos (§6): pantalla **Asistente** (`/asistente`). Elige equipo, GPU(s) destino, modelos y prueba; Arena arranca cada modelo en cada destino, lo mide, lo para y deja los runs listos para Comparar. *Hecho 18/10/2026, probado con equipos simulados; falta una pasada con las GPU reales.*
+- [x] **Corrección automática en la Batalla**: se puede enfrentar QA, código o contexto; el marcador cuenta aciertos por lado y la insignia compara aciertos (18/10/2026).
 **Criterio:** dos lados simultáneos en M40 y 3060, telemetría separada por GPU, prompts y semillas idénticos verificados por test.
 *04/10/2026: verificado por test con las dos GPU simuladas (`tests/server/test_battle.py`: mismos prompts y semilla en las peticiones que recibe cada servidor, cada lado vigila su GPU). Falta la prueba real con la M40.*
 

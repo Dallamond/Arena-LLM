@@ -14,6 +14,7 @@ export function itemsToRows(items: RunItem[]): CompareRow[] {
       const num = (v: unknown) => (typeof v === "number" ? v : null);
       return {
         prompt,
+        name: it.name,
         rep,
         cells: [
           {
@@ -24,6 +25,7 @@ export function itemsToRows(items: RunItem[]): CompareRow[] {
             tps: num(m.tps_client),
             ttft: num(m.ttft_s),
             finish: typeof m.finish_reason === "string" ? m.finish_reason : null,
+            eval: it.eval && it.eval.kind !== "concurrency" ? { ...it.eval, code: undefined } : null,
           },
         ],
       };

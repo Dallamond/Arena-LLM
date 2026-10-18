@@ -38,6 +38,9 @@ const visible = computed(() => {
 });
 const anyReasoning = computed(() => props.rows.some((r) => r.cells.some((c) => c?.reasoning)));
 const repeated = computed(() => props.rows.some((r) => r.rep > 0));
+const graded = computed(() => props.rows.some((r) => r.cells.some((c) => c?.eval)));
+/** Nota de la primera columna con evaluación (en la cabecera de la fila, solo si hay una columna). */
+const firstEval = (r: CompareRow) => (props.columns.length === 1 ? (r.cells[0]?.eval ?? null) : null);
 
 function allCollapsed(v: boolean) {
   collapsed.value = Object.fromEntries(props.rows.map((_, i) => [i, v]));
@@ -60,7 +63,10 @@ function allCollapsed(v: boolean) {
     <section v-for="{ r, i, ref: lib } in visible" :key="i" class="row">
       <button type="button" class="row__head" :aria-expanded="!collapsed[i]" @click="collapsed[i] = !collapsed[i]">
         <span aria-hidden="true">{{ collapsed[i] ? "▸" : "▾" }}</span>
-        <b>Prompt {{ i + 1 }}</b>
+        <b>{{ r.name && graded ? r.name : `Prompt ${i + 1}` }}</b>
+        <span v-if="firstEval(r)" class="mark" :class="firstEval(r)!.correct ? 'mark--ok' : 'mark--bad'">
+          {{ firstEval(r)!.correct ? "✓" : "✗" }}
+        </span>
         <span v-if="repeated" class="dim mono">rep {{ r.rep + 1 }}</span>
         <span v-if="lib" class="tag">{{ lib.titulo }}</span>
         <span class="row__prompt dim">{{ r.prompt }}</span>
@@ -82,6 +88,16 @@ function allCollapsed(v: boolean) {
                 {{ fmt(c.tokens) }} tokens · {{ words(c.response) }} palabras · {{ fmt(c.tps, 1, "t/s") }} · TTFT {{ fmt(c.ttft, 2, "s") }}
                 <span v-if="c.finish === 'length'" class="warn" title="La respuesta llegó al límite de tokens máximos">· ■ cortada por tokens máximos</span>
               </div>
+              <p v-if="c.eval" class="grade small" :class="c.eval.correct ? 'grade--ok' : 'grade--bad'">
+                <b>{{ c.eval.correct ? "✓ Correcta" : "✗ Incorrecta" }}</b>
+                <template v-if="c.eval.expected != null">
+                  · esperado <code>{{ c.eval.expected }}</code>
+                  <template v-if="c.eval.kind !== 'needle'"> · obtuvo <code>{{ c.eval.got ?? "sin respuesta" }}</code></template>
+                </template>
+                <template v-if="c.eval.status && c.eval.status !== 'ok'"> · {{ c.eval.status }}</template>
+                <span v-if="c.eval.truncated" class="warn"> · cortada por tokens máximos</span>
+                <span v-if="c.eval.note" class="grade__note">{{ c.eval.note }}</span>
+              </p>
               <p v-if="c.error" class="error small">✕ {{ c.error }}</p>
               <details v-if="showReasoning && c.reasoning" class="reasoning">
                 <summary class="small">Razonamiento ({{ words(c.reasoning) }} palabras)</summary>
@@ -98,6 +114,38 @@ function allCollapsed(v: boolean) {
 </template>
 
 <style scoped>
+.mark {
+  font-weight: 700;
+}
+.mark--ok {
+  color: var(--ok);
+}
+.mark--bad {
+  color: var(--crit);
+}
+.grade {
+  margin: 4px 0;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+}
+.grade--ok {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  color: var(--ok);
+}
+.grade--bad {
+  background: color-mix(in srgb, var(--crit) 14%, transparent);
+  color: var(--crit);
+}
+.grade code {
+  font-family: var(--font-mono);
+}
+.grade__note {
+  display: block;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  color: var(--ink-dim);
+  margin-top: 2px;
+}
 .tools {
   display: flex;
   flex-wrap: wrap;

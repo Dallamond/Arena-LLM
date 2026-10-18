@@ -24,7 +24,7 @@ from tests.server.test_quality_runs import answerer
 from tests.server.test_runs import wait
 
 
-def write_fit_gguf(path, n_layers=2, layer_bytes=1 << 20, name="Mini"):
+def write_fit_gguf(path, n_layers=2, layer_bytes=1 << 20, name="Mini", dim=64):
     """GGUF con capas blk.N y tamaños deducibles de los offsets: la calculadora de encaje lo acepta."""
     import struct
 
@@ -33,7 +33,7 @@ def write_fit_gguf(path, n_layers=2, layer_bytes=1 << 20, name="Mini"):
         _kv("general.name", 8, _s(name)),
         _kv("general.file_type", 4, struct.pack("<I", 15)),
         _kv("llama.block_count", 4, struct.pack("<I", n_layers)),
-        _kv("llama.context_length", 4, struct.pack("<I", 4096)),
+        _kv("llama.context_length", 4, struct.pack("<I", 32768)),
         _kv("llama.embedding_length", 4, struct.pack("<I", 64)),
         _kv("llama.feed_forward_length", 4, struct.pack("<I", 128)),
         _kv("llama.attention.head_count", 4, struct.pack("<I", 8)),
@@ -41,13 +41,13 @@ def write_fit_gguf(path, n_layers=2, layer_bytes=1 << 20, name="Mini"):
     ]
     names = ["token_embd.weight", *(f"blk.{i}.attn_q.weight" for i in range(n_layers)), "output.weight"]
     tensors = b"".join(
-        _s(n) + struct.pack("<I", 2) + struct.pack("<2Q", 64, 64) + struct.pack("<IQ", 0, i * layer_bytes)
+        _s(n) + struct.pack("<I", 2) + struct.pack("<2Q", dim, dim) + struct.pack("<IQ", 0, i * layer_bytes)
         for i, n in enumerate(names)
     )
     head = b"GGUF" + struct.pack("<I", 3) + struct.pack("<QQ", len(names), len(kvs))
     header = head + b"".join(kvs) + tensors
     pad = (-len(header)) % 32
-    path.write_bytes(header + b"\0" * pad + b"\0" * (len(names) * layer_bytes))
+    path.write_bytes(header + bytes(pad) + bytes(len(names) * layer_bytes))
 
 
 def serve_on(app, port):

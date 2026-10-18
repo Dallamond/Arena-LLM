@@ -8,7 +8,9 @@ import BlueprintCard from "../components/BlueprintCard.vue";
 import Stamp from "../components/Stamp.vue";
 import { fmt, fmtDuration } from "../lib/format";
 import PromptPicker from "../components/PromptPicker.vue";
+import SuiteForm from "../components/SuiteForm.vue";
 import { joinPrompts, splitPrompts } from "../lib/library";
+import { initialState, toParams, type FormState } from "../lib/suiteForm";
 
 const route = useRoute();
 const router = useRouter();
@@ -38,6 +40,14 @@ watch(
 );
 
 // Formularios (valores por defecto de cada suite)
+// Pruebas con evaluación automática: su formulario sale de los campos que define el servidor
+const GRADED_ORDER = ["qa", "codigo", "contexto", "concurrencia"];
+const gradedSuites = computed(() =>
+  GRADED_ORDER.map((id) => suites.value.find((s) => s.id === id)).filter((s): s is Suite => !!s),
+);
+const forms = reactive<Record<string, FormState>>({});
+const gradedLabels = reactive<Record<string, string>>({});
+
 const stress = reactive({ duration_s: 120, parallel: 1, max_tokens: 512, baseline_s: 10, cooldown_s: 30, label: "" });
 const free = reactive({ prompts: "", repeats: 1, max_tokens: 512, baseline_s: 5, label: "" });
 const adv = reactive({ temperature: 0, seed: 42, top_k: "", top_p: "", min_p: "", cache_prompt: false, system: "", extra: "{}" });
@@ -61,6 +71,7 @@ onMounted(async () => {
     const f = suites.value.find((x) => x.id === "libre")?.defaults ?? {};
     freeDefaults.value = (f.prompts as string[]) ?? [];
     free.prompts = joinPrompts(freeDefaults.value);
+    for (const g of gradedSuites.value) forms[g.id] = initialState(g);
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   }
@@ -108,6 +119,33 @@ async function launch(suite: "estres" | "libre") {
   } finally {
     busy.value = false;
   }
+}
+
+async function launchGraded(suite: Suite) {
+  if (endpointId.value === null) return;
+  error.value = null;
+  busy.value = true;
+  try {
+    const params = { ...advParams(), ...toParams(suite, forms[suite.id]), baseline_s: suite.defaults.baseline_s ?? 3 };
+    const run = await api<{ id: number }>("/api/runs", {
+      method: "POST",
+      body: JSON.stringify({ suite: suite.id, endpoint_id: endpointId.value, label: gradedLabels[suite.id] || null, params }),
+    });
+    router.push(`/pruebas/${run.id}`);
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
+/** Aviso si las peticiones en paralelo de Concurrencia superan los slots del servidor. */
+function slotWarning(suite: Suite): string | null {
+  if (suite.id !== "concurrencia" || !selected.value) return null;
+  const slots = selected.value.snapshot?.derived?.total_slots;
+  const levels = String(forms[suite.id]?.levels ?? "").split(/[\s,;]+/).map(Number).filter(Number.isFinite);
+  const max = Math.max(0, ...levels);
+  return slots && max > slots ? `El servidor tiene ${slots} slots: con ${max} peticiones a la vez las demás esperan en cola y el agregado no escala.` : null;
 }
 
 const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.duration_s) + Number(stress.cooldown_s));
@@ -205,13 +243,22 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
       </div>
     </BlueprintCard>
 
-    <!-- Próximas -->
-    <BlueprintCard title="Próximas pruebas" class="gap">
-      <div class="todo">
-        <Stamp text="llega en F7" tone="dim" />
-        <p class="dim">Razonamiento (12 preguntas) · Código con ejecución aislada · Contexto largo (aguja en pajar) · Concurrencia</p>
-      </div>
-    </BlueprintCard>
+    <!-- Pruebas con corrección automática (F7) -->
+    <h3 class="sub">Pruebas de calidad</h3>
+    <div class="cards">
+      <BlueprintCard v-for="g in gradedSuites" :key="g.id" :title="g.name">
+        <p class="desc">{{ g.description }}</p>
+        <SuiteForm v-if="forms[g.id]" :suite="g" :model-value="forms[g.id]" :id-prefix="`q-${g.id}`" />
+        <label class="wide lbl">
+          <span class="label">etiqueta (opcional)</span>
+          <input v-model="gradedLabels[g.id]" type="text" maxlength="80" />
+        </label>
+        <p v-if="slotWarning(g)" class="warn small">▲ {{ slotWarning(g) }}</p>
+        <button class="btn btn--primary" type="button" :disabled="busy || !endpointId || !!busyEndpoint" @click="launchGraded(g)">
+          ▶ Lanzar {{ g.name.toLowerCase() }}
+        </button>
+      </BlueprintCard>
+    </div>
   </div>
 </template>
 
@@ -269,6 +316,16 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
 }
 .target__text {
   flex: 1;
+}
+.sub {
+  font-size: 16px;
+  margin: 26px 0 0;
+}
+.lbl {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
 }
 .cards {
   display: grid;

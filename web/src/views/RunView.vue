@@ -6,6 +6,7 @@ import { api, live, onEvent, serverNow } from "../api/live";
 import type { BenchRow, DeviceInfo, LibraryPrompt, PromptLibrary, RunDetail, Sample, Snapshot, TpsPoint } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import LineChart, { type ChartBand, type ChartLine, type ChartMarker, type ChartSeries } from "../components/LineChart.vue";
+import QualityResult from "../components/QualityResult.vue";
 import ResponsesMatrix from "../components/ResponsesMatrix.vue";
 import Stamp from "../components/Stamp.vue";
 import { deviceColor, shortName } from "../lib/devices";
@@ -632,6 +633,11 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
             </template>
           </tbody>
         </table></div>
+      </BlueprintCard>
+
+      <!-- Resultado de las pruebas de calidad -->
+      <BlueprintCard v-if="sum?.quality && !running" :title="`Resultado · ${suiteLabel(run.suite)}`" class="gap">
+        <QualityResult :quality="sum.quality" :items="detail?.items ?? []" />
       </BlueprintCard>
 
       <!-- Lectura de todas las respuestas -->

@@ -70,6 +70,10 @@ export function fmtDuration(s: number | null | undefined): string {
 export const SUITE_LABEL: Record<string, string> = {
   libre: "Prompt libre",
   estres: "Estrés",
+  qa: "Calidad · QA",
+  codigo: "Calidad · código",
+  contexto: "Calidad · contexto",
+  concurrencia: "Concurrencia",
   "bench-dispositivo": "Bench · un dispositivo",
   "bench-cpu": "Bench · solo CPU/RAM",
   "bench-ngl": "Bench · curva -ngl",

@@ -137,6 +137,8 @@ GGUF en disco:  modelo · cuant. · tamaño · ENCAJE:  [Cabe en M40] [Necesita 
 ### 5.3 Rendimiento (llama-bench)
 Selector de familia: **Solo GPU · Solo CPU/RAM · Híbrido · Reparto entre GPUs**. Formulario con modelo, tamaños de prompt/generación, repeticiones y barrido (por ejemplo `-ngl` de 0 a máx. en pasos). Resultado principal: **curva t/s frente a % de capas en GPU** con la cota de ancho de banda efectivo, y tabla pp/tg con desviación.
 
+> **18/10/2026:** además de Calidad hay una pantalla **Asistente** (barrido de modelos × GPU, ver `ESTADO.md`) y la Batalla admite pruebas que se corrigen solas.
+
 ### 5.4 Calidad
 Tarjeta por prueba (razonamiento, código, contexto largo, concurrencia, estrés) con sus opciones editables, última puntuación y botón lanzar. Al ejecutar, vista en vivo de la prueba con progreso por ítem.
 

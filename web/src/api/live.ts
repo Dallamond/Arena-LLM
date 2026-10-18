@@ -4,6 +4,7 @@ import { computed, reactive, ref } from "vue";
 import type {
   Appearance,
   Battle,
+  Sweep,
   ConfigChange,
   CpuSample,
   DeviceInfo,
@@ -50,6 +51,7 @@ export const live = reactive({
   runs: {} as Record<number, Run>,
   runLive: {} as Record<number, RunLive>,
   battles: {} as Record<number, Battle>,
+  sweeps: {} as Record<number, Sweep>,
   thresholds: {} as ThresholdOverrides,
   appearance: null as Partial<Appearance> | null,
 });
@@ -251,6 +253,7 @@ export function connect(url = "/api/events"): void {
   on("run_live", (d: RunLive) => (live.runLive[d.run] = { ...live.runLive[d.run], ...d }));
   on("run_item", () => {});
   on("battle", (b: Battle) => (live.battles[b.id] = b));
+  on("sweep", (s: Sweep) => (live.sweeps[s.id] = s));
   on("settings", (d: { key: string; value: unknown }) => {
     if (d.key === "thresholds") live.thresholds = d.value as ThresholdOverrides;
     if (d.key === "appearance") live.appearance = d.value as Partial<Appearance>;

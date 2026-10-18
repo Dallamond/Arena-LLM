@@ -10,7 +10,7 @@ relacionado: ["Arena LLM"]
 ---
 # Arena LLM — Estado
 
-> Leer al retomar. Última actualización: 18/10/2026 (recomendados por hardware y pulido de la GUI). Las secciones están en orden de más antigua a más reciente salvo esta cabecera; lo último está al final.
+> Leer al retomar. Última actualización: 18/10/2026 (F7, Batalla corregida, Asistente). Las secciones están en orden de más antigua a más reciente salvo esta cabecera; lo último está al final.
 
 ## Resumen
 
@@ -247,3 +247,19 @@ Pedido por Lucas: una etiqueta de **recomendado para tu hardware** en la lista d
 - Tests: 243 de Python y 23 de la web; `ruff` limpio.
 
 **Sin comprobar**: no he abierto la GUI con capturas esta sesión; el aspecto de la etiqueta, el Historial a 1280 px y la franja de dispositivos están sin revisar a ojo. Los criterios de `docs/GUI-DISENO.md` §8 siguen sin marcar.
+
+## F7 · pruebas de calidad, Batalla corregida y Asistente (18/10/2026)
+
+Pedido por Lucas: los puntos 1–4 de la lista de pendientes (F7, corrección en la Batalla, modo guiado y probar con las GPU reales).
+
+- **F7** (`server/quality/`): datasets (12 preguntas, 10 problemas de Python en 3 niveles, generador de «aguja en un pajar»), corrección (`grading.py`: normaliza acentos, mayúsculas y números; exige la línea `RESPUESTA: …`), resumen (`summary.py`) y sandbox (`sandbox.py`).
+  - **Suites** nuevas en `server/runs/suites.py` (versión `1`, el hash incluye preguntas y tests): `qa`, `codigo`, `contexto` y `concurrencia`. Cada ítem guarda su nota en `items.eval`; el resumen añade `summary.quality` (aciertos, pass@1 por nivel, acierto por tamaño × profundidad con t/s de procesado, TTFT y VRAM, y escalado por nivel de concurrencia). Los campos del formulario los define el servidor (`Suite.fields`) y la GUI los dibuja (`SuiteForm.vue`).
+  - **Sandbox**: subproceso `python -I` con entorno vacío, directorio temporal propio, `stdin` cerrado, timeout con muerte del árbol de procesos y un gancho de auditoría que prohíbe red, procesos, escritura fuera del directorio, `ctypes` y `rmtree`; en Linux, además, límites `resource`. Es defensa en profundidad contra descuidos del código generado, no una frontera frente a un atacante.
+  - **Contexto largo**: un tamaño que no cabe queda como resultado (así se conoce el límite); el prompt enorme no se guarda entero.
+  - Tests: 42 de calidad y 13 de runs de punta a punta (`test_quality.py`, `test_quality_runs.py`).
+- **Batalla corregida**: `POST /api/battles` acepta `suite` (`libre`, `qa`, `codigo`, `contexto`); las opciones de la prueba son comunes a los lados. El comparador suma la métrica «aciertos», el veredicto «Más aciertos» y la nota ✓/✗ de cada respuesta.
+- **Asistente** (`/asistente`, `server/runs/sweep.py`, migración 7: tabla `sweeps` y `runs.sweep_id`): para cada modelo × destino (Automático, una GPU o repartido) calcula el encaje con la memoria libre de ese momento, arranca `llama-server` desde el agente, espera a que esté listo, lanza la prueba, lo para y pasa al siguiente. Un paso que no cabe o falla se anota y el barrido sigue; se puede cancelar y borrar. Solo toca lo que lanzó él. El cálculo de encaje se extrajo a `server/fitting.py`. Tests: 7 (`test_sweep.py`, con el `/launch` del agente sustituido por un llama-server simulado).
+- **Web**: Calidad con las cuatro tarjetas nuevas, `QualityResult.vue` en la vista del run (aciertos, chips, cuadrícula de contexto con VRAM, escalado), Historial con columna «Resultado», Batalla con selector de prueba y Asistente en el menú. Revisado con capturas a 1440 y 1280 px en una instancia simulada, sin errores de consola.
+- Tests: 305 de Python y 27 de la web; `ruff` limpio.
+
+**Punto 4 (GPU reales), sin hacer**: el 18/10 las dos GPU estaban ocupadas por dos `llama-server` ajenos a Arena (Qwen3.5-9B en la M40 y gpt-oss-20b en la 3060, con `--api-key`), y la 3060 trabajaba al límite de potencia. Para no falsear sus medidas ni interferir, no se lanzó nada real. Pendiente: Batalla en paralelo M40 + 3060, reparto `-ts`, prueba térmica de 5 min en la M40 y una pasada de las cuatro pruebas con modelos reales.

@@ -8,10 +8,12 @@ import { api, hostList, live } from "../api/live";
 import type { Battle, Endpoint, Suite } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import PromptPicker from "../components/PromptPicker.vue";
+import SuiteForm from "../components/SuiteForm.vue";
 import Stamp from "../components/Stamp.vue";
 import { shortName } from "../lib/devices";
 import { RUN_STATUS, fmt, fmtDate } from "../lib/format";
 import { splitPrompts } from "../lib/library";
+import { initialState, toParams, type FormState } from "../lib/suiteForm";
 
 const MAX_SIDES = 6;
 const router = useRouter();
@@ -33,6 +35,20 @@ function gpuNames(e: Endpoint | null): string {
   return names.join(" + ") || "GPU sin asociar";
 }
 const epName = (e: Endpoint | null) => (e ? e.alias || e.snapshot?.model_file || e.base_url : "—");
+
+// --- prueba: prompts propios o una prueba que se corrige sola (aciertos por lado) ---
+const BATTLE_TESTS = ["libre", "qa", "codigo", "contexto"];
+const allSuites = ref<Suite[]>([]);
+const testId = ref("libre");
+const testForms = reactive<Record<string, FormState>>({});
+const gradedSuite = computed(() => (testId.value === "libre" ? null : (allSuites.value.find((s) => s.id === testId.value) ?? null)));
+const tests = computed(() => BATTLE_TESTS.map((id) => allSuites.value.find((s) => s.id === id)).filter((s): s is Suite => !!s));
+const testCount = computed(() => {
+  const s = gradedSuite.value;
+  if (!s) return promptList.value.length;
+  const chosen = testForms[s.id]?.include;
+  return Array.isArray(chosen) && chosen.length ? chosen.length : (s.cases?.length ?? 0);
+});
 
 // --- lo común ---
 const prompts = ref("");
@@ -122,18 +138,23 @@ function sideParams(s: SideForm, letter: string): Record<string, unknown> {
 
 const promptList = computed(() => splitPrompts(prompts.value));
 const canLaunch = computed(
-  () => !busy.value && promptList.value.length > 0 && sides.value.length >= 2 && sides.value.every((s) => s.endpoint_id !== null) && !(mode.value === "paralelo" && dupEndpoints.value),
+  () => !busy.value && (gradedSuite.value !== null || promptList.value.length > 0) && sides.value.length >= 2 && sides.value.every((s) => s.endpoint_id !== null) && !(mode.value === "paralelo" && dupEndpoints.value),
 );
 
 async function launch() {
   error.value = null;
   busy.value = true;
   try {
+    const graded = gradedSuite.value;
     const body = {
       mode: mode.value,
       label: label.value || null,
-      prompts: promptList.value,
-      common: { ...common },
+      suite: testId.value,
+      prompts: graded ? [] : promptList.value,
+      // En una prueba corregida, sus opciones (preguntas, tokens, repeticiones…) mandan sobre las del formulario libre
+      common: graded
+        ? { seed: common.seed, temperature: common.temperature, baseline_s: common.baseline_s, ...toParams(graded, testForms[graded.id]) }
+        : { ...common },
       sides: sides.value.map((s, i) => ({ endpoint_id: s.endpoint_id, label: s.label || null, params: sideParams(s, LETTERS[i]) })),
     };
     const b = await api<Battle>("/api/battles", { method: "POST", body: JSON.stringify(body) });
@@ -148,6 +169,11 @@ async function launch() {
 onMounted(async () => {
   try {
     const suites = await api<Suite[]>("/api/suites");
+    allSuites.value = suites;
+    for (const id of BATTLE_TESTS.slice(1)) {
+      const s = suites.find((x) => x.id === id);
+      if (s) testForms[id] = initialState(s);
+    }
     const d = suites.find((s) => s.id === "libre")?.defaults ?? {};
     promptDefaults.value = (d.prompts as string[]) ?? [];
     prompts.value = promptDefaults.value.join("\n---\n");
@@ -176,7 +202,26 @@ onMounted(async () => {
       <p class="dim">Lanza tus <code>llama-server</code> (en Servidores → GGUF en disco tienes el comando) y aparecerán aquí.</p>
     </div>
 
-    <BlueprintCard title="Prompts (comunes a todos los lados)">
+    <BlueprintCard title="Prueba (común a todos los lados)">
+      <div class="seg tests" role="radiogroup" aria-label="Prueba de la batalla">
+        <button v-for="t in tests" :key="t.id" type="button" role="radio" class="seg__btn" :aria-checked="testId === t.id" @click="testId = t.id">
+          {{ t.id === "libre" ? "Prompts propios" : t.name }}
+        </button>
+      </div>
+      <p v-if="gradedSuite" class="dim small desc">
+        {{ gradedSuite.description }} <b>Se corrige sola</b>: el marcador cuenta los aciertos de cada lado además de la velocidad.
+      </p>
+      <p v-else class="dim small desc">Prompts tuyos: se leen las respuestas y se comparan métricas. No hay corrección automática.</p>
+
+      <template v-if="gradedSuite && testForms[gradedSuite.id]">
+        <SuiteForm :suite="gradedSuite" :model-value="testForms[gradedSuite.id]" id-prefix="battle" />
+        <div class="form">
+          <label><span class="label">semilla</span><input v-model.number="common.seed" type="number" /></label>
+          <label><span class="label">temperatura</span><input v-model.number="common.temperature" type="number" step="0.05" min="0" max="2" /></label>
+          <label><span class="label">reposo antes (s)</span><input v-model.number="common.baseline_s" type="number" min="0" max="600" /></label>
+        </div>
+      </template>
+      <template v-else>
       <PromptPicker v-model="prompts" :defaults="promptDefaults" @max-tokens="(n) => (common.max_tokens = n)" />
       <div class="form">
         <label><span class="label">semilla</span><input v-model.number="common.seed" type="number" /></label>
@@ -185,6 +230,7 @@ onMounted(async () => {
         <label><span class="label">repeticiones</span><input v-model.number="common.repeats" type="number" min="1" max="100" /></label>
         <label><span class="label">reposo antes (s)</span><input v-model.number="common.baseline_s" type="number" min="0" max="600" /></label>
       </div>
+      </template>
       <p class="dim small">La semilla, los prompts y las fases son siempre iguales en todos los lados. Temperatura y tokens máximos son el valor por defecto: cada lado puede cambiarlos.</p>
     </BlueprintCard>
 
@@ -239,7 +285,7 @@ onMounted(async () => {
           <button type="button" role="radio" class="seg__btn" :aria-checked="mode === 'secuencial'" @click="mode = 'secuencial'">→ Uno detrás de otro</button>
         </div>
         <label class="field grow"><span class="label">etiqueta de la batalla (opcional)</span><input v-model="label" type="text" maxlength="80" /></label>
-        <button class="btn btn--primary" type="button" :disabled="!canLaunch" @click="launch">▶ Lanzar batalla ({{ promptList.length }} prompts × {{ sides.length }} lados)</button>
+        <button class="btn btn--primary" type="button" :disabled="!canLaunch" @click="launch">▶ Lanzar batalla ({{ testCount }} {{ gradedSuite ? "ítems" : "prompts" }} × {{ sides.length }} lados)</button>
       </div>
       <p class="dim small">
         <template v-if="mode === 'paralelo'">Todos los lados a la vez: cada uno necesita su propio servidor. Si comparten GPU o equipo, se reparten la máquina y la velocidad baja.</template>

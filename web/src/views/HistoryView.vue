@@ -6,7 +6,7 @@ import { live, refreshRuns, runList } from "../api/live";
 import type { Run } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import Stamp from "../components/Stamp.vue";
-import { RUN_STATUS, fmt, fmtDate, fmtDuration, suiteLabel } from "../lib/format";
+import { RUN_STATUS, fmt, fmtDate, fmtDuration, isNum, suiteLabel } from "../lib/format";
 
 const MAX_COMPARE = 12;
 const router = useRouter();
@@ -31,6 +31,15 @@ function endpointName(r: Run): string {
 /** t/s de la fila: mediana del cliente; en un bench, la mejor generación (tg) del barrido. */
 function tps(r: Run): number | null | undefined {
   return r.kind === "bench" ? r.summary?.bench?.best_tg?.t_s : r.summary?.tps_client.median;
+}
+
+/** Resultado de una prueba de calidad: «9/12 · 75 %» o el mejor agregado de concurrencia. */
+function outcome(r: Run): string | null {
+  const q = r.summary?.quality;
+  if (!q) return null;
+  if (q.suite === "concurrencia") return isNum(q.best_tps_aggregate) ? `${fmt(q.best_tps_aggregate, 1)} t/s agr.` : null;
+  const acc = isNum(q.accuracy_pct) ? ` · ${fmt(q.accuracy_pct, 0)} %` : "";
+  return `${q.correct}/${q.total}${acc}`;
 }
 
 function maxTemp(r: Run): number | null {
@@ -66,6 +75,7 @@ const rows = computed(() => {
             <th>prueba</th>
             <th>servidor / modelo</th>
             <th>estado</th>
+            <th>resultado</th>
             <th>t/s (mediana)</th>
             <th>tokens</th>
             <th>temp. máx</th>
@@ -95,6 +105,7 @@ const rows = computed(() => {
             <td>
               <Stamp :text="`${RUN_STATUS[r.status]?.icon} ${RUN_STATUS[r.status]?.text ?? r.status}`" :tone="RUN_STATUS[r.status]?.tone ?? 'dim'" :tilt="0" />
             </td>
+            <td>{{ outcome(r) ?? "—" }}</td>
             <td>{{ fmt(tps(r), 1) }}<span v-if="r.kind === 'bench' && tps(r) != null" class="dim"> tg</span></td>
             <td>{{ r.kind === "bench" ? "—" : fmt(r.summary?.completion_tokens) }}</td>
             <td>{{ fmt(maxTemp(r), 0, "°C") }}</td>

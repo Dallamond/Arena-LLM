@@ -8,6 +8,7 @@ const PATHS: Record<string, string> = {
   battle: "M4 4l7 7M20 4l-7 7M7 17l-3 3M17 17l3 3M9 15l6-6M15 15L9 9",
   history: "M12 7v5l3 2M3 12a9 9 0 1 0 3-6.7M3 4v4h4",
   compare: "M4 20V10M10 20V4M16 20v-7M22 20H2",
+  wizard: "M4 20l11-11M13 7l1.2-3L15.4 7l3 1.2-3 1.2L14.2 12.5 13 9.4 10 8.2zM18 15l.6-1.5.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6z",
   logs: "M5 4h14v16H5zM8 8h8M8 12h8M8 16h5",
   settings: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1",
   collapse: "M15 6l-6 6 6 6",

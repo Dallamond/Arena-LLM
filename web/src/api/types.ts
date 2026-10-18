@@ -180,14 +180,26 @@ export interface ConfigChange {
 
 // --- Pruebas (F4–F5) ----------------------------------------------------------
 
+/** Campo de formulario de una suite de calidad (lo define el servidor). */
+export interface SuiteField {
+  key: string;
+  label: string;
+  type: "number" | "numlist" | "choices" | "pairs" | "text";
+  help?: string;
+  choices?: { value: string; label: string }[];
+}
+
 export interface Suite {
   id: string;
   name: string;
   version: string;
-  mode: "items" | "duration" | "bench";
+  mode: "items" | "duration" | "bench" | "concurrency";
   description: string;
   defaults: Record<string, unknown>;
   prompts: string[];
+  graded?: boolean;
+  fields?: SuiteField[];
+  cases?: string[] | null;
   sweep?: string | null;
   sweep_label?: string | null;
   min_gpus?: number;
@@ -246,6 +258,87 @@ export interface RunSummary {
   thresholds: Record<string, { name: string | null; warn: number; crit: number; source: string }>;
   phases: { load_start: number | null; load_end: number | null };
   bench?: BenchSummary;
+  quality?: QualitySummary;
+}
+
+// --- Pruebas de calidad (F7) -------------------------------------------------------
+
+interface AccuracyBlock {
+  total: number;
+  correct: number;
+  failed: number;
+  accuracy_pct: number | null;
+  truncated: number;
+}
+export interface NeedleRow {
+  name: string | null;
+  size: number;
+  depth: number;
+  correct: boolean;
+  failed: boolean;
+  note: string | null;
+  prompt_tokens: number | null;
+  ttft_s: number | null;
+  pp_server: number | null;
+  vram_mib: number | null;
+  vram_delta_mib: number | null;
+}
+export interface NeedleSize {
+  size: number;
+  total: number;
+  correct: number;
+  failed: number;
+  accuracy_pct: number | null;
+  prompt_tokens: number | null;
+  pp_server: number | null;
+  ttft_s: number | null;
+  vram_mib: number | null;
+  vram_delta_mib: number | null;
+}
+export interface ConcurrencyLevel {
+  level: number;
+  requests: number;
+  errors: number;
+  wall_s: number | null;
+  tokens: number;
+  tps_aggregate: number | null;
+  tps_per_request: number | null;
+  ttft_s: number | null;
+  scaling: number | null;
+  efficiency_pct: number | null;
+}
+export type QualitySummary =
+  | ({ suite: "qa"; format_ok_pct: number | null } & AccuracyBlock)
+  | ({
+      suite: "codigo";
+      pass_at_1_pct: number | null;
+      by_level: Record<string, { total: number; correct: number }>;
+      no_code: number;
+      timeouts: number;
+    } & AccuracyBlock)
+  | ({
+      suite: "contexto";
+      rows: NeedleRow[];
+      by_size: NeedleSize[];
+      max_size_ok: number | null;
+      first_failed_size: number | null;
+    } & AccuracyBlock)
+  | { suite: "concurrencia"; levels: ConcurrencyLevel[]; best_level: number | null; best_tps_aggregate: number | null };
+
+/** Nota automática de un ítem de una prueba corregida. */
+export interface ItemEval {
+  kind: "qa" | "code" | "needle" | "concurrency";
+  correct?: boolean;
+  expected?: string;
+  got?: string | null;
+  note?: string;
+  status?: string;
+  truncated?: boolean;
+  format_ok?: boolean;
+  failed?: boolean;
+  level?: number;
+  code?: string;
+  seconds?: number;
 }
 
 // --- Rendimiento por componente (F6) ---------------------------------------------
@@ -341,6 +434,7 @@ export interface RunItem {
   response: string | null;
   reasoning: string | null;
   metrics: Record<string, number | string | null> | null;
+  eval?: ItemEval | null;
   error: string | null;
   started_at: number | null;
   finished_at: number | null;
@@ -555,6 +649,57 @@ export interface Battle {
   finished_at: number | null;
 }
 
+// --- Asistente (barridos modelo × GPU) -------------------------------------------------
+
+export type SweepStepState =
+  | "pendiente"
+  | "comprobando"
+  | "arrancando"
+  | "midiendo"
+  | "hecho"
+  | "error"
+  | "no cabe"
+  | "omitido"
+  | "detenido";
+
+export interface SweepStep {
+  i: number;
+  model_path: string;
+  model_name: string;
+  target: string;
+  state: SweepStepState;
+  message: string | null;
+  pid: number | null;
+  port: number | null;
+  run_id: number | null;
+  option: string | null;
+  started_at: number | null;
+  finished_at: number | null;
+}
+
+export interface Sweep {
+  id: number;
+  label: string | null;
+  status: RunStatus;
+  params: {
+    host_id: number;
+    models: string[];
+    targets: string[];
+    fit: FitParams;
+    suite: string;
+    suite_params: Record<string, unknown>;
+    load_timeout_s: number;
+  };
+  steps: SweepStep[];
+  error: string | null;
+  created_at: number;
+  finished_at: number | null;
+}
+
+export interface SweepDetail extends Sweep {
+  runs: Record<string, Pick<Run, "id" | "status" | "summary" | "suite" | "error" | "started_at" | "finished_at">>;
+}
+
 export interface BattleDetail extends Battle {
   runs: ((Run & { servers_snapshot: EndpointSnapshot | null; items?: RunItem[] }) | null)[];
 }
@@ -569,10 +714,13 @@ export interface CompareCell {
   tps: number | null;
   ttft: number | null;
   finish: string | null;
+  eval?: ItemEval | null;
 }
 
 export interface CompareRow {
   prompt: string;
+  /** Nombre del ítem (en las pruebas de calidad: «producto», «lru», «4096 tok · 50 %»). */
+  name?: string | null;
   rep: number;
   cells: (CompareCell | null)[];
 }
