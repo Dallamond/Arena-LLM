@@ -1,4 +1,4 @@
-// Apariencia configurable (Ajustes → Apariencia): acento, contraste, tamaño, croquis y rejilla.
+// Apariencia configurable (Ajustes → Apariencia): acento, contraste y tamaño.
 // Se guarda en el servidor (igual en todos los navegadores) y en localStorage para aplicarla
 // antes de conectar y evitar el parpadeo.
 
@@ -25,8 +25,6 @@ export const DEFAULT_APPEARANCE: Appearance = {
   accent: ACCENTS[0].value,
   contrast: "normal",
   scale: 1,
-  sketch: true,
-  grid: "normal",
 };
 
 const CACHE_KEY = "arena.appearance";
@@ -36,9 +34,8 @@ export function normalize(a: Partial<Appearance> | null | undefined): Appearance
   if (!/^#[0-9a-f]{6}$/i.test(out.accent)) out.accent = DEFAULT_APPEARANCE.accent;
   if (!SCALES.some((s) => s.value === out.scale)) out.scale = 1;
   if (out.contrast !== "alto") out.contrast = "normal";
-  if (!["normal", "tenue", "off"].includes(out.grid)) out.grid = "normal";
-  out.sketch = out.sketch !== false;
-  return out;
+  // Ajustes antiguos (rejilla, croquis) ya no existen: se descartan al leer.
+  return { accent: out.accent, contrast: out.contrast, scale: out.scale };
 }
 
 /** Mezcla un color hex con negro (amount < 0) o blanco (amount > 0). */
@@ -57,8 +54,6 @@ export function apply(a: Appearance): void {
   root.style.setProperty("--accent-soft", shade(a.accent, -0.55));
   root.style.setProperty("--zoom", String(a.scale));
   root.dataset.contrast = a.contrast;
-  root.dataset.sketch = a.sketch ? "on" : "off";
-  root.dataset.grid = a.grid;
 }
 
 export function readCached(): Appearance {

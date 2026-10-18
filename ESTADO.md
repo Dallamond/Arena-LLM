@@ -1,6 +1,6 @@
 ---
 fecha_creacion: 2026-10-03
-fecha_modificacion: 2026-10-04
+fecha_modificacion: 2026-10-18
 tipo: proyecto
 categoria: tech
 tags: [tech, homelab, agente]
@@ -10,7 +10,7 @@ relacionado: ["Arena LLM"]
 ---
 # Arena LLM — Estado
 
-> Leer al retomar. Última actualización: 04/10/2026 (tarde: Batalla, Comparar y lectura de respuestas).
+> Leer al retomar. Última actualización: 18/10/2026 (recomendados por hardware y pulido de la GUI). Las secciones están en orden de más antigua a más reciente salvo esta cabecera; lo último está al final.
 
 ## Resumen
 
@@ -228,3 +228,22 @@ Pedido por Lucas (como en LocalHarness): elegir la GPU y lanzar el modelo direct
 - **Web** (`GgufList.vue`): fichas de GPU destino («Automático» o cada GPU con su memoria libre), botón **Lanzar en <GPU>** (desactivado con el motivo si no cabe entero ahí), **Parar** para lo lanzado desde Arena, estado «arrancando / cargando / en marcha :puerto» con el registro mientras carga, orden por Tamaño · Parámetros (B) · Nombre · Encaje (asc/desc, se recuerda). Tarjetas con cifras grandes (parámetros, cuantización, tamaño, contexto, capas), veredicto y barra de encaje más grandes. «Copiar comando» sigue como botón secundario.
 - Probado de verdad: Qwen3.5-0.8B Q8_0 lanzado en la Tesla M40 (`-dev CUDA0`, orden PCI) desde la GUI, detectado como cargando y parado; la VRAM volvió al valor inicial. Tests: 8 del lanzador del agente y 1 de coherencia spec ↔ comando.
 - Pendiente: probar `Repartido` (`-ts`) con las dos GPU libres, y mostrar los lanzados en la pestaña «En marcha».
+
+
+## Recomendados por hardware y pulido (18/10/2026)
+
+Pedido por Lucas: una etiqueta de **recomendado para tu hardware** en la lista de GGUF y cerrar los pendientes de la GUI.
+
+- **Recomendados** (`web/src/lib/recommend.ts`, usado por `GgufList.vue`). Candidatos: modelos de chat que caben **enteros** en la GPU destino (o en cualquiera con «Automático»; o repartidos entre varias) ocupando como mucho el 90 % de su memoria libre, y cuyo contexto entrenado cubre el contexto por slot elegido. Puntuación = parámetros × calidad de la cuantización (tabla por familia: F16 1,0 · Q8 0,99 · Q6 0,97 · Q5 0,95 · Q4_K 0,92 · Q4_0 0,89 · Q3 0,75–0,8 · Q2 0,5 · IQ1 0,35 · desconocida 0,85). De cada familia solo la mejor cuantización; se etiquetan hasta 3 que lleguen al 75 % del mejor: «★ Mejor para tu hardware» y «★ Recomendado» (el motivo sale al pasar el cursor). Nuevo orden «Recomendado». Se recalcula al cambiar GPU destino, contexto, slots o caché KV, y sin umbrales de hardware escritos en el código.
+  - **Limitaciones**: es una heurística sobre la cabecera, no una medida. Con «Automático» no distingue GPU rápidas de lentas (una M40 con más memoria puede ganar a la 3060): usar el ancho de banda de F6 para desempatar queda pendiente, igual que el catálogo editable. Los MoE cuentan todos sus parámetros.
+  - Tests: 6 de web (`web/tests/recommend.test.ts`).
+- **Ajustes → Apariencia**: quitadas las opciones de rejilla y croquis (no hacían nada). Los ajustes antiguos guardados se descartan al leer.
+- **Historial**: la columna del modelo se recorta con puntos suspensivos (el nombre completo sale al pasar el cursor) y las celdas se compactan por debajo de 1400 px, de modo que la energía y la duración caben a 1280 px.
+- **Franja de dispositivos**: tarjetas de 230 px como mínimo (antes 280), así que GPU, CPU y RAM caben en una sola fila a 1280 px.
+- **Panel**: las minigráficas de 2 min ya salen llenas al abrir la página. El servidor guarda las últimas 120 lecturas de cada equipo (`HostState.recent`) y las reenvía al conectar el SSE como evento `backlog`, que solo rellena el historial (no cuenta como dato fresco ni entra en las muestras de un run). El cliente ignora lecturas repetidas.
+- **Run**: la tarjeta dice «N peticiones completadas» y la tabla de peticiones se refresca mientras corre, así que ya no marca menos que la tarjeta.
+- **Servidores**: el contexto muestra solo lo que hay («N por slot × M slots», «N en total» o un único «sin datos») y la cabecera de la tarjeta tiene alto fijo para que no salte al aparecer «Probar».
+- Ya estaban hechos antes: «+-1» (ahora «+3», «−1») y el eje de velocidad con enteros. El aviso de contexto mayor que el entrenado sale ahora también en la tarjeta del GGUF.
+- Tests: 243 de Python y 23 de la web; `ruff` limpio.
+
+**Sin comprobar**: no he abierto la GUI con capturas esta sesión; el aspecto de la etiqueta, el Historial a 1280 px y la franja de dispositivos están sin revisar a ojo. Los criterios de `docs/GUI-DISENO.md` §8 siguen sin marcar.

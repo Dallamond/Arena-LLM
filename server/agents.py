@@ -8,6 +8,7 @@ con su color estable y publica los cambios en el `EventHub`.
 import asyncio
 import logging
 import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -29,6 +30,10 @@ class AgentError(Exception):
         self.message = message
 
 
+#: Lecturas que se guardan por equipo para rellenar el historial corto de la GUI.
+RECENT_SAMPLES = 120
+
+
 @dataclass
 class HostState:
     pk: int
@@ -42,6 +47,8 @@ class HostState:
     metrics: dict[str, Any] | None = None
     last_ok: float | None = None
     colors: dict[str, int | None] = field(default_factory=dict)
+    #: Últimas lecturas (≈2 min a 1 Hz): una GUI recién abierta pinta las minigráficas llenas.
+    recent: deque[dict[str, Any]] = field(default_factory=lambda: deque(maxlen=RECENT_SAMPLES))
 
     def public(self) -> dict[str, Any]:
         info = self.info or {}
@@ -171,6 +178,8 @@ class AgentMonitor:
         if set(snap.get("devices", {})) - known:  # dispositivo nuevo: volver a pedir la ficha
             await self.refresh_info(state)
         state.metrics = snap
+        if snap:
+            state.recent.append(snap)
         state.last_ok = time.time()
         self._set_status(state, "online", None)
         self.hub.publish("metrics", {"host": state.pk, "snapshot": snap})

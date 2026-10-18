@@ -153,7 +153,7 @@ function resetThreshold(id: string) {
           <div class="row">
             <div class="row__text">
               <h3>Contraste</h3>
-              <p>"Alto" aclara los textos secundarios y las líneas, y quita el efecto croquis. Más fácil de leer.</p>
+              <p>"Alto" aclara los textos secundarios y las líneas. Más fácil de leer.</p>
             </div>
             <div class="row__control seg" role="radiogroup" aria-label="Contraste">
               <label><input v-model="look.contrast" type="radio" value="normal" @change="persist" /> Normal</label>
@@ -170,28 +170,6 @@ function resetThreshold(id: string) {
               <label v-for="s in SCALES" :key="s.value">
                 <input v-model="look.scale" type="radio" :value="s.value" @change="persist" /> {{ s.label }} <span class="dim">{{ Math.round(s.value * 100) }} %</span>
               </label>
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="row__text">
-              <h3>Rejilla de fondo</h3>
-              <p>La cuadrícula de plano. "Tenue" o "sin rejilla" reducen el ruido visual.</p>
-            </div>
-            <div class="row__control seg" role="radiogroup" aria-label="Rejilla">
-              <label><input v-model="look.grid" type="radio" value="normal" @change="persist" /> Normal</label>
-              <label><input v-model="look.grid" type="radio" value="tenue" @change="persist" /> Tenue</label>
-              <label><input v-model="look.grid" type="radio" value="off" @change="persist" /> Sin rejilla</label>
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="row__text">
-              <h3>Efecto croquis</h3>
-              <p>Trazo ligeramente irregular en ejes y medidores. Nunca afecta al texto ni a los datos. Se apaga solo con "reducir movimiento" del sistema.</p>
-            </div>
-            <div class="row__control">
-              <label class="check"><input v-model="look.sketch" type="checkbox" @change="persist" /> Activado</label>
             </div>
           </div>
         </BlueprintCard>

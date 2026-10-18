@@ -391,8 +391,6 @@ export interface Appearance {
   accent: string;
   contrast: "normal" | "alto";
   scale: number;
-  sketch: boolean;
-  grid: "normal" | "tenue" | "off";
 }
 
 export type ThresholdOverrides = Record<string, { warn?: number; crit?: number }>;

@@ -83,6 +83,25 @@ onMounted(() => {
 onBeforeUnmount(() => offs.forEach((f) => f()));
 watch(runId, load);
 
+// La tabla de peticiones se refresca mientras corre, para que coincida con el contador de la tarjeta.
+let itemsTimer: number | undefined;
+watch(
+  () => lv.value?.requests_done,
+  () => {
+    if (!running.value || itemsTimer) return;
+    itemsTimer = window.setTimeout(async () => {
+      itemsTimer = undefined;
+      try {
+        const fresh = await api<RunDetail>(`/api/runs/${runId.value}`);
+        if (detail.value) detail.value = { ...detail.value, items: fresh.items };
+      } catch {
+        /* se reintenta con la siguiente petición completada */
+      }
+    }, 800);
+  },
+);
+onBeforeUnmount(() => window.clearTimeout(itemsTimer));
+
 // --- series de las gráficas ------------------------------------------------
 const t0 = computed(() => run.value?.started_at ?? 0);
 const allTps = computed(() => [...(detail.value?.tps ?? []), ...liveTps.value]);
@@ -366,7 +385,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
         <BlueprintCard v-if="!isBench" dense title="Tokens">
           <div class="big mono">{{ fmt(running ? lv?.tokens : sum?.completion_tokens, 0) }}</div>
           <div class="dim small">
-            {{ fmt(running ? lv?.requests_done : sum?.requests, 0) }} peticiones
+            {{ fmt(running ? lv?.requests_done : sum?.requests, 0) }} peticiones completadas
             <span v-if="(running ? lv?.requests_error : sum?.requests_error)" class="warn">
               · ▲ {{ running ? lv?.requests_error : sum?.requests_error }} con error
             </span>

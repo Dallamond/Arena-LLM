@@ -509,8 +509,12 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
                 yield sse_format("hello", f'{{"version":"{__version__}","t":{time.time()}}}')
                 for s in mon.states.values():
                     yield sse_format("host", _json(s.public()))
-                    if s.metrics is not None:
-                        yield sse_format("metrics", _json({"host": s.pk, "snapshot": s.metrics}))
+                    # Las últimas lecturas, en orden: la GUI rellena sus minigráficas de 2 min al abrir
+                    # (las antiguas como "backlog": solo historial; la última como "metrics")
+                    snaps = list(s.recent) or ([s.metrics] if s.metrics is not None else [])
+                    for i, snap in enumerate(snaps):
+                        kind = "metrics" if i == len(snaps) - 1 else "backlog"
+                        yield sse_format(kind, _json({"host": s.pk, "snapshot": snap}))
                 while True:
                     if await request.is_disconnected():
                         break

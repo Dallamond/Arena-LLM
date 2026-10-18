@@ -273,6 +273,7 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
 - [x] **Comando copiable de `llama-server`** para cada GGUF desde la calculadora de encaje (ruta del binario detectada, `-m`, `-ngl` sugerido, `-c`, `-ts`, `--port` libre, `-fa`). Es también el paso 2 del modo guiado de F8.
   *Hecho 04/10/2026: Servidores → GGUF en disco → Ver comando (cmd/PowerShell o bash, `-dev` o `-ts` con `CUDA_DEVICE_ORDER=PCI_BUS_ID`, puerto libre, binario de `llama_server`/junto a `llama_bench`/detectado). Probado arrancando el comando real en la 3060 con b11379.*
 - [ ] **Recomendaciones de modelos según el hardware**: qué tamaño y cuantización caben en cada equipo (por VRAM + RAM y ancho de banda medido en F6), con un catálogo editable de modelos conocidos (fichero de datos, no código).
+  *Hecho 18/10/2026 (primera versión): etiqueta «★ Mejor para tu hardware» / «★ Recomendado» en la lista de GGUF (Servidores → GGUF en disco) y orden «Recomendado». Entre los que caben enteros en GPU con margen del 10 %, gana el de más parámetros × calidad de cuantización (`web/src/lib/recommend.ts`). Falta: usar el ancho de banda medido en F6 para desempatar entre GPU lentas y rápidas, y el catálogo editable.*
 
 ### F7 — Pruebas de calidad
 - [ ] `qa` (12 preguntas), `contexto` (aguja en pajar + VRAM vs contexto), `concurrencia`, `codigo` (10 problemas con ejecución aislada), todas con opciones editables y semillas fijas.

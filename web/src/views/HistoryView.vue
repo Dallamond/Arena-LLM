@@ -86,12 +86,12 @@ const rows = computed(() => {
             </td>
             <td><RouterLink :to="`/pruebas/${r.id}`">#{{ r.id }}</RouterLink></td>
             <td>{{ fmtDate(r.started_at ?? r.created_at) }}</td>
-            <td>
+            <td class="suite">
               {{ suiteLabel(r.suite) }}
               <RouterLink v-if="r.battle_id" :to="`/batalla/${r.battle_id}`" class="battle">⚔ #{{ r.battle_id }} · {{ r.side }}</RouterLink>
               <span v-if="r.label" class="dim">· {{ r.label }}</span>
             </td>
-            <td>{{ endpointName(r) }}</td>
+            <td class="model" :title="endpointName(r)">{{ endpointName(r) }}</td>
             <td>
               <Stamp :text="`${RUN_STATUS[r.status]?.icon} ${RUN_STATUS[r.status]?.text ?? r.status}`" :tone="RUN_STATUS[r.status]?.tone ?? 'dim'" :tilt="0" />
             </td>
@@ -158,6 +158,24 @@ const rows = computed(() => {
   padding: 6px 8px;
   border-bottom: 1px dotted var(--line);
   white-space: nowrap;
+}
+.runs td.model {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.runs td.suite {
+  white-space: normal;
+  min-width: 110px;
+}
+@media (max-width: 1400px) {
+  .runs th,
+  .runs td {
+    padding-inline: 5px;
+  }
+  .runs td.model {
+    max-width: 170px;
+  }
 }
 .runs tbody tr:hover {
   background: rgba(108, 180, 255, 0.04);

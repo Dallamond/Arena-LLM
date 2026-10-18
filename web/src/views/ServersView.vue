@@ -299,10 +299,11 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
             <div>
               <dt>contexto</dt>
               <dd>
-                <template v-if="ep.snapshot?.derived?.n_ctx_slot != null || ep.snapshot?.derived?.total_slots != null">
+                <template v-if="ep.snapshot?.derived?.n_ctx_slot != null && ep.snapshot?.derived?.total_slots != null">
                   {{ fmt(ep.snapshot?.derived?.n_ctx_slot) }} por slot × {{ fmt(ep.snapshot?.derived?.total_slots) }} slots
-                  <span class="dim">(total {{ fmt(ep.snapshot?.derived?.n_ctx_total) }})</span>
+                  <span v-if="ep.snapshot?.derived?.n_ctx_total != null" class="dim">(total {{ fmt(ep.snapshot?.derived?.n_ctx_total) }})</span>
                 </template>
+                <template v-else-if="ep.snapshot?.derived?.n_ctx_total != null">{{ fmt(ep.snapshot?.derived?.n_ctx_total) }} en total</template>
                 <template v-else>{{ NO_DATA }}</template>
               </dd>
             </div>
@@ -393,6 +394,11 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
 </template>
 
 <style scoped>
+/* La cabecera de cada servidor no cambia de alto cuando aparece o desaparece «Probar» */
+.ep :deep(.card__head) {
+  min-height: 44px;
+}
+
 .head {
   display: flex;
   align-items: center;

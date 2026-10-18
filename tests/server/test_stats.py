@@ -111,3 +111,14 @@ def test_peticion_cortada_no_es_error():
 def test_pico_de_ram():
     rows = [{"t": float(t), "phase": "carga", "data": {"used_mib": 1000 + t}} for t in range(5)]
     assert stats.device_summary(rows)["ram_used_peak_mib"] == 1004
+
+
+def test_historial_reciente_del_equipo_esta_acotado():
+    """La GUI recién abierta recibe como mucho las últimas lecturas (≈2 min a 1 Hz)."""
+    from server.agents import RECENT_SAMPLES, HostState
+
+    st = HostState(pk=1, agent_url="http://127.0.0.1:1")
+    for i in range(RECENT_SAMPLES + 30):
+        st.recent.append({"t": i})
+    assert len(st.recent) == RECENT_SAMPLES
+    assert st.recent[0]["t"] == 30 and st.recent[-1]["t"] == RECENT_SAMPLES + 29

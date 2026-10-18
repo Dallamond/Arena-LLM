@@ -156,6 +156,7 @@ function pushHistory(hostId: number, snap: Snapshot): void {
   for (const [id, s] of Object.entries(snap.devices)) {
     const key = historyKey(hostId, id);
     const arr = (live.history[key] ??= []);
+    if (arr.length && arr[arr.length - 1].t >= t) continue; // repetida al reconectar el SSE
     const g = s as GpuSample;
     const c = s as CpuSample;
     arr.push({
@@ -169,6 +170,7 @@ function pushHistory(hostId: number, snap: Snapshot): void {
   }
   if (snap.ram) {
     const arr = (live.history[historyKey(hostId, "ram")] ??= []);
+    if (arr.length && arr[arr.length - 1].t >= t) return;
     arr.push({ t, temp: null, power: null, util: null, mem: snap.ram.used_mib });
     if (arr.length > HISTORY_POINTS) arr.splice(0, arr.length - HISTORY_POINTS);
   }
@@ -218,6 +220,11 @@ export function connect(url = "/api/events"): void {
     const { id } = JSON.parse((e as MessageEvent).data) as { id: number };
     delete live.hosts[id];
     delete live.metrics[id];
+  });
+  // Lecturas antiguas que reenvía el servidor al conectar: solo rellenan el historial corto.
+  source.addEventListener("backlog", (e) => {
+    const { host, snapshot } = JSON.parse((e as MessageEvent).data) as { host: number; snapshot: Snapshot };
+    pushHistory(host, snapshot);
   });
   source.addEventListener("metrics", (e) => {
     const { host, snapshot } = JSON.parse((e as MessageEvent).data) as { host: number; snapshot: Snapshot };

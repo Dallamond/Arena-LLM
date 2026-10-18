@@ -14,6 +14,7 @@ import type {
 } from "../api/types";
 import { deviceColor, shortName } from "../lib/devices";
 import { NO_DATA, fmt, isNum } from "../lib/format";
+import { recommend } from "../lib/recommend";
 import BarWithOverflow from "./BarWithOverflow.vue";
 import LaunchCommand from "./LaunchCommand.vue";
 import Stamp from "./Stamp.vue";
@@ -229,8 +230,19 @@ const launchModel = (f: ModelFile, opt: LaunchOption) =>
   act(f, "/launch", { path: f.path, option: opt.id, ctx: params.ctx, parallel: params.parallel, kv_type: params.kv_type });
 const stopModel = (f: ModelFile, pid: number) => act(f, "/launch/stop", { pid });
 
+// --- recomendados para este hardware (ESTIMADO): los que caben enteros en GPU con más parámetros efectivos
+const recs = computed(() =>
+  recommend(
+    files.value.map((f) => ({ path: f.path, r: ok(fits[f.path]) })),
+    target.value,
+    Math.floor(params.ctx / Math.max(params.parallel, 1)),
+    shortName,
+  ),
+);
+
 // --- orden
 const SORTS = [
+  { key: "rec", label: "Recomendado" },
   { key: "size", label: "Tamaño" },
   { key: "params", label: "Parámetros (B)" },
   { key: "name", label: "Nombre" },
@@ -248,6 +260,11 @@ const rows = computed(() => {
   const num = (v: number | null | undefined) => (isNum(v) && v > 0 ? v : null);
   list.sort((a, b) => {
     let c = 0;
+    if (sort.key === "rec") {
+      c = (recs.value.get(a.f.path)?.rank ?? 99) - (recs.value.get(b.f.path)?.rank ?? 99);
+      if (c === 0) c = (b.r?.model.n_params ?? 0) - (a.r?.model.n_params ?? 0);
+      return sort.desc ? c : -c;
+    }
     if (sort.key === "name") c = name(a).localeCompare(name(b));
     else if (sort.key === "params") {
       const x = num(a.r?.model.n_params);
@@ -358,10 +375,14 @@ function elapsed(l: LaunchedServer): string {
     <p v-for="(msg, dir) in models?.errors ?? {}" :key="dir" class="dim">{{ dir }}: {{ msg }}</p>
 
     <ul class="rows">
-      <li v-for="{ f, r, err, b, size } in rows" :key="f.path" class="row" :class="{ 'row--on': runOf(f).ep }">
+      <li v-for="{ f, r, err, b, size } in rows" :key="f.path" class="row" :class="{ 'row--on': runOf(f).ep, 'row--rec': recs.get(f.path)?.rank === 1 }">
         <template v-if="r">
           <header class="head">
             <h4 class="title">{{ r!.model.name ?? f.file }}</h4>
+            <span v-if="recs.get(f.path)" class="tag tag--rec" :title="recs.get(f.path)!.reason">
+              <span aria-hidden="true">★</span>
+              {{ recs.get(f.path)!.rank === 1 ? "Mejor para tu hardware" : "Recomendado" }}
+            </span>
             <span class="tag">{{ r!.model.architecture ?? "?" }}</span>
             <span v-if="r!.estimate.kind === 'mmproj'" class="tag">proyector</span>
             <span v-if="(r!.estimate.recurrent ?? 0) > 0" class="tag">híbrido</span>
@@ -599,6 +620,9 @@ function elapsed(l: LaunchedServer): string {
 .row--on {
   border-color: color-mix(in srgb, var(--ok) 55%, transparent);
 }
+.row--rec:not(.row--on) {
+  border-color: color-mix(in srgb, var(--ok) 28%, transparent);
+}
 .head {
   display: flex;
   align-items: center;
@@ -619,6 +643,12 @@ function elapsed(l: LaunchedServer): string {
   border-radius: 999px;
   background: var(--panel-raised);
   color: var(--ink-dim);
+}
+.tag--rec {
+  font-weight: 600;
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  cursor: help;
 }
 .state {
   margin-left: auto;

@@ -45,6 +45,8 @@ relacionado: ["Arena LLM", "Homelab"]
 
 ## 3. Estilo "blueprint sketch con flujo"
 
+> **Sustituido el 14/10/2026** por el rediseño minimalista (fondo negro, superficies `#1c1c1e`, esquinas de 16 px, botones en cápsula, color solo para estado y GPU). Ya no hay rejilla, marcas de registro ni efecto croquis, y las opciones correspondientes se quitaron de Ajustes el 18/10/2026. Lo que sigue es el planteamiento original, que se conserva como histórico.
+
 Un **plano técnico del equipo**: lo que miras es una máquina dibujada con sus medidas, y los datos circulan por ella.
 
 1. **Fondo de plano.** Rejilla fina (16 px) y rejilla mayor (80 px) en azul muy tenue sobre azul tinta.
