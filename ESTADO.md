@@ -271,3 +271,12 @@ Pedido por Lucas: los puntos 1–4 de la lista de pendientes (F7, corrección en
 - Barrido Código: Qwen2.5-Coder-7B 8/10, Llama-3.1-8B 8/10, Qwen3-4B 9/10; el sandbox funcionó sin incidencias. Cada paso arrancó, midió y paró su servidor, y la M40 volvió a 0 MiB entre pasos.
 - **Aviso de fiabilidad**: durante el último paso (Qwen3-4B) Lucas arrancó su propio Qwen3.5-9B en la M40 (21 GiB de uso en ese momento). Esa medida de t/s no es válida; la calidad (aciertos) no depende de ello.
 - **Por hacer**: contexto y concurrencia con modelos reales, prueba térmica de 5 min, Batalla en paralelo M40 + 3060 y reparto `-ts`. Quedan a la espera de GPU libres. Observación: el servidor lanzado usa 4 slots (`n_slots = 4`) aunque el barrido pidió 1; revisar si el lanzamiento debe pasar `-np`.
+
+## Al retomar (18/10/2026)
+
+- **Código**: F7, Batalla corregida, Asistente y recomendados están hechos y en `main`. Última verificación: 305+ tests de Python, 27 de la web, ruff y vue-tsc limpios.
+- **Tu Arena del puerto 8090 corre código antiguo**: para ver lo nuevo hay que reiniciarlo y recompilar la web (`npm run build --prefix web`).
+- **Pendiente en hardware real** (necesita las GPU libres, sin tus `llama-server`): contexto y concurrencia con modelos reales, prueba térmica de 5 min en la M40, reparto `-ts` y Batalla en paralelo M40 + 3060. QA y Código ya se midieron en la M40.
+- **Decisión abierta**: el servidor lanzado usa 4 slots aunque se pida 1; decidir si el lanzamiento pasa `-np`.
+- **Ideas siguientes** (ver `docs/HOJA-DE-RUTA.md`): recomendaciones v2 (desempate por ancho de banda, catálogo editable), resto de F9, accesibilidad, F10.
+- Datos de la pasada real: `D:\dev-tools\arena-real-tmp` (fuera del repo).
