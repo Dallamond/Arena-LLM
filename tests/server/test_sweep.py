@@ -101,14 +101,16 @@ def lab(tmp_path, stoppers, monkeypatch):
             launched[pid] = {"pid": pid, "port": port, "model": body["model"], "alive": True, "returncode": None,
                              "log_tail": [], "stop": stop, "spec": body}  # fmt: skip
             log.append(("launch", body["model"].rsplit("/", 1)[-1].rsplit("\\", 1)[-1]))
-            return {k: v for k, v in launched[pid].items() if k not in ("stop", "spec")}
+            # Misma forma que el agente real: {"launch": {...}}
+            public = {k: v for k, v in launched[pid].items() if k not in ("stop", "spec")}
+            return public if cfg.get("flat") else {"launch": public}
         if path == "/launch/stop":
             item = launched[body["pid"]]
             item["stop"]()
             item["alive"] = False
             procs.processes[:] = [p for p in procs.processes if p.pid != body["pid"]]
             log.append(("stop", str(body["pid"])))
-            return {}
+            return {"launch": {"pid": body["pid"], "alive": False}}
         return await real_post(state, path, body)
 
     async def get(state, path, params=None, timeout=None):
@@ -184,6 +186,14 @@ def test_un_paso_que_falla_no_impide_los_siguientes(lab):
     sw = finished(c, c.post("/api/sweeps", json={**body(host, models), "models": paths}).json()["id"])
     assert [s["state"] for s in sw["steps"]] == ["error", "hecho"] and sw["status"] == "done"
     assert [k for k, _ in log] == ["launch", "stop"]
+
+
+def test_respuesta_de_lanzamiento_con_otra_forma_es_un_error_del_paso(lab):
+    c, host, models, _, _, cfg = lab
+    cfg["flat"] = True  # sin la clave «launch» del agente real
+    sw = finished(c, c.post("/api/sweeps", json=body(host, models)).json()["id"])
+    assert sw["status"] == "error" and [s["state"] for s in sw["steps"]] == ["error", "error"]
+    assert "pid" in sw["steps"][0]["message"]
 
 
 def test_cancelar_a_mitad_para_el_servidor_y_omite_el_resto(lab):

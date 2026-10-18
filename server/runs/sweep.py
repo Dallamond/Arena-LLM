@@ -237,7 +237,10 @@ class SweepManager:
                 out = await self.monitor.agent.post(state, "/launch", option["spec"])
             except AgentError as exc:
                 raise _StepError("error", f"El agente no pudo lanzar llama-server: {exc.message}") from exc
-            pid, port = out["pid"], out["port"]
+            launch = out.get("launch") if isinstance(out, dict) else None
+            if not isinstance(launch, dict) or "pid" not in launch or "port" not in launch:
+                raise _StepError("error", "El agente respondió al lanzamiento sin pid ni puerto")
+            pid, port = launch["pid"], launch["port"]
             self._set(sid, step, steps, pid=pid, port=port)
 
             endpoint = await self._wait_ready(sid, state, params, pid, port)

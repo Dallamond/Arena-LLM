@@ -263,3 +263,11 @@ Pedido por Lucas: los puntos 1–4 de la lista de pendientes (F7, corrección en
 - Tests: 305 de Python y 27 de la web; `ruff` limpio.
 
 **Punto 4 (GPU reales), sin hacer**: el 18/10 las dos GPU estaban ocupadas por dos `llama-server` ajenos a Arena (Qwen3.5-9B en la M40 y gpt-oss-20b en la 3060, con `--api-key`), y la 3060 trabajaba al límite de potencia. Para no falsear sus medidas ni interferir, no se lanzó nada real. Pendiente: Batalla en paralelo M40 + 3060, reparto `-ts`, prueba térmica de 5 min en la M40 y una pasada de las cuatro pruebas con modelos reales.
+
+**Punto 4, primera pasada en la M40 (18/10, Lucas cedió la M40; la 3060 siguió con sus servidores y no se tocó):**
+- Instancia propia de Arena (puerto 8191, datos en `D:\dev-toolsrena-real-tmp`) contra el agente real, con `llama-server` b11379. La que Lucas tiene en 8090 no se tocó.
+- **Error encontrado**: el Asistente esperaba el `/launch` del agente plano y el real responde `{"launch": {...}}`; la simulación copiaba mi suposición y lo ocultó. Corregido en `server/runs/sweep.py` (una respuesta sin pid/puerto es ahora un error del paso) y el doble de pruebas devuelve la forma real, con test de regresión.
+- Barrido QA (3 modelos pedidos; uno falló por una ruta mía mal escrita, con mensaje claro): Qwen2.5-Coder-7B Q8 4/12 y Llama-3.1-8B Q4 9/12, ≈20 y ≈25 t/s. En el Coder-7B, 3 de los 8 fallos eran respuestas correctas sin la línea `RESPUESTA:`; el resumen ya lo separa (`format_ok_pct`).
+- Barrido Código: Qwen2.5-Coder-7B 8/10, Llama-3.1-8B 8/10, Qwen3-4B 9/10; el sandbox funcionó sin incidencias. Cada paso arrancó, midió y paró su servidor, y la M40 volvió a 0 MiB entre pasos.
+- **Aviso de fiabilidad**: durante el último paso (Qwen3-4B) Lucas arrancó su propio Qwen3.5-9B en la M40 (21 GiB de uso en ese momento). Esa medida de t/s no es válida; la calidad (aciertos) no depende de ello.
+- **Por hacer**: contexto y concurrencia con modelos reales, prueba térmica de 5 min, Batalla en paralelo M40 + 3060 y reparto `-ts`. Quedan a la espera de GPU libres. Observación: el servidor lanzado usa 4 slots (`n_slots = 4`) aunque el barrido pidió 1; revisar si el lanzamiento debe pasar `-np`.
