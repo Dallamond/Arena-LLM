@@ -148,6 +148,7 @@ class RunManager:
         label: str | None,
         battle_id: int | None = None,
         side: str | None = None,
+        sweep_id: int | None = None,
     ) -> dict:
         suite = SUITES.get(suite_id)
         if suite is None:
@@ -182,6 +183,7 @@ class RunManager:
             started_at=time.time(),
             battle_id=battle_id,
             side=side,
+            sweep_id=sweep_id,
         )
         ar = ActiveRun(id=run["id"], suite=suite, host_pk=state.pk, endpoint=ep, params=params, watch=watch)
         self.active[ar.id] = ar

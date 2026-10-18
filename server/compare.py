@@ -319,6 +319,7 @@ def item_matrix(runs: list[dict[str, Any]], items: dict[int, list[dict[str, Any]
     """Filas = (prompt, repetición), en el orden de aparición; columnas = runs."""
     order: list[tuple[str, int]] = []
     cells: dict[tuple[str, int], list[dict[str, Any] | None]] = {}
+    names: dict[tuple[str, int], str | None] = {}
     for col, r in enumerate(runs):
         seen: dict[str, int] = {}
         for it in items.get(r["id"], []):
@@ -329,6 +330,7 @@ def item_matrix(runs: list[dict[str, Any]], items: dict[int, list[dict[str, Any]
             if key not in cells:
                 order.append(key)
                 cells[key] = [None] * len(runs)
+                names[key] = it.get("name")
             m = it.get("metrics") or {}
             cells[key][col] = {
                 "response": it.get("response"),
@@ -340,7 +342,7 @@ def item_matrix(runs: list[dict[str, Any]], items: dict[int, list[dict[str, Any]
                 "finish": m.get("finish_reason"),
                 "eval": _eval_public(it.get("eval")),
             }
-    return [{"prompt": p, "rep": rep, "cells": cells[(p, rep)]} for p, rep in order]
+    return [{"prompt": p, "name": names[(p, rep)], "rep": rep, "cells": cells[(p, rep)]} for p, rep in order]
 
 
 # --- series superpuestas --------------------------------------------------------------

@@ -13,16 +13,18 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 
-from server import __version__, compare, launch, library
+from server import __version__, compare, library
 from server.agents import AgentError, AgentMonitor
 from server.db import Database
 from server.detect import EndpointDetector, normalize_base_url
-from server.fit import FitError, FitParams, estimate, fit, gpus_from_state, ram_free_from_metrics
+from server.fit import FitParams
+from server.fitting import GGUF_TIMEOUT_S, HostError, fit_model
 from server.hub import EventHub, sse_format
 from server.runs.battle import BattleManager
 from server.runs.bench import BENCH_SUITES
-from server.runs.manager import BENCH_DEVICES_TIMEOUT_S, GGUF_TIMEOUT_S, RunError, RunManager, _run_public
+from server.runs.manager import BENCH_DEVICES_TIMEOUT_S, RunError, RunManager, _run_public
 from server.runs.suites import SUITES
+from server.runs.sweep import SweepManager
 from server.settings import Settings
 
 SSE_HEARTBEAT_S = 15.0
@@ -42,6 +44,19 @@ class BattleIn(BaseModel):
     prompts: list[str] = []
     common: dict[str, Any] = {}
     sides: list[BattleSideIn]
+
+
+class SweepIn(BaseModel):
+    host_id: int
+    models: list[str]
+    targets: list[str] = ["auto"]  # auto | id de GPU | reparto
+    ctx: int = 8192
+    parallel: int = 1
+    kv_type: str = "f16"
+    suite: str = "qa"
+    params: dict[str, Any] = {}
+    label: str | None = None
+    load_timeout_s: int = 600
 
 
 class LaunchIn(BaseModel):
@@ -90,10 +105,6 @@ class EndpointIn(BaseModel):
         return normalize_base_url(v)
 
 
-#: Datos de la cabecera GGUF que acompañan al encaje (la lista de modelos los muestra).
-MODEL_SUMMARY_KEYS = ("name", "architecture", "general_type", "file_type", "size_label", "n_params",
-                      "context_length", "expert_count", "file_size")  # fmt: skip
-
 #: Claves de ajustes que acepta la API (el resto se rechaza).
 SETTINGS_KEYS = {"appearance", "thresholds"}
 
@@ -130,15 +141,19 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
         detector = EndpointDetector(db, hub, monitor, client)
         runs = RunManager(db, hub, monitor, llm)
         battles = BattleManager(db, hub, runs)
+        sweeps = SweepManager(db, hub, monitor, runs, {settings.port})
         db.mark_interrupted_runs()
         db.mark_interrupted_battles()
+        db.mark_interrupted_sweeps()
         app.state.db, app.state.hub, app.state.monitor = db, hub, monitor
         app.state.detector, app.state.runs, app.state.battles = detector, runs, battles
+        app.state.sweeps = sweeps
         monitor.start_all()
         detector.start()
         try:
             yield
         finally:
+            await sweeps.shutdown()
             await battles.shutdown()
             await runs.shutdown()
             await detector.stop()
@@ -216,27 +231,11 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
 
     async def compute_fit(request: Request, host_id: int, path: str, params: FitParams) -> dict[str, Any]:
         try:
-            params.validate()
-        except FitError as exc:
-            raise HTTPException(422, str(exc)) from exc
-        g = (await proxy(request, host_id, "/gguf", {"path": path}, timeout=GGUF_TIMEOUT_S))["gguf"]
-        state = state_or_404(request, host_id)
-        est = estimate(g, params)
-        gpus = gpus_from_state(state.info, state.metrics)
-        verdict = fit(est, gpus, ram_free_from_metrics(state.metrics))
-        model = {k: g.get(k) for k in MODEL_SUMMARY_KEYS}
-        command = launch.build(
-            path=path,
-            est=est,
-            verdict=verdict,
-            model=model,
-            host_info=state.info,
-            gpus=gpus,
-            endpoints=request.app.state.db.list_endpoints(host_id),
-            reserved_ports={settings.port},
-        )
-        est.pop("layer_cost", None)
-        return {"path": path, "estimated": True, "model": model, "estimate": est, "fit": verdict, "command": command}
+            return await fit_model(
+                monitor(request), request.app.state.db, host_id, path, params, {settings.port}
+            )
+        except HostError as exc:
+            raise HTTPException(exc.status, exc.message) from exc
 
     @app.get("/api/hosts/{host_id}/fit")
     async def host_fit(
@@ -422,6 +421,50 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
             )
         except RunError as exc:
             raise HTTPException(exc.status, exc.message) from exc
+
+    # --- asistente (barridos de modelos × GPU) ----------------------------------
+
+    @app.get("/api/sweeps")
+    def list_sweeps(request: Request, limit: int = 50) -> list[dict[str, Any]]:
+        return request.app.state.db.list_sweeps(min(max(limit, 1), 500))
+
+    @app.post("/api/sweeps", status_code=201)
+    async def start_sweep(request: Request, body: SweepIn) -> dict[str, Any]:
+        try:
+            return await request.app.state.sweeps.start(
+                body.host_id,
+                body.models,
+                body.targets,
+                {"ctx": body.ctx, "parallel": body.parallel, "kv_type": body.kv_type},
+                body.suite,
+                body.params,
+                body.label,
+                body.load_timeout_s,
+            )
+        except RunError as exc:
+            raise HTTPException(exc.status, exc.message) from exc
+
+    @app.get("/api/sweeps/{sweep_id}")
+    def get_sweep(request: Request, sweep_id: int) -> dict[str, Any]:
+        try:
+            return request.app.state.sweeps.public(sweep_id)
+        except RunError as exc:
+            raise HTTPException(exc.status, exc.message) from exc
+
+    @app.post("/api/sweeps/{sweep_id}/cancel", status_code=202)
+    async def cancel_sweep(request: Request, sweep_id: int) -> dict[str, Any]:
+        try:
+            await request.app.state.sweeps.cancel(sweep_id)
+        except RunError as exc:
+            raise HTTPException(exc.status, exc.message) from exc
+        return {"status": "cancelling"}
+
+    @app.delete("/api/sweeps/{sweep_id}", status_code=204)
+    def delete_sweep(request: Request, sweep_id: int) -> None:
+        if sweep_id in request.app.state.sweeps.tasks:
+            raise HTTPException(409, "Cancela el barrido antes de borrarlo")
+        if not request.app.state.db.delete_sweep(sweep_id):
+            raise HTTPException(404, "Barrido no encontrado")
 
     @app.get("/api/battles/{battle_id}")
     def get_battle(request: Request, battle_id: int, items: bool = True) -> dict[str, Any]:

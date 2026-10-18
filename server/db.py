@@ -174,6 +174,21 @@ MIGRATIONS: list[str] = [
     ALTER TABLE runs ADD COLUMN side TEXT;
     CREATE INDEX runs_battle ON runs(battle_id);
     """,
+    # 7 — asistente: barrido de modelos × GPU que arranca, mide y para cada servidor
+    """
+    CREATE TABLE sweeps (
+        id INTEGER PRIMARY KEY,
+        label TEXT,
+        status TEXT NOT NULL,
+        params TEXT,
+        steps TEXT,
+        error TEXT,
+        created_at REAL NOT NULL,
+        finished_at REAL
+    );
+    ALTER TABLE runs ADD COLUMN sweep_id INTEGER;
+    CREATE INDEX runs_sweep ON runs(sweep_id);
+    """,
 ]
 
 #: Tamaño de la paleta de dispositivos de la GUI (--dev-1 … --dev-N).
@@ -461,7 +476,7 @@ class Database:
         with self.lock:
             rows = self.conn.execute(
                 "SELECT id, kind, suite, suite_version, suite_hash, label, status, host_pk, endpoint_id, params,"
-                " created_at, started_at, finished_at, summary, error, abort_reason, tags, battle_id, side"
+                " created_at, started_at, finished_at, summary, error, abort_reason, tags, battle_id, side, sweep_id"
                 " FROM runs ORDER BY id DESC LIMIT ?",
                 (limit,),
             ).fetchall()
@@ -519,6 +534,53 @@ class Database:
         with self.lock:
             return self.conn.execute(
                 "UPDATE battles SET status='error', error='Servidor detenido durante la batalla', finished_at=?"
+                " WHERE status IN ('pending', 'running')",
+                (time.time(),),
+            ).rowcount
+
+    # --- asistente (barridos) ------------------------------------------------
+
+    SWEEP_JSON = ("params", "steps")
+
+    def create_sweep(self, **fields: Any) -> dict[str, Any]:
+        fields.setdefault("created_at", time.time())
+        for k in self.SWEEP_JSON:
+            if k in fields:
+                fields[k] = json.dumps(fields[k])
+        cols = ", ".join(fields)
+        marks = ", ".join("?" for _ in fields)
+        with self.lock:
+            cur = self.conn.execute(f"INSERT INTO sweeps({cols}) VALUES ({marks})", tuple(fields.values()))
+        return self.get_sweep(cur.lastrowid)
+
+    def update_sweep(self, sweep_id: int, **fields: Any) -> None:
+        for k in self.SWEEP_JSON:
+            if k in fields:
+                fields[k] = json.dumps(fields[k])
+        sets = ", ".join(f"{k}=?" for k in fields)
+        with self.lock:
+            self.conn.execute(f"UPDATE sweeps SET {sets} WHERE id=?", (*fields.values(), sweep_id))
+
+    def get_sweep(self, sweep_id: int) -> dict[str, Any] | None:
+        with self.lock:
+            row = self.conn.execute("SELECT * FROM sweeps WHERE id=?", (sweep_id,)).fetchone()
+        return _json_cols(row, *self.SWEEP_JSON) if row else None
+
+    def list_sweeps(self, limit: int = 100) -> list[dict[str, Any]]:
+        with self.lock:
+            rows = self.conn.execute("SELECT * FROM sweeps ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [_json_cols(r, *self.SWEEP_JSON) for r in rows]
+
+    def delete_sweep(self, sweep_id: int) -> bool:
+        """Borra el barrido y los runs que hizo."""
+        with self.lock:
+            self.conn.execute("DELETE FROM runs WHERE sweep_id=?", (sweep_id,))
+            return self.conn.execute("DELETE FROM sweeps WHERE id=?", (sweep_id,)).rowcount > 0
+
+    def mark_interrupted_sweeps(self) -> int:
+        with self.lock:
+            return self.conn.execute(
+                "UPDATE sweeps SET status='error', error='Servidor detenido durante el barrido', finished_at=?"
                 " WHERE status IN ('pending', 'running')",
                 (time.time(),),
             ).rowcount
