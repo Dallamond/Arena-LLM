@@ -46,6 +46,22 @@
   --accent-soft: #3a3a3c;
 }
 
+/* Modo vídeo (src/lib/videoMode.ts): escala grande, contraste alto forzado y sin animaciones decorativas */
+:root.video-mode {
+  --video-zoom: 1.6;
+  --ink-dim: #d8dce6;
+  --ink-faint: #b8bfcc;
+  --line: #4a4a4e;
+  --line-strong: #8a8a90;
+  --gap: 16px;
+}
+:root.video-mode *,
+:root.video-mode *::before,
+:root.video-mode *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
 /* Contraste alto: textos secundarios y líneas más claros, bordes más visibles */
 :root[data-contrast="alto"] {
   --ink: #ffffff;

@@ -8,8 +8,10 @@ import "./styles/base.css";
 import App from "./App.vue";
 import { connect } from "./api/live";
 import { initAppearance } from "./lib/appearance";
+import { initVideoMode } from "./lib/videoMode";
 import { router } from "./router";
 
 initAppearance();
+initVideoMode();
 connect();
 createApp(App).use(router).mount("#app");

@@ -3,6 +3,7 @@
 // Los huecos (null) cortan la línea. Ejes con trazo croquis; las líneas de datos, nunca.
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { fmt, isNum } from "../lib/format";
+import { VIDEO_CHART_SCALE, videoMode } from "../lib/videoMode";
 
 export interface ChartPoint {
   x: number;
@@ -81,7 +82,7 @@ const yRange = computed(() => {
   return { lo, hi };
 });
 
-const H = computed(() => props.height);
+const H = computed(() => Math.round(props.height * (videoMode.value ? VIDEO_CHART_SCALE : 1)));
 const px = (x: number) => PAD.l + ((x - props.xMin) / (xMaxV.value - props.xMin || 1)) * (W.value - PAD.l - PAD.r);
 const py = (y: number) => {
   const { lo, hi } = yRange.value;
@@ -344,6 +345,10 @@ const hoverValues = computed(() => {
   vector-effect: non-scaling-stroke;
   stroke-linejoin: round;
   stroke-linecap: round;
+}
+/* Modo vídeo: trazo grueso para que se lea en pantallas compartidas y vídeos comprimidos */
+:global(.video-mode) .line {
+  stroke-width: 4;
 }
 .line--dash {
   stroke-dasharray: 5 4;

@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { currentHost, currentSnapshot, gpus, gpuSample, hostList, live, selectHost } from "../api/live";
 import { gpuHealth } from "../lib/thresholds";
+import { toggleVideoMode } from "../lib/videoMode";
 import StatusChip from "./StatusChip.vue";
 
 const host = currentHost;
@@ -55,6 +56,9 @@ function onSelect(e: Event) {
     </div>
     <h1 class="topbar__title">Arena <span>LLM</span></h1>
     <div class="topbar__right">
+      <button class="btn" type="button" title="Pantalla limpia y grande para grabar (tecla V)" @click="toggleVideoMode">
+        Modo vídeo
+      </button>
       <StatusChip
         v-if="warnings"
         label="avisos"

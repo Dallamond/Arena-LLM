@@ -2,26 +2,59 @@
 import DeviceStrip from "./components/DeviceStrip.vue";
 import SideNav from "./components/SideNav.vue";
 import TopBar from "./components/TopBar.vue";
+import { setVideoMode, videoMode } from "./lib/videoMode";
 </script>
 
 <template>
   <a class="skip sr-only" href="#main">Saltar al contenido</a>
-  <TopBar />
+  <!-- Modo vídeo: sin barra, menú ni franja de dispositivos; solo el contenido y una salida discreta -->
+  <TopBar v-if="!videoMode" />
   <div class="layout">
-    <SideNav />
+    <SideNav v-if="!videoMode" />
     <div class="content">
-      <DeviceStrip v-if="$route.path !== '/'" />
-      <main id="main" class="main" :class="{ 'main--wide': $route.path.startsWith('/batalla/') }" tabindex="-1">
+      <DeviceStrip v-if="$route.path !== '/' && !videoMode" />
+      <main
+        id="main"
+        class="main"
+        :class="{ 'main--wide': $route.path.startsWith('/batalla/') && !videoMode }"
+        tabindex="-1"
+      >
         <RouterView />
       </main>
     </div>
   </div>
+  <button v-if="videoMode" class="video-exit" type="button" title="Salir del modo vídeo (Esc o V)" @click="setVideoMode(false)">
+    ✕ Salir del modo vídeo
+  </button>
 </template>
 
 <style scoped>
 .layout {
   display: flex;
-  min-height: calc(100vh / var(--zoom) - var(--topbar-h));
+  min-height: calc(100vh / (var(--zoom) * var(--video-zoom, 1)) - var(--topbar-h));
+}
+/* Modo vídeo: sin barra superior, el contenido ocupa toda la altura (1200 px de diseño × 1,6 = 1920 px) */
+:global(.video-mode) .layout {
+  min-height: calc(100vh / (var(--zoom) * var(--video-zoom, 1)));
+}
+.video-exit {
+  position: fixed;
+  right: 10px;
+  bottom: 8px;
+  z-index: 100;
+  font-size: 11px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  color: var(--ink-faint);
+  cursor: pointer;
+  opacity: 0.55;
+}
+.video-exit:hover,
+.video-exit:focus-visible {
+  opacity: 1;
+  color: var(--ink);
 }
 .content {
   flex: 1;
