@@ -296,7 +296,7 @@ Sesión autónoma sin GPU (las dos seguían ocupadas). Todo en `main`, un commit
 - **Servidores**: los `llama-server` lanzados desde Arena que aún cargan salen en «En marcha» con su registro y botón de parar.
 - **Criterio de F9** (`tests/server/test_f9_criterio.py`): 6 runs de `nvidia2` y `cpu-only`, normalizadas `null` donde no hay GPU, versión de prueba distinta ⇒ «No comparables»; test del frontmatter del Markdown.
 - **QA visual** con Playwright en una instancia simulada (Historial, Comparar, PNG, Batalla, modo vídeo a 1920×1080): sin errores de consola. Arreglado: ancho del modo vídeo (el contenido se salía por la derecha) y cifras que se pisaban en el PNG con 6 runs.
-- Tests: 25 de Python y 51 de la web; ruff y vue-tsc limpios.
+- Tests: 318 de Python y 51 de la web; ruff y vue-tsc limpios.
 
 **Pendiente / avisos**
 - El modo vídeo oculta la barra superior, así que no hay indicador de avisos térmicos (en el Panel sí se ve el sello de throttling por GPU). El botón «Salir» tapa un poco ese sello. La etiqueta «ahora» del eje X se corta («ahor»), ya pasaba antes.
