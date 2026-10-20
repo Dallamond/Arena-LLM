@@ -10,6 +10,7 @@ import LineChart, { type ChartSeries } from "../components/LineChart.vue";
 import ResponsesMatrix from "../components/ResponsesMatrix.vue";
 import Stamp from "../components/Stamp.vue";
 import { toCsv, toMarkdown, visibleMetrics } from "../lib/compare";
+import { scoreboardPng } from "../lib/scoreboardImage";
 import { NO_DATA, RUN_STATUS, fmt, fmtDate, suiteLabel } from "../lib/format";
 
 const MAX = 12;
@@ -164,6 +165,27 @@ function download(name: string, text: string, type: string) {
   a.download = name;
   a.click();
   URL.revokeObjectURL(url);
+}
+const imageNote = ref<string | null>(null);
+async function scoreboardImage(action: "download" | "copy", hd = false) {
+  if (!data.value) return;
+  imageNote.value = null;
+  try {
+    const blob = await scoreboardPng(data.value, { normalized: normalized.value, ...(hd ? { width: 1920, height: 1080 } : {}) });
+    if (action === "copy") {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      imageNote.value = "✓ Imagen copiada";
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `marcador-${stamp()}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  } catch (e) {
+    imageNote.value = e instanceof Error ? e.message : String(e);
+  }
 }
 const stamp = () => new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
 async function copyMarkdown() {
@@ -436,10 +458,14 @@ async function copyMarkdown() {
           <button class="btn" type="button" @click="copyMarkdown">{{ copied ? "✓ Copiado" : "Copiar Markdown para el vault" }}</button>
           <button class="btn" type="button" @click="download(`comparacion-${stamp()}.md`, toMarkdown(data!, new Date(), normalized), 'text/markdown')">Descargar .md</button>
           <button class="btn" type="button" @click="download(`comparacion-${stamp()}.csv`, toCsv(data!, normalized), 'text/csv')">Descargar CSV</button>
+          <button class="btn" type="button" @click="scoreboardImage('download')">Imagen del marcador (PNG)</button>
+          <button class="btn" type="button" @click="scoreboardImage('download', true)">PNG 1920×1080</button>
+          <button class="btn" type="button" @click="scoreboardImage('copy')">Copiar imagen</button>
           <button class="btn" type="button" @click="download(`comparacion-${stamp()}.json`, JSON.stringify(data, null, 2), 'application/json')">
             Descargar JSON
           </button>
         </div>
+        <p v-if="imageNote" class="small mono" role="status">{{ imageNote }}</p>
         <p class="dim small">El Markdown lleva frontmatter YAML (tipo proyecto) y las respuestas completas: se pega tal cual en el vault.</p>
       </BlueprintCard>
     </template>

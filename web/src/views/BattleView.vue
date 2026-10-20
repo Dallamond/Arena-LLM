@@ -10,6 +10,7 @@ import ResponsesMatrix from "../components/ResponsesMatrix.vue";
 import Sparkline from "../components/Sparkline.vue";
 import Stamp from "../components/Stamp.vue";
 import { shortName } from "../lib/devices";
+import { scoreboardPng } from "../lib/scoreboardImage";
 import { NO_DATA, RUN_STATUS, fmt, fmtDate, isNum } from "../lib/format";
 
 const props = defineProps<{ id: string }>();
@@ -138,6 +139,17 @@ const sideOf = (runIndex: number) => {
   return columns.value.find((c) => c.run?.id === id);
 };
 
+async function downloadScoreboard() {
+  if (!cmp.value) return;
+  const blob = await scoreboardPng(cmp.value);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `marcador-batalla-${props.id}.png`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 async function stop() {
   busy.value = true;
   try {
@@ -262,6 +274,9 @@ const paramText = (p: Record<string, unknown>) =>
 
       <!-- Marcador -->
       <BlueprintCard v-if="cmp && !running" title="Marcador" class="gap">
+        <template #actions>
+          <button class="btn" type="button" @click="downloadScoreboard">Imagen (PNG)</button>
+        </template>
         <div v-if="cmp.verdicts.length" class="verdicts">
           <div v-for="v in cmp.verdicts" :key="v.key" class="verdict" :style="{ borderColor: sideOf(v.run_index)?.color }">
             <span class="label">{{ v.title }}</span>
