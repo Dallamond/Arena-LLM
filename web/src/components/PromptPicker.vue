@@ -169,6 +169,6 @@ textarea {
   color: var(--warn);
 }
 .error {
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 </style>

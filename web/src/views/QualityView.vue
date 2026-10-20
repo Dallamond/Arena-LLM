@@ -277,7 +277,7 @@ const stressTotal = computed(() => Number(stress.baseline_s) + Number(stress.dur
   color: var(--warn);
 }
 .error {
-  color: var(--crit);
+  color: var(--crit-ink);
   border: 1px dashed var(--crit);
   padding: 8px 10px;
   margin: 14px 0 0;

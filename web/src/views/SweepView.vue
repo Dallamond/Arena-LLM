@@ -197,7 +197,7 @@ const compareLink = computed(() => `/comparar?runs=${doneRuns.value.join(",")}`)
   color: var(--warn);
 }
 .error {
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 .progress {
   height: 8px;

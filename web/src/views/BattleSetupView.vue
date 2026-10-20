@@ -333,7 +333,7 @@ onMounted(async () => {
   color: var(--warn);
 }
 .error {
-  color: var(--crit);
+  color: var(--crit-ink);
   border: 1px dashed var(--crit);
   padding: 8px 10px;
   margin: 10px 0 0;

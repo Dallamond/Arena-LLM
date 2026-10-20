@@ -249,7 +249,7 @@ const concSeries = computed<ChartSeries[]>(() => {
   background: color-mix(in srgb, var(--ok) 14%, transparent);
 }
 .chip--bad {
-  color: var(--crit);
+  color: var(--crit-ink);
   background: color-mix(in srgb, var(--crit) 14%, transparent);
 }
 .scroll {
@@ -292,7 +292,7 @@ const concSeries = computed<ChartSeries[]>(() => {
   background: color-mix(in srgb, var(--ok) 14%, transparent);
 }
 .gcell--bad {
-  color: var(--crit);
+  color: var(--crit-ink);
   background: color-mix(in srgb, var(--crit) 14%, transparent);
 }
 .gcell--err {

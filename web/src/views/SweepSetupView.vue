@@ -290,7 +290,7 @@ onMounted(async () => {
   color: var(--warn);
 }
 .error {
-  color: var(--crit);
+  color: var(--crit-ink);
   margin: 10px 0 0;
 }
 .gap {

@@ -54,7 +54,7 @@ const icon = computed(() => ({ ok: "●", warn: "▲", crit: "✕", pending: "�
 }
 .chip--crit .chip__icon,
 .chip--crit .chip__text {
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 .chip--pending .chip__icon {
   color: var(--accent);

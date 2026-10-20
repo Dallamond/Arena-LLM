@@ -402,7 +402,7 @@ input[type="password"] {
   margin-top: 14px;
 }
 .err {
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 .ok {
   color: var(--ok);

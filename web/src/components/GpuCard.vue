@@ -148,6 +148,6 @@ const levelIcon = computed(() => (health.value.level === "crit" ? "✕" : health
   color: var(--warn);
 }
 .lvl-crit {
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 </style>

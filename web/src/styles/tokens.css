@@ -6,10 +6,10 @@
   --panel: #1c1c1e;
   --panel-raised: #2c2c2e;
   --line: #38383a;
-  --line-strong: #58585c;
+  --line-strong: #636368;
   --ink: #ffffff;
   --ink-dim: #a1a1a8;
-  --ink-faint: #8e8e93; /* AA sobre --panel para texto pequeño */
+  --ink-faint: #98989d; /* AA (≥4,5:1) sobre --panel y --panel-raised para texto pequeño */
   --accent: #f2f2f7;
 
   /* Paleta de dispositivos: el índice se asigna por device_id en el servidor */
@@ -24,6 +24,7 @@
 
   --warn: #ff9f0a;
   --crit: #ff453a;
+  --crit-ink: #ff7a70; /* rojo para TEXTO: AA (≥4,5:1) sobre fondos oscuros y tintados */
   --ok: #30d158;
 
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;

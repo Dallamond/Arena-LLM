@@ -150,6 +150,6 @@ const useSeries = computed<ChartSeries[]>(() => [
   color: var(--warn);
 }
 .lvl-crit {
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 </style>
