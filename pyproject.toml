@@ -18,3 +18,5 @@ select = ["E", "F", "W", "I", "B", "UP"]
 [tool.ruff.lint.per-file-ignores]
 # Bancos de preguntas y problemas: texto en español en una línea por entrada
 "server/quality/datasets.py" = ["E501"]
+# Script de auditoría puntual: rutas y selectores largos
+"scripts/a11y.py" = ["E501"]
