@@ -273,7 +273,7 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
 - [x] **Comando copiable de `llama-server`** para cada GGUF desde la calculadora de encaje (ruta del binario detectada, `-m`, `-ngl` sugerido, `-c`, `-ts`, `--port` libre, `-fa`). Es también el paso 2 del modo guiado de F8.
   *Hecho 04/10/2026: Servidores → GGUF en disco → Ver comando (cmd/PowerShell o bash, `-dev` o `-ts` con `CUDA_DEVICE_ORDER=PCI_BUS_ID`, puerto libre, binario de `llama_server`/junto a `llama_bench`/detectado). Probado arrancando el comando real en la 3060 con b11379.*
 - [ ] **Recomendaciones de modelos según el hardware**: qué tamaño y cuantización caben en cada equipo (por VRAM + RAM y ancho de banda medido en F6), con un catálogo editable de modelos conocidos (fichero de datos, no código).
-  *Hecho 18/10/2026 (primera versión): etiqueta «★ Mejor para tu hardware» / «★ Recomendado» en la lista de GGUF (Servidores → GGUF en disco) y orden «Recomendado». Entre los que caben enteros en GPU con margen del 10 %, gana el de más parámetros × calidad de cuantización (`web/src/lib/recommend.ts`). Falta: usar el ancho de banda medido en F6 para desempatar entre GPU lentas y rápidas, y el catálogo editable.*
+  *Hecho 18/10/2026 (primera versión): etiqueta «★ Mejor para tu hardware» / «★ Recomendado» en la lista de GGUF (Servidores → GGUF en disco) y orden «Recomendado». Entre los que caben enteros en GPU con margen del 10 %, gana el de más parámetros × calidad de cuantización (`web/src/lib/recommend.ts`). Falta el catálogo editable.* *20/10/2026 (v2): con destino Automático se elige la GPU de mayor ancho de banda medido en F6 (`GET /api/devices/bandwidth`, ESTIMADO) entre las que alojan el modelo; sin medidas, la de más memoria libre.*
 
 ### F7 — Pruebas de calidad
 - [x] `qa` (12 preguntas), `contexto` (aguja en pajar + VRAM vs contexto), `concurrencia`, `codigo` (10 problemas con ejecución aislada), todas con opciones editables y semillas fijas.
@@ -291,15 +291,16 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
 *04/10/2026: verificado por test con las dos GPU simuladas (`tests/server/test_battle.py`: mismos prompts y semilla en las peticiones que recibe cada servidor, cada lado vigila su GPU). Falta la prueba real con la M40.*
 
 ### F9 — Historial, comparación y exportación
-- [~] Historial filtrable con etiquetas/notas; bandeja "Comparar (N)". *04/10/2026: búsqueda y bandeja hechas; faltan etiquetas/notas editables y filtros por equipo/dispositivo.*
+- [x] Historial filtrable con etiquetas/notas; bandeja "Comparar (N)". *04/10/2026: búsqueda y bandeja. 20/10/2026: etiquetas, notas y nombre editables (`PATCH /api/runs/{id}`, editor en la vista del run, chips en el Historial) y filtros por equipo, dispositivo, prueba, estado y etiqueta (se recuerdan en el navegador).*
 - [x] Comparador: tarjetas de veredicto, tabla con mejor valor resaltado, gráficas superpuestas, matriz por ítem (respuestas por prompt), diff de configuración (04/10/2026).
-- [~] Exportar JSON, CSV, **Markdown para el vault** (con YAML válido) e imagen del marcador. *04/10/2026: JSON, CSV y Markdown hechos; falta la imagen.*
-- [~] **Comparación entre equipos y tarjetas:** insignia de comparabilidad (Comparables / Parcialmente / No comparables, con los motivos), métricas normalizadas opcionales (t/s por GiB de VRAM, por W, por Wh) y filtro por equipo/dispositivo. *04/10/2026: insignia con motivos hecha (no comparables = otra prueba o versión; parcialmente = prompts distintos, runs incompletos o más de un factor cambiado); faltan métricas normalizadas y filtro.*
-- [ ] **Paquete de resultados**: exportar e importar runs (con ficha de equipo, versión de prueba y modelo) para comparar entre instalaciones.
+- [x] Exportar JSON, CSV, **Markdown para el vault** (con YAML válido) e imagen del marcador. *04/10/2026: JSON, CSV y Markdown. 20/10/2026: PNG del marcador (1280×720 y 1920×1080, SVG propio) en Comparar y en la Batalla; el Markdown incluye etiquetas y notas.*
+- [x] **Comparación entre equipos y tarjetas:** insignia de comparabilidad (Comparables / Parcialmente / No comparables, con los motivos), métricas normalizadas opcionales (t/s por GiB de VRAM, por W, por Wh) y filtro por equipo/dispositivo. *04/10/2026: insignia con motivos hecha (no comparables = otra prueba o versión; parcialmente = prompts distintos, runs incompletos o más de un factor cambiado); 20/10/2026: métricas normalizadas opcionales (t/s por GiB de VRAM, t/s por W, Wh por 1000 tokens; ESTIMADO cuando usan potencia de placa, `null` si falta el dato) y filtro por equipo/dispositivo en el Historial.*
+- [x] **Paquete de resultados**: exportar e importar runs (con ficha de equipo, versión de prueba y modelo) para comparar entre instalaciones. *20/10/2026: formato `arena-pack` v1 (`server/pack.py`, `GET /api/runs/pack`, `POST /api/runs/import`, migración 8). Reduce rutas a nombre de fichero y descarta URLs, tokens y ids locales; no importa dos veces lo mismo (hash de contenido); los importados llevan la etiqueta «importado».*
 **Criterio:** comparar 5+ runs de al menos dos equipos o dispositivos distintos; el Markdown exportado se pega en el vault sin errores; un run de otra versión de prueba se marca como no comparable.
+*20/10/2026: cumplido en simulado (`tests/server/test_f9_criterio.py`: 6 runs de dos equipos, otra versión ⇒ «No comparables», frontmatter del Markdown válido). Falta repetirlo con las dos GPU reales.*
 
 ### F10 — Modo vídeo y pulido
-- [ ] Modo vídeo (menú oculto, fuentes grandes, 16:9, marcador exportable).
+- [x] Modo vídeo (menú oculto, fuentes grandes, 16:9, marcador exportable). *20/10/2026: botón en la barra superior, tecla V, `?video=1`; Esc para salir. Oculta menú y barras, zoom 1,6×, gráficas más altas, contraste alto y sin animaciones. Marcador exportable en PNG 1920×1080 desde Comparar.*
 - [ ] Accesibilidad mínima: `prefers-reduced-motion` (desactiva el efecto "sketch" y animaciones), foco visible, contraste AA, no depender solo del color.
 - [ ] Documentación de uso y de cómo añadir una GPU o un endpoint.
 

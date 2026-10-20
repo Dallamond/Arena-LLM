@@ -24,9 +24,10 @@ relacionado: ["Arena LLM"]
 | F5 — Telemetría, resumen y estrés | ✅ salvo la prueba real de 5 min (hecha de 60 s) |
 | F6 — Rendimiento por componente | ✅ Criterio cumplido con la 3060 real (curva `-ngl`). Reparto `-ts` solo probado en simulado (falta la M40) |
 | F8 — Batalla | ✅ núcleo (pedido por Lucas antes de F7): 2–6 lados, paralelo/secuencial, columnas en vivo, marcador. Falta la prueba real con la M40 y el modo guiado |
-| F9 — Comparar | Gran parte: insignia, veredictos, métricas, gráficas, diff, respuestas por prompt, export MD/CSV/JSON. Faltan etiquetas/notas, filtros, métricas normalizadas, imagen y paquete de resultados |
-| Ideas de Lucas | ✅ Biblioteca de prompts · ✅ comando copiable de llama-server · ✅ ver todas las respuestas · falta recomendaciones por hardware |
-| Siguiente | Lucas prueba Batalla/Comparar → recomendaciones por hardware → F7 (calidad) → resto de F9 → F10 |
+| F9 — Historial y comparación | ✅ Cerrada (20/10/2026): etiquetas/notas, filtros, métricas normalizadas, imagen PNG del marcador y paquete de resultados; criterio probado con 6 runs de dos equipos simulados |
+| F10 — Modo vídeo y pulido | Modo vídeo ✅ (20/10/2026); faltan accesibilidad y documentación de uso |
+| Ideas de Lucas | ✅ Biblioteca de prompts · ✅ comando copiable de llama-server · ✅ ver todas las respuestas · ✅ recomendaciones por hardware (v2 con ancho de banda; falta el catálogo editable) |
+| Siguiente | Con las GPU libres: contexto/concurrencia reales, térmica 5 min, `-ts`, Batalla M40 + 3060 → accesibilidad y documentación de F10 → F11 |
 
 ## Batalla, Comparar y respuestas (04/10/2026, tarde)
 
@@ -280,3 +281,26 @@ Pedido por Lucas: los puntos 1–4 de la lista de pendientes (F7, corrección en
 - **Decisión abierta**: el servidor lanzado usa 4 slots aunque se pida 1; decidir si el lanzamiento pasa `-np`.
 - **Ideas siguientes** (ver `docs/HOJA-DE-RUTA.md`): recomendaciones v2 (desempate por ancho de banda, catálogo editable), resto de F9, accesibilidad, F10.
 - Datos de la pasada real: `D:\dev-tools\arena-real-tmp` (fuera del repo).
+
+## F9 cerrada, modo vídeo y recomendaciones v2 (20/10/2026)
+
+Sesión autónoma sin GPU (las dos seguían ocupadas). Todo en `main`, un commit por hito.
+
+- **Etiquetas, notas y nombre** de cada run: `PATCH /api/runs/{id}` (hasta 12 etiquetas de 32 car., notas de 4000), editor `RunMeta.vue` en la vista del run, chips en el Historial y búsqueda por ellas. Comparar las lleva y el Markdown las lista.
+- **Filtros del Historial** (`web/src/lib/history.ts`): equipo, dispositivo, prueba, estado y etiqueta; se recuerdan en el navegador. El servidor añade `host_name`, `device_names`, `model_name` y `origin` a `GET /api/runs`.
+- **Métricas normalizadas** (`server/compare.py`): t/s por GiB de VRAM pico, t/s por W y Wh por 1000 tokens. Las que usan potencia de placa llevan `estimated`; sin dato son `null`. Interruptor «normalizar» en Comparar, también en MD y CSV.
+- **Imagen del marcador** (`web/src/lib/scoreboardImage.ts`): SVG propio → PNG, 1280×720 o 1920×1080, en Comparar (descargar y copiar) y en la Batalla.
+- **Paquete de resultados** (`server/pack.py`, migración 8: `runs.origin`, `runs.pack_hash`): `GET /api/runs/pack?runs=…` y `POST /api/runs/import`, formato `arena-pack` v1. Rutas reducidas a nombre de fichero; URLs, tokens e ids locales no viajan. Sin duplicados por hash de contenido (también frente a lo exportado desde la propia instalación). Los importados llevan la etiqueta «importado» y no tienen servidor local.
+- **Modo vídeo** (`web/src/lib/videoMode.ts`): botón en la barra superior, tecla V, `?video=1`, Esc para salir. Oculta menús, zoom 1,6×, gráficas más altas, contraste alto, sin animaciones.
+- **Recomendaciones v2**: `GET /api/devices/bandwidth` (último ancho de banda medido por GPU en bench, ESTIMADO); con destino Automático gana la GPU más rápida donde cabe el modelo.
+- **Servidores**: los `llama-server` lanzados desde Arena que aún cargan salen en «En marcha» con su registro y botón de parar.
+- **Criterio de F9** (`tests/server/test_f9_criterio.py`): 6 runs de `nvidia2` y `cpu-only`, normalizadas `null` donde no hay GPU, versión de prueba distinta ⇒ «No comparables»; test del frontmatter del Markdown.
+- **QA visual** con Playwright en una instancia simulada (Historial, Comparar, PNG, Batalla, modo vídeo a 1920×1080): sin errores de consola. Arreglado: ancho del modo vídeo (el contenido se salía por la derecha) y cifras que se pisaban en el PNG con 6 runs.
+- Tests: 25 de Python y 51 de la web; ruff y vue-tsc limpios.
+
+**Pendiente / avisos**
+- El modo vídeo oculta la barra superior, así que no hay indicador de avisos térmicos (en el Panel sí se ve el sello de throttling por GPU). El botón «Salir» tapa un poco ese sello. La etiqueta «ahora» del eje X se corta («ahor»), ya pasaba antes.
+- El PNG deja la mitad inferior vacía con pocas métricas.
+- El modo vídeo no se ha probado en Chrome antiguo (el ancho depende del `zoom` estándar).
+- El catálogo editable de modelos para recomendaciones sigue pendiente.
+- Sigue sin hacerse lo que necesita GPU libres y la decisión de `-np` (4 slots aunque se pida 1).

@@ -631,7 +631,7 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
 
     @app.get("/api/devices/bandwidth")
     def devices_bandwidth(request: Request) -> dict[str, dict[str, Any]]:
-        """Ancho de banda efectivo (ESTIMADO) medido por GPU en el último bench; sirve para desempatar recomendaciones."""
+        """Ancho de banda efectivo (ESTIMADO) por GPU en el último bench: desempata recomendaciones."""
         return device_bandwidth(request.app.state.db.list_runs(500))
 
     @app.get("/api/devices")
