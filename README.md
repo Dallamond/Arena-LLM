@@ -287,7 +287,7 @@ Los perfiles simulados son `nvidia2` (dos GPU NVIDIA con servidores simulados), 
 | F7 | Pruebas de calidad (razonamiento, código aislado, contexto largo, concurrencia) y Asistente de barridos | ✅ (contexto y concurrencia sin probar con GPU reales) |
 | F8 | Batalla: el mismo prompt en dos o más lados | ✅ (falta la prueba real con dos GPU) |
 | F9 | Historial, comparación (insignia de comparabilidad) y exportación | ✅ |
-| F10 | Modo vídeo, accesibilidad y documentación de uso | ✅ modo vídeo · accesibilidad y documentación en curso |
+| F10 | Modo vídeo, accesibilidad y documentación de uso | ✅ (accesibilidad sin probar con lector de pantalla) |
 | F11–F12 | Despliegue en Linux y backlog | Pendiente |
 
 ## Datos

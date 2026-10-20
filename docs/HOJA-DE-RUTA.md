@@ -301,8 +301,8 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
 
 ### F10 — Modo vídeo y pulido
 - [x] Modo vídeo (menú oculto, fuentes grandes, 16:9, marcador exportable). *20/10/2026: botón en la barra superior, tecla V, `?video=1`; Esc para salir. Oculta menú y barras, zoom 1,6×, gráficas más altas, contraste alto y sin animaciones. Marcador exportable en PNG 1920×1080 desde Comparar.*
-- [ ] Accesibilidad mínima: `prefers-reduced-motion` (desactiva el efecto "sketch" y animaciones), foco visible, contraste AA, no depender solo del color.
-- [ ] Documentación de uso y de cómo añadir una GPU o un endpoint.
+- [x] Accesibilidad mínima: `prefers-reduced-motion` (desactiva el efecto "sketch" y animaciones), foco visible, contraste AA, no depender solo del color. *20/10/2026: axe-core con 0 infracciones en 13 rutas (tema normal, movimiento reducido y contraste alto) y en los estados dinámicos; tokens de contraste corregidos con test AA (`web/tests/contrast.test.ts`); flechas entre pestañas con foco, trazos distintos por serie en las gráficas, skip-link y aria. Se repite con `scripts/a11y.py`. Sin probar con lector de pantalla real, zoom 200 % ni 320 px.*
+- [x] Documentación de uso y de cómo añadir una GPU o un endpoint. *20/10/2026: `docs/USO.md` y `docs/EXTENDER.md` (servidor, equipo, GPU de otro fabricante, prueba); README al día.*
 
 ### F11 — Despliegue y Linux
 - [ ] Servidor en Proxmox (LXC/Docker) hablando con el agente del PC; agente como servicio (Windows y Linux); token obligatorio fuera de `localhost`.

@@ -25,9 +25,9 @@ relacionado: ["Arena LLM"]
 | F6 — Rendimiento por componente | ✅ Criterio cumplido con la 3060 real (curva `-ngl`). Reparto `-ts` solo probado en simulado (falta la M40) |
 | F8 — Batalla | ✅ núcleo (pedido por Lucas antes de F7): 2–6 lados, paralelo/secuencial, columnas en vivo, marcador. Falta la prueba real con la M40 y el modo guiado |
 | F9 — Historial y comparación | ✅ Cerrada (20/10/2026): etiquetas/notas, filtros, métricas normalizadas, imagen PNG del marcador y paquete de resultados; criterio probado con 6 runs de dos equipos simulados |
-| F10 — Modo vídeo y pulido | Modo vídeo ✅ (20/10/2026); faltan accesibilidad y documentación de uso |
+| F10 — Modo vídeo y pulido | ✅ (20/10/2026): modo vídeo, accesibilidad (axe 0 infracciones) y documentación (`docs/USO.md`, `docs/EXTENDER.md`) |
 | Ideas de Lucas | ✅ Biblioteca de prompts · ✅ comando copiable de llama-server · ✅ ver todas las respuestas · ✅ recomendaciones por hardware (v2 con ancho de banda; falta el catálogo editable) |
-| Siguiente | Con las GPU libres: contexto/concurrencia reales, térmica 5 min, `-ts`, Batalla M40 + 3060 → accesibilidad y documentación de F10 → F11 |
+| Siguiente | Con las GPU libres: contexto/concurrencia reales, térmica 5 min, `-ts`, Batalla M40 + 3060 → F11 (despliegue y Linux) |
 
 ## Batalla, Comparar y respuestas (04/10/2026, tarde)
 
@@ -304,3 +304,12 @@ Sesión autónoma sin GPU (las dos seguían ocupadas). Todo en `main`, un commit
 - El modo vídeo no se ha probado en Chrome antiguo (el ancho depende del `zoom` estándar).
 - El catálogo editable de modelos para recomendaciones sigue pendiente.
 - Sigue sin hacerse lo que necesita GPU libres y la decisión de `-np` (4 slots aunque se pida 1).
+
+## F10: accesibilidad y documentación (20/10/2026)
+
+- **Accesibilidad** (auditoría con axe-core + recorrido por teclado, `scripts/a11y.py`; requiere Playwright y axe-core instalados fuera del repo, en `D:\dev-tools`): 0 infracciones en 13 rutas con tema normal, movimiento reducido y contraste alto, y en pestañas, bandeja, etiquetas, GGUF y modo vídeo.
+  - Contraste: `--ink-faint` `#98989d`, `--line-strong` `#636368`, nuevo `--crit-ink` `#ff7a70` para texto rojo; test AA de los tokens (`web/tests/contrast.test.ts`).
+  - Teclado/aria: flechas entre pestañas mueven el foco (Comparar y Servidores), respuestas con scroll alcanzables, nombres en barras de progreso y botones, `h1` oculto en modo vídeo.
+  - No depender solo del color: trazo distinto (sólido, rayas, puntos) por serie en las gráficas y en la leyenda.
+- **Documentación**: `docs/USO.md` (flujos, pantallas, atajos) y `docs/EXTENDER.md` (añadir servidor, equipo, GPU de otro fabricante —proveedor de telemetría, prefijo de backend, umbrales— y prueba); README actualizado.
+- **Sin probar**: lector de pantalla real (NVDA), zoom 200 % / 320 px, contraste del texto dentro del PNG del marcador, líneas de ejes de las gráficas; pocos `aria-live` para estados de carga.

@@ -234,7 +234,7 @@ function resetThreshold(id: string) {
             <div><dt>servidores conocidos</dt><dd>{{ Object.values(live.endpoints).flat().length }}</dd></div>
             <div><dt>base de datos</dt><dd>carpeta <code>data/</code> del proyecto, o la de <code>ARENA_DATA_DIR</code> (fuera de git y Syncthing)</dd></div>
           </dl>
-          <div class="todo"><Stamp text="exportar / importar: F9" tone="dim" /></div>
+          <p class="hint">Para llevar resultados a otra instalación, usa «Exportar paquete» e «Importar paquete…» en el Historial.</p>
         </BlueprintCard>
       </div>
     </div>
