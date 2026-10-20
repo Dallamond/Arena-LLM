@@ -103,7 +103,7 @@ function allCollapsed(v: boolean) {
                 <summary class="small">Razonamiento ({{ words(c.reasoning) }} palabras)</summary>
                 <pre>{{ c.reasoning }}</pre>
               </details>
-              <pre class="response" :class="{ 'response--compact': compact }">{{ c.response || NO_DATA }}</pre>
+              <pre class="response" :class="{ 'response--compact': compact }" :tabindex="compact ? 0 : undefined" :role="compact ? 'group' : undefined" :aria-label="compact ? 'Respuesta (se desplaza con las flechas)' : undefined">{{ c.response || NO_DATA }}</pre>
             </template>
             <p v-else class="dim small">Este run no tiene este prompt.</p>
           </article>
@@ -121,7 +121,7 @@ function allCollapsed(v: boolean) {
   color: var(--ok);
 }
 .mark--bad {
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 .grade {
   margin: 4px 0;
@@ -134,7 +134,7 @@ function allCollapsed(v: boolean) {
 }
 .grade--bad {
   background: color-mix(in srgb, var(--crit) 14%, transparent);
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 .grade code {
   font-family: var(--font-mono);
@@ -275,7 +275,7 @@ function allCollapsed(v: boolean) {
   color: var(--warn);
 }
 .error {
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 .btn.tiny {
   padding: 1px 8px;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Comparar runs: insignia de comparabilidad, veredictos, métricas, gráficas superpuestas,
 // diff de configuración, respuestas por prompt y exportación (Markdown para el vault, CSV, JSON).
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api, refreshRuns, runList } from "../api/live";
 import type { CompareResponse } from "../api/types";
@@ -105,13 +105,15 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "graficas", label: "Gráficas" },
 ];
 const tab = ref<Tab>("resumen");
-function onTabKey(e: KeyboardEvent) {
+async function onTabKey(e: KeyboardEvent) {
   const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
   if (!d) return;
   const i = TABS.findIndex((t) => t.id === tab.value);
   tab.value = TABS[(i + d + TABS.length) % TABS.length].id;
-  (e.currentTarget as HTMLElement).querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
   e.preventDefault();
+  const list = e.currentTarget as HTMLElement;
+  await nextTick(); // el foco va a la pestaña nueva cuando ya está marcada
+  list.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
 }
 
 // Resumen: solo lo crítico (velocidad, latencia, temperatura, potencia, energía)
@@ -494,7 +496,7 @@ async function copyMarkdown() {
   color: var(--warn);
 }
 .error {
-  color: var(--crit);
+  color: var(--crit-ink);
   border: 1px dashed var(--crit);
   padding: 8px 10px;
 }

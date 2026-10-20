@@ -599,7 +599,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
               <th>t/s servidor</th>
               <th>TTFT</th>
               <th>fin</th>
-              <th></th>
+              <th><span class="sr-only">detalle</span></th>
             </tr>
           </thead>
           <tbody>
@@ -688,7 +688,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
 }
 .error,
 .abort {
-  color: var(--crit);
+  color: var(--crit-ink);
   font-size: 13px;
   border: 1px dashed var(--crit);
   padding: 8px 10px;
@@ -805,7 +805,7 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
   border-bottom: 1px dotted var(--line);
 }
 .row--error td {
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 .detail pre {
   white-space: pre-wrap;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Servidores detectados: configuración completa, estado y cambios registrados.
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { api, hostList, live, now } from "../api/live";
 import type { ConfigChange, Endpoint, LaunchedResponse, LaunchedServer } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
@@ -19,6 +19,18 @@ const diskOpened = ref(false); // la lista de GGUF se monta al abrir la pestaña
 const diskCount = ref<Record<number, { n: number; bytes: number }>>({});
 const diskTotals = computed(() => Object.values(diskCount.value).reduce((a, c) => ({ n: a.n + c.n, bytes: a.bytes + c.bytes }), { n: 0, bytes: 0 }));
 const runningCount = computed(() => groups.value.reduce((a, g) => a + g.endpoints.filter((e) => e.status !== "detenido").length, 0));
+
+const TAB_IDS = ["running", "disk"] as const;
+/** Flechas entre pestañas (patrón ARIA): activa la vecina y le pasa el foco. */
+async function onTabKey(e: KeyboardEvent) {
+  const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+  if (!d) return;
+  const list = e.currentTarget as HTMLElement;
+  e.preventDefault();
+  openTab(TAB_IDS[(TAB_IDS.indexOf(tab.value) + d + TAB_IDS.length) % TAB_IDS.length]);
+  await nextTick();
+  list.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
+}
 
 function openTab(t: "running" | "disk") {
   tab.value = t;
@@ -232,24 +244,24 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
       </form>
     </BlueprintCard>
 
-    <div class="tabs" role="tablist">
-      <button role="tab" type="button" class="tab" :aria-selected="tab === 'running'" @click="openTab('running')">
+    <div class="tabs" role="tablist" aria-label="Servidores" @keydown="onTabKey">
+      <button id="tab-running" role="tab" type="button" class="tab" aria-controls="panel-running" :aria-selected="tab === 'running'" :tabindex="tab === 'running' ? 0 : -1" @click="openTab('running')">
         En marcha <span class="count">{{ runningCount }}</span>
       </button>
-      <button role="tab" type="button" class="tab" :aria-selected="tab === 'disk'" @click="openTab('disk')">
+      <button id="tab-disk" role="tab" type="button" class="tab" aria-controls="panel-disk" :aria-selected="tab === 'disk'" :tabindex="tab === 'disk' ? 0 : -1" @click="openTab('disk')">
         GGUF en disco <span class="count">{{ diskOpened ? diskTotals.n : "·" }}</span>
         <span v-if="diskOpened && diskTotals.bytes" class="dim small">{{ fmt(diskTotals.bytes / 1024 ** 3, 1) }} GiB</span>
       </button>
     </div>
 
-    <div v-if="diskOpened" v-show="tab === 'disk'">
+    <div v-if="diskOpened" v-show="tab === 'disk'" id="panel-disk" role="tabpanel" aria-labelledby="tab-disk">
       <template v-for="g in groups" :key="g.host.id">
         <h3 class="label host">Equipo · {{ g.host.name }}</h3>
         <GgufList :host-id="g.host.id" @count="(n, bytes) => (diskCount[g.host.id] = { n, bytes })" />
       </template>
     </div>
 
-    <div v-show="tab === 'running'">
+    <div v-show="tab === 'running'" id="panel-running" role="tabpanel" aria-labelledby="tab-running">
     <template v-for="g in groups" :key="g.host.id">
       <div class="hosthead">
         <h3 class="label host">Equipo · {{ g.host.name }}</h3>
@@ -469,13 +481,13 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
   flex-basis: 100%;
 }
 .err {
-  color: var(--crit);
+  color: var(--crit-ink);
   font-size: 12px;
   margin: 0 0 8px;
 }
 .btn--danger {
   border-color: var(--crit);
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 .gpu {
   margin-right: 8px;

@@ -19,6 +19,7 @@ import { setVideoMode, videoMode } from "./lib/videoMode";
         :class="{ 'main--wide': $route.path.startsWith('/batalla/') && !videoMode }"
         tabindex="-1"
       >
+        <h1 v-if="videoMode" class="sr-only">Arena LLM</h1>
         <RouterView />
       </main>
     </div>
@@ -47,9 +48,9 @@ import { setVideoMode, videoMode } from "./lib/videoMode";
   border: 1px solid var(--line);
   border-radius: 999px;
   background: color-mix(in srgb, var(--bg) 80%, transparent);
-  color: var(--ink-faint);
+  color: var(--ink-dim);
   cursor: pointer;
-  opacity: 0.55;
+  opacity: 0.9;
 }
 .video-exit:hover,
 .video-exit:focus-visible {

@@ -160,6 +160,11 @@ const hoverValues = computed(() => {
     return { label: s.label, color: s.color, y: best && Math.abs(best.x - x) < tol ? best.y : null };
   });
 });
+
+/** Con varias series, cada una lleva además un trazo distinto: no se distinguen solo por el color. */
+const DASHES = [undefined, "8 4", "2 4", "10 3 2 3", "4 3"];
+const dashFor = (i: number): string | undefined => (props.series.length > 1 ? DASHES[i % DASHES.length] : undefined);
+const dashAt = (id: string): string | undefined => dashFor(props.series.findIndex((x) => x.id === id));
 </script>
 
 <template>
@@ -167,8 +172,11 @@ const hoverValues = computed(() => {
     <figcaption class="chart__head">
       <span class="label">{{ title }}</span>
       <span class="legend">
-        <span v-for="s in series" :key="s.id" class="legend__item">
-          <span class="swatch" :class="{ 'swatch--dash': s.dash }" :style="{ background: s.color }" aria-hidden="true" />
+        <span v-for="(s, si) in series" :key="s.id" class="legend__item">
+          <svg v-if="dashFor(si) && !s.dash" class="swatch-line" width="22" height="6" aria-hidden="true">
+            <line x1="0" y1="3" x2="22" y2="3" :stroke="s.color" stroke-width="3" :stroke-dasharray="dashFor(si)" />
+          </svg>
+          <span v-else class="swatch" :class="{ 'swatch--dash': s.dash }" :style="{ background: s.color }" aria-hidden="true" />
           {{ s.label }} <b>{{ fmt(lastValue(s), digits, unit) }}</b>
         </span>
       </span>
@@ -219,7 +227,7 @@ const hoverValues = computed(() => {
         <template v-if="area">
           <path v-for="(d, i) in s.areas" :key="'a' + i" :d="d" :fill="`url(#fill-${uid}-${s.id})`" class="area" />
         </template>
-        <path v-for="(d, i) in s.segs" :key="i" :d="d" :stroke="s.color" class="line" :class="{ 'line--dash': s.dash }" />
+        <path v-for="(d, i) in s.segs" :key="i" :d="d" :stroke="s.color" class="line" :class="{ 'line--dash': s.dash }" :stroke-dasharray="s.dash ? undefined : dashAt(s.id)" />
         <template v-if="dots">
           <circle
             v-for="(p, i) in s.points.filter((q) => q.y !== null)"

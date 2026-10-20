@@ -365,7 +365,7 @@ function elapsed(l: LaunchedServer): string {
           <button
             class="btn sortdir"
             type="button"
-            :aria-label="sort.desc ? 'Orden descendente: cambiar a ascendente' : 'Orden ascendente: cambiar a descendente'"
+            :aria-label="sort.desc ? 'Mayor primero: cambiar a menor primero' : 'Menor primero: cambiar a mayor primero'"
             :title="sort.desc ? 'De mayor a menor' : 'De menor a mayor'"
             @click="sort.desc = !sort.desc"
           >
@@ -758,7 +758,7 @@ function elapsed(l: LaunchedServer): string {
 }
 .btn--stop {
   background: color-mix(in srgb, var(--crit) 20%, transparent);
-  color: var(--crit);
+  color: var(--crit-ink);
 }
 .error {
   margin: 0;

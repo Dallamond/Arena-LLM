@@ -247,7 +247,7 @@ const paramText = (p: Record<string, unknown>) =>
               <span class="clock mono" :aria-label="`Tiempo transcurrido: ${clock_(c.elapsed)}`"><span class="dim small">tiempo</span> {{ clock_(c.elapsed) }}</span>
               <span class="answered mono"><span class="dim small">prompts contestados</span> {{ fmt(c.done) }}<span class="dim"> / {{ c.total || NO_DATA }}</span></span>
             </div>
-            <div class="bar" role="progressbar" :aria-valuenow="c.done ?? 0" aria-valuemin="0" :aria-valuemax="c.total || 0">
+            <div class="bar" role="progressbar" aria-label="Prompts contestados" :aria-valuenow="c.done ?? 0" aria-valuemin="0" :aria-valuemax="c.total || 0">
               <div class="bar__fill" :style="{ width: c.total ? Math.min(100, ((c.done ?? 0) / c.total) * 100) + '%' : '0%', background: c.color }" />
             </div>
           </div>
@@ -343,7 +343,7 @@ const paramText = (p: Record<string, unknown>) =>
   font-size: 11px;
 }
 .error {
-  color: var(--crit);
+  color: var(--crit-ink);
   border: 1px dashed var(--crit);
   padding: 8px 10px;
 }
