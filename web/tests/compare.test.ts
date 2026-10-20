@@ -100,3 +100,22 @@ describe("comparar · métricas normalizadas", () => {
     expect(toCsv(withNorm(), true)).toContain("t/s por W");
   });
 });
+
+describe("comparar · Markdown para el vault", () => {
+  it("el frontmatter YAML es válido: abre y cierra con --- y cada línea es «clave: valor»", () => {
+    const md = toMarkdown(cmp(), new Date("2026-10-20T10:00:00Z"));
+    const lines = md.split("\n");
+    expect(lines[0]).toBe("---");
+    const end = lines.indexOf("---", 1);
+    expect(end).toBeGreaterThan(1);
+    const fm = lines.slice(1, end);
+    for (const l of fm) expect(l).toMatch(/^[a-z_]+: .+$/);
+    const keys = fm.map((l) => l.split(":")[0]);
+    for (const k of ["fecha_creacion", "fecha_modificacion", "tipo", "categoria", "tags", "estado", "fecha_limite", "relacionado"]) {
+      expect(keys).toContain(k);
+    }
+    expect(fm).toContain("fecha_creacion: 2026-10-20");
+    expect(fm).toContain('relacionado: ["Arena LLM"]');
+    expect(lines[end + 1].startsWith("# Comparación Arena LLM")).toBe(true);
+  });
+});
