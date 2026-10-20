@@ -182,3 +182,17 @@ def test_etiquetas_y_notas(lab):
     assert c.patch(f"/api/runs/{run_id}", json={"tags": [f"t{i}" for i in range(13)]}).status_code == 422
     assert c.patch(f"/api/runs/{run_id}", json={"notes": "n" * 4001}).status_code == 422
     assert c.patch("/api/runs/99999", json={"tags": ["a"]}).status_code == 404
+
+
+def test_historial_indica_equipo_y_dispositivos(lab):
+    c, _ = lab()
+    ep = endpoint_ready(c)
+    r = c.post(
+        "/api/runs",
+        json={"suite": "libre", "endpoint_id": ep["id"],
+              "params": {"prompts": ["Hola"], "max_tokens": 5, "baseline_s": 0}},  # fmt: skip
+    )
+    run_finished(c, r.json()["id"])
+    row = c.get("/api/runs").json()[0]
+    assert row["host_name"] and row["device_names"]
+    assert "host_snapshot" not in row and "servers_snapshot" not in row

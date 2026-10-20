@@ -67,6 +67,16 @@ def _device_names(run: dict[str, Any]) -> dict[str, str]:
     return {d["device_id"]: d.get("name") or d["device_id"] for d in devs if d.get("device_id")}
 
 
+def run_origin(run: dict[str, Any]) -> dict[str, Any]:
+    """Dónde se midió un run: nombre del equipo y de sus dispositivos (para filtrar el historial)."""
+    host = run.get("host_snapshot") or {}
+    names = _device_names(run)
+    return {
+        "host_name": host.get("name") or (host.get("host") or {}).get("hostname"),
+        "device_names": [names.get(g, g) for g in _gpu_ids(run)],
+    }
+
+
 def run_config(run: dict[str, Any]) -> dict[str, Any]:
     """Configuración comparable de un run (servidor + equipo + parámetros)."""
     snap = run.get("servers_snapshot") or {}

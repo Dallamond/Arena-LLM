@@ -424,6 +424,8 @@ export interface Run {
   tags?: string[] | null;
   battle_id?: number | null;
   side?: string | null;
+  host_name?: string | null;
+  device_names?: string[];
 }
 
 export interface RunItem {

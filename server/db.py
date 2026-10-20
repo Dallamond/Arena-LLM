@@ -472,16 +472,18 @@ class Database:
             row = self.conn.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
         return _json_cols(row, *self.RUN_JSON) if row else None
 
-    def list_runs(self, limit: int = 200) -> list[dict[str, Any]]:
+    def list_runs(self, limit: int = 200, snapshots: bool = False) -> list[dict[str, Any]]:
+        """Runs recientes sin items. `snapshots` añade las fotos de equipo y servidor (para derivar el origen)."""
         with self.lock:
             rows = self.conn.execute(
                 "SELECT id, kind, suite, suite_version, suite_hash, label, status, host_pk, endpoint_id, params,"
                 " created_at, started_at, finished_at, summary, error, abort_reason, tags, notes,"
-                " battle_id, side, sweep_id"
+                " battle_id, side, sweep_id" + (", host_snapshot, servers_snapshot" if snapshots else "") +
                 " FROM runs ORDER BY id DESC LIMIT ?",
                 (limit,),
             ).fetchall()
-        return [_json_cols(r, "params", "summary", "tags") for r in rows]
+        cols = ("params", "summary", "tags") + (("host_snapshot", "servers_snapshot") if snapshots else ())
+        return [_json_cols(r, *cols) for r in rows]
 
     def get_runs(self, run_ids: list[int]) -> list[dict[str, Any]]:
         """Varios runs completos, en el orden pedido (los que no existen se omiten)."""

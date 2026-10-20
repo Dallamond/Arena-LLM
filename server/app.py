@@ -419,7 +419,12 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
 
     @app.get("/api/runs")
     def list_runs(request: Request, limit: int = 200) -> list[dict[str, Any]]:
-        return request.app.state.db.list_runs(min(max(limit, 1), 2000))
+        runs = request.app.state.db.list_runs(min(max(limit, 1), 2000), snapshots=True)
+        for r in runs:
+            r.update(compare.run_origin(r))
+            r.pop("host_snapshot", None)
+            r.pop("servers_snapshot", None)
+        return runs
 
     @app.post("/api/runs", status_code=201)
     async def start_run(request: Request, body: RunIn) -> dict[str, Any]:

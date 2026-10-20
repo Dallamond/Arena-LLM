@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // Historial de runs: búsqueda, selección para Comparar y enlace a la batalla de cada lado.
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { live, refreshRuns, runList } from "../api/live";
 import type { Run } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import Stamp from "../components/Stamp.vue";
 import { RUN_STATUS, fmt, fmtDate, fmtDuration, isNum, suiteLabel } from "../lib/format";
+import { EMPTY_FILTERS, type HistoryFilters, filterRuns, loadFilters, saveFilters, uniqueValues } from "../lib/history";
 
 const MAX_COMPARE = 12;
 const router = useRouter();
@@ -49,12 +50,22 @@ function maxTemp(r: Run): number | null {
   return temps.length ? Math.max(...temps) : null;
 }
 
-const rows = computed(() => {
-  const q = text.value.trim().toLowerCase();
-  return runList.value.filter(
-    (r) => !q || `${r.id} ${r.suite} ${r.label ?? ""} ${(r.tags ?? []).join(" ")} ${r.notes ?? ""} ${endpointName(r)} ${r.status}`.toLowerCase().includes(q),
-  );
-});
+const filters = ref<HistoryFilters>(loadFilters());
+watch(filters, saveFilters, { deep: true });
+const searchText = (r: Run) =>
+  `${r.id} ${r.suite} ${r.label ?? ""} ${(r.tags ?? []).join(" ")} ${r.notes ?? ""} ${endpointName(r)} ${r.status}`;
+const rows = computed(() => filterRuns(runList.value, { ...filters.value, text: text.value }, searchText));
+const options = computed(() => ({
+  hosts: uniqueValues(runList.value, (r) => (r.host_name ? [r.host_name] : [])),
+  devices: uniqueValues(runList.value, (r) => r.device_names ?? []),
+  suites: uniqueValues(runList.value, (r) => [r.suite]),
+  tags: uniqueValues(runList.value, (r) => r.tags ?? []),
+}));
+const filtering = computed(() => text.value.trim() !== "" || Object.values(filters.value).some((v) => v !== ""));
+function clearFilters() {
+  text.value = "";
+  filters.value = { ...EMPTY_FILTERS };
+}
 </script>
 
 <template>
@@ -63,6 +74,25 @@ const rows = computed(() => {
       <h2 class="title">Historial</h2>
       <input v-model="text" class="search mono" type="search" placeholder="Buscar (prueba, nombre, etiqueta, nota, modelo, estado)…" aria-label="Buscar en el historial" />
       <span class="dim small">Marca runs para compararlos (también vale uno solo, para leer sus respuestas).</span>
+    </div>
+    <div class="filters" role="group" aria-label="Filtros del historial">
+      <label>equipo
+        <select v-model="filters.host" class="sel mono"><option value="">todos</option><option v-for="h in options.hosts" :key="h" :value="h">{{ h }}</option></select>
+      </label>
+      <label>dispositivo
+        <select v-model="filters.device" class="sel mono"><option value="">todos</option><option v-for="d in options.devices" :key="d" :value="d">{{ d }}</option></select>
+      </label>
+      <label>prueba
+        <select v-model="filters.suite" class="sel mono"><option value="">todas</option><option v-for="u in options.suites" :key="u" :value="u">{{ suiteLabel(u) }}</option></select>
+      </label>
+      <label>estado
+        <select v-model="filters.status" class="sel mono"><option value="">todos</option><option v-for="(st, key) in RUN_STATUS" :key="key" :value="key">{{ st.text }}</option></select>
+      </label>
+      <label>etiqueta
+        <select v-model="filters.tag" class="sel mono"><option value="">todas</option><option v-for="t in options.tags" :key="t" :value="t">{{ t }}</option></select>
+      </label>
+      <span class="dim small count" aria-live="polite">{{ rows.length }} de {{ runList.length }}</span>
+      <button v-if="filtering" class="btn" type="button" @click="clearFilters">Quitar filtros</button>
     </div>
     <BlueprintCard>
       <p v-if="!rows.length" class="dim">Sin runs todavía. Lanza uno desde <RouterLink to="/calidad">Calidad</RouterLink>.</p>
@@ -195,6 +225,35 @@ const rows = computed(() => {
 }
 .runs tr.sel {
   background: rgba(108, 180, 255, 0.08);
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+.filters label {
+  display: grid;
+  gap: 3px;
+}
+.sel {
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  max-width: 180px;
+}
+.count {
+  margin-left: auto;
 }
 .chip {
   display: inline-block;
