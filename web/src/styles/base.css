@@ -12,8 +12,6 @@ body {
 
 #app {
   zoom: calc(var(--zoom) * var(--video-zoom, 1));
-  /* Chromium reparte el ancho entre el zoom una vez más: se compensa para llenar la ventana */
-  width: calc(100% * var(--zoom) * var(--video-zoom, 1));
 }
 
 body {

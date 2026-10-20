@@ -100,13 +100,17 @@ export function buildScoreboardSvg(c: CompareResponse, opts: ScoreboardOptions =
     text(x + 16 * k, cursor - 3 * k, 14, FAINT, clip(runName(r), Math.floor((colW - 16 * k) / (8 * k))), 'font-weight="600"');
   });
   out.push(`<line x1="${pad}" x2="${W - pad}" y1="${cursor + 6 * k}" y2="${cursor + 6 * k}" stroke="${LINE}"/>`);
+  // La cifra más larga manda: se encoge el tamaño (fuente mono ≈ 0,62 em por carácter) hasta que quepa en la columna
+  const cell = (m: (typeof rows)[number], i: number) => `${fmt(m.values[i], m.digits, m.unit)}${m.best.includes(i) ? " ▲" : ""}`;
+  const longest = Math.max(1, ...rows.flatMap((m) => m.values.map((_, i) => cell(m, i).length)));
+  const valueSize = Math.min(16, (colW - 24 * k) / (longest * 0.62 * k));
   rows.forEach((m, ri) => {
     const yy = cursor + 6 * k + (ri + 1) * rowH - 9 * k;
     const label = `${m.label}${m.estimated ? " (est.)" : ""}`;
     text(pad, yy, 14, FAINT, clip(label, Math.floor(labelW / (7.4 * k))));
-    m.values.forEach((v, i) => {
+    m.values.forEach((_, i) => {
       const best = m.best.includes(i);
-      text(pad + labelW + i * colW + 16 * k, yy, 16, best ? INK : "#c7c7cc", `${fmt(v, m.digits, m.unit)}${best ? " ▲" : ""}`, `font-family="${MONO}"${best ? ' font-weight="700"' : ""}`);
+      text(pad + labelW + i * colW + 16 * k, yy, valueSize, best ? INK : "#c7c7cc", cell(m, i), `font-family="${MONO}"${best ? ' font-weight="700"' : ""}`);
     });
   });
   if (metrics.length > rows.length) text(pad, H - pad + 6 * k, 12, FAINT, `+${metrics.length - rows.length} métricas más en Comparar`);
