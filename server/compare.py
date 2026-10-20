@@ -71,7 +71,9 @@ def run_origin(run: dict[str, Any]) -> dict[str, Any]:
     """Dónde se midió un run: nombre del equipo y de sus dispositivos (para filtrar el historial)."""
     host = run.get("host_snapshot") or {}
     names = _device_names(run)
+    snap = run.get("servers_snapshot") or {}
     return {
+        "model_name": snap.get("model_file") or _file((run.get("params") or {}).get("model")),
         "host_name": host.get("name") or (host.get("host") or {}).get("hostname"),
         "device_names": [names.get(g, g) for g in _gpu_ids(run)],
     }

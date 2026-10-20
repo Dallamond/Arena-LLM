@@ -426,6 +426,9 @@ export interface Run {
   side?: string | null;
   host_name?: string | null;
   device_names?: string[];
+  model_name?: string | null;
+  /** "importado" si vino de un paquete de resultados. */
+  origin?: string | null;
 }
 
 export interface RunItem {

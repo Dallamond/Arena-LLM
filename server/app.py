@@ -1,6 +1,7 @@
 """API del servidor Arena (FastAPI) y servido de la web compilada."""
 
 import asyncio
+import json
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -9,11 +10,11 @@ from urllib.parse import urlsplit
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 
-from server import __version__, compare, library
+from server import __version__, compare, library, pack
 from server.agents import AgentError, AgentMonitor
 from server.db import Database
 from server.detect import EndpointDetector, normalize_base_url
@@ -544,6 +545,39 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
             {r["id"]: db.list_samples(r["id"]) for r in found},
             {r["id"]: db.list_bench_rows(r["id"]) for r in found},
         )
+
+    @app.get("/api/runs/pack")
+    def export_runs_pack(request: Request, runs: str) -> Response:
+        try:
+            ids = list(dict.fromkeys(int(x) for x in runs.split(",") if x.strip()))
+        except ValueError as exc:
+            raise HTTPException(422, "'runs' debe ser una lista de ids separados por comas") from exc
+        if not 1 <= len(ids) <= pack.MAX_RUNS:
+            raise HTTPException(422, f"Se exportan de 1 a {pack.MAX_RUNS} runs")
+        try:
+            data = pack.export_pack(request.app.state.db, ids)
+        except pack.PackError as exc:
+            raise HTTPException(exc.status, exc.message) from exc
+        name = f"arena-pack-{time.strftime('%Y%m%d-%H%M')}.json"
+        return Response(
+            json.dumps(data, ensure_ascii=False),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        )
+
+    @app.post("/api/runs/import", status_code=201)
+    async def import_runs_pack(request: Request) -> dict[str, Any]:
+        raw = await request.body()
+        if len(raw) > pack.MAX_BYTES:
+            raise HTTPException(413, f"El paquete pasa de {pack.MAX_BYTES // (1024 * 1024)} MB")
+        try:
+            data = json.loads(raw)
+        except ValueError as exc:
+            raise HTTPException(422, "El fichero no es un JSON válido") from exc
+        try:
+            return pack.import_pack(request.app.state.db, data)
+        except pack.PackError as exc:
+            raise HTTPException(exc.status, exc.message) from exc
 
     @app.get("/api/runs/{run_id}")
     def get_run(request: Request, run_id: int) -> dict[str, Any]:

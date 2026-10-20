@@ -2,7 +2,7 @@
 // Historial de runs: búsqueda, selección para Comparar y enlace a la batalla de cada lado.
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { live, refreshRuns, runList } from "../api/live";
+import { api, live, refreshRuns, runList } from "../api/live";
 import type { Run } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import Stamp from "../components/Stamp.vue";
@@ -26,6 +26,7 @@ function endpointName(r: Run): string {
   // Un bench no tiene servidor: se muestra el GGUF que midió llama-bench
   const model = r.params?.model;
   if (r.kind === "bench" && typeof model === "string") return model.split(/[\\/]/).pop() ?? model;
+  if (r.model_name) return r.model_name; // runs importados: sin servidor local
   return r.endpoint_id ? `servidor #${r.endpoint_id}` : "—";
 }
 
@@ -48,6 +49,25 @@ function maxTemp(r: Run): number | null {
     .map((d) => d.temp_max_c)
     .filter((t): t is number => typeof t === "number");
   return temps.length ? Math.max(...temps) : null;
+}
+
+// Paquete de resultados: exportar los runs elegidos / importar uno de otra instalación
+const packInput = ref<HTMLInputElement | null>(null);
+const packNote = ref<string | null>(null);
+const packUrl = computed(() => `/api/runs/pack?runs=${[...selected.value].sort((a, b) => a - b).join(",")}`);
+async function importPack(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  try {
+    const out = await api<{ imported: number[]; duplicates: number[] }>("/api/runs/import", { method: "POST", body: await file.text() });
+    const dup = out.duplicates.length ? ` · ${out.duplicates.length} ya estaban (${out.duplicates.map((i) => `#${i}`).join(", ")})` : "";
+    packNote.value = `✓ Importados ${out.imported.length}${out.imported.length ? ` (${out.imported.map((i) => `#${i}`).join(", ")})` : ""}${dup}`;
+    await refreshRuns();
+  } catch (err) {
+    packNote.value = `▲ ${err instanceof Error ? err.message : String(err)}`;
+  }
 }
 
 const filters = ref<HistoryFilters>(loadFilters());
@@ -74,7 +94,10 @@ function clearFilters() {
       <h2 class="title">Historial</h2>
       <input v-model="text" class="search mono" type="search" placeholder="Buscar (prueba, nombre, etiqueta, nota, modelo, estado)…" aria-label="Buscar en el historial" />
       <span class="dim small">Marca runs para compararlos (también vale uno solo, para leer sus respuestas).</span>
+      <button class="btn" type="button" @click="packInput?.click()">Importar paquete…</button>
+      <input ref="packInput" type="file" accept=".json,application/json" class="sr-only" tabindex="-1" aria-label="Elegir un paquete de resultados" @change="importPack" />
     </div>
+    <p v-if="packNote" class="small mono" role="status">{{ packNote }}</p>
     <div class="filters" role="group" aria-label="Filtros del historial">
       <label>equipo
         <select v-model="filters.host" class="sel mono"><option value="">todos</option><option v-for="h in options.hosts" :key="h" :value="h">{{ h }}</option></select>
@@ -152,6 +175,7 @@ function clearFilters() {
     <div v-if="selected.length" class="tray" role="region" aria-label="Runs elegidos para comparar">
       <span class="mono">{{ selected.map((id) => `#${id}`).join(" · ") }}</span>
       <button class="btn" type="button" @click="selected = []">Vaciar</button>
+      <a class="btn" :href="packUrl" download title="JSON con los runs elegidos, para compararlos en otra instalación">Exportar paquete</a>
       <button class="btn btn--primary" type="button" @click="compare">{{ selected.length === 1 ? "Ver respuestas" : `Comparar (${selected.length})` }}</button>
     </div>
   </div>

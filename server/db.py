@@ -189,6 +189,12 @@ MIGRATIONS: list[str] = [
     ALTER TABLE runs ADD COLUMN sweep_id INTEGER;
     CREATE INDEX runs_sweep ON runs(sweep_id);
     """,
+    # 8 — paquetes de resultados: origen del run y hash de contenido (para no importar dos veces lo mismo)
+    """
+    ALTER TABLE runs ADD COLUMN origin TEXT;
+    ALTER TABLE runs ADD COLUMN pack_hash TEXT;
+    CREATE INDEX runs_pack_hash ON runs(pack_hash);
+    """,
 ]
 
 #: Tamaño de la paleta de dispositivos de la GUI (--dev-1 … --dev-N).
@@ -478,12 +484,21 @@ class Database:
             rows = self.conn.execute(
                 "SELECT id, kind, suite, suite_version, suite_hash, label, status, host_pk, endpoint_id, params,"
                 " created_at, started_at, finished_at, summary, error, abort_reason, tags, notes,"
-                " battle_id, side, sweep_id" + (", host_snapshot, servers_snapshot" if snapshots else "") +
+                " battle_id, side, sweep_id, origin" + (", host_snapshot, servers_snapshot" if snapshots else "") +
                 " FROM runs ORDER BY id DESC LIMIT ?",
                 (limit,),
             ).fetchall()
         cols = ("params", "summary", "tags") + (("host_snapshot", "servers_snapshot") if snapshots else ())
         return [_json_cols(r, *cols) for r in rows]
+
+    def find_run_by_pack_hash(self, digest: str) -> int | None:
+        with self.lock:
+            row = self.conn.execute("SELECT id FROM runs WHERE pack_hash=? LIMIT 1", (digest,)).fetchone()
+        return row["id"] if row else None
+
+    def set_pack_hash(self, run_id: int, digest: str) -> None:
+        with self.lock:
+            self.conn.execute("UPDATE runs SET pack_hash=? WHERE id=? AND pack_hash IS NULL", (digest, run_id))
 
     def get_runs(self, run_ids: list[int]) -> list[dict[str, Any]]:
         """Varios runs completos, en el orden pedido (los que no existen se omiten)."""
