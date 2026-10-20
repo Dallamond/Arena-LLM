@@ -12,12 +12,13 @@ Resuelve un problema concreto: comparar dos modelos, dos cuantizaciones o dos ta
 
 - [Funciones](#funciones): Panel, Servidores, Calidad, Rendimiento, Batalla, Historial, Comparar, Ajustes y exportación.
 - [Novedades recientes de la interfaz](#novedades-recientes-de-la-interfaz)
+- Guías: [uso](docs/USO.md) y [cómo ampliar Arena](docs/EXTENDER.md)
 - [Instalación y arranque](#instalación-y-arranque)
 - [Principios](#principios), [componentes](#componentes), [estado por fases](#estado-por-fases) y [documentación](#documentación)
 
 ## Funciones
 
-El menú lateral tiene ocho secciones: Panel, Servidores, Calidad, Rendimiento, Batalla, Historial, Comparar y Ajustes. La franja del equipo (una tarjeta por GPU, CPU y RAM) está arriba en todas las pantallas y se puede plegar con **Plegar**.
+El menú lateral tiene nueve secciones: Panel, Servidores, Asistente, Calidad, Rendimiento, Batalla, Historial, Comparar y Ajustes. Guía por flujos en [`docs/USO.md`](docs/USO.md). La franja del equipo (una tarjeta por GPU, CPU y RAM) está arriba en todas las pantallas y se puede plegar con **Plegar**.
 
 ### Panel y telemetría en vivo
 
@@ -72,7 +73,7 @@ Al terminar queda el resultado completo: resumen (mediana de t/s, TTFT, degradac
 
 ![Biblioteca de prompts en Prompt libre, con categorías y prompts seleccionados](docs/img/prompt-biblioteca.png)
 
-La sección también anuncia las pruebas que llegan en F7 (razonamiento, código con ejecución aislada, contexto largo, concurrencia); aún no existen.
+Además hay cuatro pruebas **con corrección automática** (F7): **QA** (12 preguntas con respuesta conocida), **Código** (10 problemas de Python ejecutados en un sandbox aislado, con pass@1), **Contexto** (aguja en un pajar por tamaño y profundidad) y **Concurrencia** (escalado de t/s con varias peticiones a la vez). El **Asistente** las encadena para muchos modelos × GPU: arranca cada modelo, lo mide, lo para y pasa al siguiente.
 
 ### Rendimiento (`llama-bench`)
 
@@ -142,7 +143,7 @@ Cuatro pestañas:
 
 ### Historial
 
-Todos los runs guardados, con su servidor, modelo, suite (versión y hash) y métricas principales (t/s, tokens, temperatura máxima, energía, duración). Hay buscador por suite, etiqueta, modelo o estado. Se marcan con casillas para compararlos («Ver respuestas» con uno solo), y los lados de una batalla enlazan a ella.
+Todos los runs guardados, con su servidor, modelo, suite (versión y hash) y métricas principales (t/s, tokens, temperatura máxima, energía, duración). Hay buscador (prueba, nombre, etiqueta, nota, modelo, estado) y filtros por equipo, dispositivo, prueba, estado y etiqueta. Cada run admite **nombre, etiquetas y notas** editables. Se marcan con casillas para compararlos («Ver respuestas» con uno solo) o para **exportar un paquete de resultados**; **Importar paquete…** trae los de otra instalación (con la etiqueta `importado`). Los lados de una batalla enlazan a ella.
 
 ![Historial de runs con dos runs marcados para comparar](docs/img/historial.png)
 
@@ -150,10 +151,10 @@ Todos los runs guardados, con su servidor, modelo, suite (versión y hash) y mé
 
 Cuatro apartados:
 
-- **Apariencia**: color de acento, contraste, tamaño de la interfaz, rejilla de fondo y efecto croquis (se apaga con «reducir movimiento» del sistema).
+- **Apariencia**: color de acento, contraste y tamaño de la interfaz.
 - **Equipos (agentes)**: añadir o quitar equipos con su URL y token (obligatorio fuera de localhost).
 - **Umbrales térmicos** por dispositivo, de aviso y de aborto, o «Automático».
-- **Datos**: runs guardados, servidores conocidos y dónde está la base de datos. Importar/exportar todo está previsto para F9.
+- **Datos**: runs guardados, servidores conocidos y dónde está la base de datos. Para llevar resultados a otra instalación, usa el paquete de resultados del Historial.
 
 ![Ajustes de apariencia](docs/img/ajustes-apariencia.png)
 
@@ -161,11 +162,16 @@ Cuatro apartados:
 
 ### Exportación
 
-En Comparar, el apartado **Exportar** (debajo de las pestañas): **Copiar Markdown para el vault** (frontmatter YAML de tipo proyecto, tablas y respuestas completas), **Descargar .md**, **CSV** (con `;`) y **JSON**.
+En Comparar, el apartado **Exportar** (debajo de las pestañas): **Copiar Markdown para el vault** (frontmatter YAML de tipo proyecto, etiquetas, notas, tablas y respuestas completas), **Descargar .md**, **CSV** (con `;`), **JSON** y la **imagen PNG del marcador** (1280×720 o 1920×1080; también en la Batalla). La casilla **normalizar** añade t/s por GiB de VRAM, por W y Wh por 1000 tokens (`ESTIMADO` cuando usan potencia de placa).
+
+**Paquete de resultados** (`arena-pack`): en el Historial, **Exportar paquete** guarda los runs marcados en un JSON con la ficha de equipo, el servidor, el modelo, la versión de prueba, los ítems y las series, sin rutas personales, URLs ni tokens; **Importar paquete…** los trae a otra instalación sin duplicar lo ya existente.
 
 ![Exportar una comparación: Markdown para el vault, .md, CSV y JSON](docs/img/comparar-exportar.png)
 
 ## Novedades recientes de la interfaz
+
+- **Modo vídeo** para grabar: botón en la barra superior, tecla **V** o `?video=1`; oculta menús y barras, agranda todo (zoom 1,6×), sube el contraste y quita las animaciones. **Esc** para salir.
+- **Recomendaciones por hardware** en Servidores → GGUF en disco (★ Mejor para tu hardware), que con destino Automático prefieren la GPU de mayor ancho de banda medido en Rendimiento.
 
 - **Menú lateral plegado** que se abre al pasar el cursor (o al enfocarlo con el teclado). Las opciones cercanas a la que tocas se desplazan en **ola** según su distancia, y al abrirse enseña la VRAM y la RAM de cada dispositivo. «Desplegar» lo deja fijo.
 
@@ -277,11 +283,12 @@ Los perfiles simulados son `nvidia2` (dos GPU NVIDIA con servidores simulados), 
 | F4 | Runner núcleo (prompt libre y biblioteca de prompts) | ✅ |
 | F5 | Telemetría sincronizada, resumen y estrés | ✅ salvo la prueba real de 5 min |
 | F6 | Rendimiento por componente (`llama-bench`) | ✅ (reparto `-ts` probado solo en simulado) |
-| — | Recomendaciones de modelos según el hardware | Siguiente |
-| F7 | Pruebas de calidad (razonamiento, código aislado, contexto largo, concurrencia) | Pendiente |
-| F8 | Batalla: el mismo prompt en dos o más lados | ✅ (falta la prueba real con dos GPU y el modo guiado) |
-| F9 | Historial, comparación (insignia de comparabilidad) y exportación | Gran parte: faltan etiquetas/notas, filtros, métricas normalizadas, imagen del marcador y paquete de resultados |
-| F10–F12 | Modo vídeo, despliegue en Linux y backlog | Pendiente |
+| — | Recomendaciones de modelos según el hardware | ✅ (falta el catálogo editable) |
+| F7 | Pruebas de calidad (razonamiento, código aislado, contexto largo, concurrencia) y Asistente de barridos | ✅ (contexto y concurrencia sin probar con GPU reales) |
+| F8 | Batalla: el mismo prompt en dos o más lados | ✅ (falta la prueba real con dos GPU) |
+| F9 | Historial, comparación (insignia de comparabilidad) y exportación | ✅ |
+| F10 | Modo vídeo, accesibilidad y documentación de uso | ✅ modo vídeo · accesibilidad y documentación en curso |
+| F11–F12 | Despliegue en Linux y backlog | Pendiente |
 
 ## Datos
 
@@ -291,6 +298,8 @@ La base de datos vive en `data/` o en la ruta de `ARENA_DATA_DIR`. `data/` está
 
 - [`docs/HOJA-DE-RUTA.md`](docs/HOJA-DE-RUTA.md): decisiones y fases.
 - [`docs/PLAN-CONSTRUCCION.md`](docs/PLAN-CONSTRUCCION.md): módulos, contrato entre agente y servidor, e hitos.
+- [`docs/USO.md`](docs/USO.md): guía de uso por flujos y pantallas.
+- [`docs/EXTENDER.md`](docs/EXTENDER.md): cómo añadir un servidor, un equipo, una GPU de otro fabricante o una prueba.
 - [`docs/GUI-DISENO.md`](docs/GUI-DISENO.md): interfaz.
 - [`docs/VIABILIDAD.md`](docs/VIABILIDAD.md): riesgos, métricas y datasets de pruebas.
 - [`ESTADO.md`](ESTADO.md): estado actual y cierre de cada sesión.
