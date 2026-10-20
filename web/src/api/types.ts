@@ -729,6 +729,8 @@ export interface CompareRun {
   id: number;
   title: string;
   label: string | null;
+  tags?: string[];
+  notes?: string | null;
   kind: string;
   suite: string;
   suite_version: string | null;

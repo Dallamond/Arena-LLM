@@ -7,6 +7,7 @@ import type { BenchRow, DeviceInfo, LibraryPrompt, PromptLibrary, RunDetail, Sam
 import BlueprintCard from "../components/BlueprintCard.vue";
 import LineChart, { type ChartBand, type ChartLine, type ChartMarker, type ChartSeries } from "../components/LineChart.vue";
 import QualityResult from "../components/QualityResult.vue";
+import RunMeta from "../components/RunMeta.vue";
 import ResponsesMatrix from "../components/ResponsesMatrix.vue";
 import Stamp from "../components/Stamp.vue";
 import { deviceColor, shortName } from "../lib/devices";
@@ -357,6 +358,10 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
         </div>
       </div>
 
+      <BlueprintCard dense title="Nombre, etiquetas y notas" class="meta-card">
+        <RunMeta :run="run" />
+      </BlueprintCard>
+
       <p v-if="run.abort_reason" class="abort mono" role="alert">✕ Abortado por temperatura: {{ run.abort_reason }}</p>
       <p v-if="run.error" class="error mono" role="alert">✕ {{ run.error }}</p>
 
@@ -653,6 +658,9 @@ const flagList = computed(() => Object.entries(snap.value?.flags ?? {}).filter((
 </template>
 
 <style scoped>
+.meta-card {
+  margin-bottom: 12px;
+}
 .head {
   display: flex;
   justify-content: space-between;

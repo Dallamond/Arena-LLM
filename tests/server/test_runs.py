@@ -151,3 +151,34 @@ def test_ajustes(lab):
     assert c.get("/api/settings").json()["appearance"] == {"accent": "#ffaa00"}
     assert c.put("/api/settings/otra", json={}).status_code == 404
     assert c.put("/api/settings/appearance", json=[1, 2]).status_code == 422
+
+
+def test_etiquetas_y_notas(lab):
+    c, _ = lab()
+    ep = endpoint_ready(c)
+    r = c.post(
+        "/api/runs",
+        json={"suite": "libre", "endpoint_id": ep["id"],
+              "params": {"prompts": ["Hola"], "max_tokens": 5, "baseline_s": 0}},  # fmt: skip
+    )
+    run_id = r.json()["id"]
+    run_finished(c, run_id)
+    p = c.patch(
+        f"/api/runs/{run_id}",
+        json={"tags": ["  M40 ", "m40", "", "Q4  K"], "notes": "  primera pasada  ", "label": "Base"},
+    )
+    assert p.status_code == 200, p.text
+    body = p.json()
+    assert body["tags"] == ["M40", "Q4 K"] and body["notes"] == "primera pasada" and body["label"] == "Base"
+    assert "host_snapshot" not in body
+    listed = next(x for x in c.get("/api/runs").json() if x["id"] == run_id)
+    assert listed["tags"] == ["M40", "Q4 K"] and listed["notes"] == "primera pasada"
+    # Un campo ausente no se toca; vacío lo borra
+    c.patch(f"/api/runs/{run_id}", json={"notes": ""})
+    again = c.get(f"/api/runs/{run_id}").json()
+    assert again["notes"] is None and again["tags"] == ["M40", "Q4 K"]
+    # Validación
+    assert c.patch(f"/api/runs/{run_id}", json={"tags": ["x" * 33]}).status_code == 422
+    assert c.patch(f"/api/runs/{run_id}", json={"tags": [f"t{i}" for i in range(13)]}).status_code == 422
+    assert c.patch(f"/api/runs/{run_id}", json={"notes": "n" * 4001}).status_code == 422
+    assert c.patch("/api/runs/99999", json={"tags": ["a"]}).status_code == 404

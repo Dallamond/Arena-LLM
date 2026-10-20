@@ -66,3 +66,18 @@ describe("comparar", () => {
     expect(csv[1]).toBe('"1";"#1 · lado A · qwen|7b.gguf";"30,25"');
   });
 });
+
+describe("comparar · etiquetas y notas", () => {
+  it("el Markdown lista etiquetas y notas de cada run", () => {
+    const c = cmp();
+    c.runs[0].tags = ["M40", "Q4 K"];
+    c.runs[0].notes = "primera pasada";
+    const md = toMarkdown(c, new Date("2026-10-20T10:00:00Z"));
+    expect(md).toContain("## Runs");
+    expect(md).toContain("#M40 #Q4-K");
+    expect(md).toContain("primera pasada");
+  });
+  it("sin etiquetas ni notas no añade la sección", () => {
+    expect(toMarkdown(cmp(), new Date("2026-10-20T10:00:00Z"))).not.toContain("## Runs");
+  });
+});

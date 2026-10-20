@@ -78,6 +78,38 @@ class RunIn(BaseModel):
     params: dict[str, Any] = {}
 
 
+class RunPatch(BaseModel):
+    """Metadatos editables de un run: no tocan resultados ni configuración."""
+
+    label: str | None = None
+    notes: str | None = None
+    tags: list[str] | None = None
+
+
+MAX_TAGS = 12
+MAX_TAG_LEN = 32
+MAX_NOTES_LEN = 4000
+MAX_LABEL_LEN = 120
+
+
+def clean_tags(tags: list[str]) -> list[str]:
+    """Etiquetas recortadas, sin vacías ni repetidas (sin distinguir mayúsculas), en el orden dado."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in tags:
+        tag = " ".join(str(raw).split())
+        if not tag:
+            continue
+        if len(tag) > MAX_TAG_LEN:
+            raise HTTPException(422, f"Una etiqueta no puede pasar de {MAX_TAG_LEN} caracteres")
+        if tag.lower() not in seen:
+            seen.add(tag.lower())
+            out.append(tag)
+    if len(out) > MAX_TAGS:
+        raise HTTPException(422, f"Como máximo {MAX_TAGS} etiquetas por run")
+    return out
+
+
 class BenchIn(BaseModel):
     suite: str
     host_id: int
@@ -521,6 +553,27 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
             "samples": db.list_samples(run_id),
             "bench_rows": [{k: v for k, v in r.items() if k != "raw"} for r in db.list_bench_rows(run_id)],
         }
+
+    @app.patch("/api/runs/{run_id}")
+    def patch_run(request: Request, run_id: int, body: RunPatch) -> dict[str, Any]:
+        db: Database = request.app.state.db
+        if db.get_run(run_id) is None:
+            raise HTTPException(404, "Run no encontrado")
+        fields: dict[str, Any] = {}
+        if body.tags is not None:
+            fields["tags"] = clean_tags(body.tags)
+        if body.notes is not None:
+            if len(body.notes) > MAX_NOTES_LEN:
+                raise HTTPException(422, f"Las notas no pueden pasar de {MAX_NOTES_LEN} caracteres")
+            fields["notes"] = body.notes.strip() or None
+        if body.label is not None:
+            if len(body.label) > MAX_LABEL_LEN:
+                raise HTTPException(422, f"El nombre no puede pasar de {MAX_LABEL_LEN} caracteres")
+            fields["label"] = body.label.strip() or None
+        if fields:
+            db.update_run(run_id, **fields)
+        run = db.get_run(run_id)
+        return {k: v for k, v in run.items() if k not in ("servers_snapshot", "host_snapshot")}
 
     @app.post("/api/runs/{run_id}/cancel", status_code=202)
     async def cancel_run(request: Request, run_id: int) -> dict[str, Any]:

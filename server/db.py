@@ -476,7 +476,8 @@ class Database:
         with self.lock:
             rows = self.conn.execute(
                 "SELECT id, kind, suite, suite_version, suite_hash, label, status, host_pk, endpoint_id, params,"
-                " created_at, started_at, finished_at, summary, error, abort_reason, tags, battle_id, side, sweep_id"
+                " created_at, started_at, finished_at, summary, error, abort_reason, tags, notes,"
+                " battle_id, side, sweep_id"
                 " FROM runs ORDER BY id DESC LIMIT ?",
                 (limit,),
             ).fetchall()

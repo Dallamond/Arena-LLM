@@ -390,6 +390,8 @@ def build(
                 "id": r["id"],
                 "title": _title(r),
                 "label": r.get("label"),
+                "tags": r.get("tags") or [],
+                "notes": r.get("notes"),
                 "kind": r.get("kind"),
                 "suite": r.get("suite"),
                 "suite_version": r.get("suite_version"),

@@ -63,6 +63,15 @@ export function toMarkdown(c: CompareResponse, date: Date = new Date()): string 
     ...c.comparability.reasons.map((r) => `- ${r}`),
     "",
   ];
+  const described = c.runs.filter((r) => r.tags?.length || r.notes);
+  if (described.length) {
+    lines.push("## Runs", "");
+    for (const r of described) {
+      const tags = r.tags?.length ? ` — ${r.tags.map((t) => `#${t.replace(/\s+/g, "-")}`).join(" ")}` : "";
+      lines.push(`- **${md(r.title)}**${tags}${r.notes ? `: ${md(r.notes)}` : ""}`);
+    }
+    lines.push("");
+  }
   if (c.verdicts.length) {
     lines.push("## Veredictos", "");
     for (const v of c.verdicts) lines.push(`- **${v.title}:** ${md(c.runs[v.run_index].title)} (${cellText(v.value)})`);

@@ -52,7 +52,7 @@ function maxTemp(r: Run): number | null {
 const rows = computed(() => {
   const q = text.value.trim().toLowerCase();
   return runList.value.filter(
-    (r) => !q || `${r.id} ${r.suite} ${r.label ?? ""} ${endpointName(r)} ${r.status}`.toLowerCase().includes(q),
+    (r) => !q || `${r.id} ${r.suite} ${r.label ?? ""} ${(r.tags ?? []).join(" ")} ${r.notes ?? ""} ${endpointName(r)} ${r.status}`.toLowerCase().includes(q),
   );
 });
 </script>
@@ -61,7 +61,7 @@ const rows = computed(() => {
   <div class="page">
     <div class="head">
       <h2 class="title">Historial</h2>
-      <input v-model="text" class="search mono" type="search" placeholder="Buscar (suite, etiqueta, modelo, estado)…" aria-label="Buscar en el historial" />
+      <input v-model="text" class="search mono" type="search" placeholder="Buscar (prueba, nombre, etiqueta, nota, modelo, estado)…" aria-label="Buscar en el historial" />
       <span class="dim small">Marca runs para compararlos (también vale uno solo, para leer sus respuestas).</span>
     </div>
     <BlueprintCard>
@@ -100,6 +100,8 @@ const rows = computed(() => {
               {{ suiteLabel(r.suite) }}
               <RouterLink v-if="r.battle_id" :to="`/batalla/${r.battle_id}`" class="battle">⚔ #{{ r.battle_id }} · {{ r.side }}</RouterLink>
               <span v-if="r.label" class="dim">· {{ r.label }}</span>
+              <span v-for="t in r.tags ?? []" :key="t" class="chip">{{ t }}</span>
+              <span v-if="r.notes" class="dim note" :title="r.notes">✎</span>
             </td>
             <td class="model" :title="endpointName(r)">{{ endpointName(r) }}</td>
             <td>
@@ -193,6 +195,17 @@ const rows = computed(() => {
 }
 .runs tr.sel {
   background: rgba(108, 180, 255, 0.08);
+}
+.chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 10px;
+}
+.note {
+  margin-left: 6px;
 }
 .battle {
   margin-left: 6px;
