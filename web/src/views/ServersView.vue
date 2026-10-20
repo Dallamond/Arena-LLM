@@ -38,6 +38,11 @@ async function loadLaunched() {
     }
   }
 }
+/** Lanzados por Arena que aún no se han detectado como servidor (cargando el modelo o recién arrancados). */
+const starting = (hostId: number, endpoints: Endpoint[]) =>
+  (launched.value[hostId] ?? []).filter((l) => !endpoints.some((e) => e.base_url.split(":").pop() === String(l.port)));
+const fileName = (p: string) => p.replaceAll("\\", "/").split("/").pop() ?? p;
+const startLog = (l: LaunchedServer) => l.log_tail.slice(-4).join("\n") || "sin salida todavía";
 const canStop = (ep: Endpoint) =>
   ep.status !== "detenido" && ep.snapshot?.pid != null && (launched.value[ep.host_pk] ?? []).some((l) => l.pid === ep.snapshot?.pid);
 async function stopPid(hostId: number, pid: number, key: number) {
@@ -259,7 +264,15 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
           ■ Parar todos los de Arena ({{ launched[g.host.id].length }})
         </button>
       </div>
-      <div v-if="!g.endpoints.length" class="empty">
+      <BlueprintCard v-for="l in starting(g.host.id, g.endpoints)" :key="`s${l.pid}`" :title="`:${l.port} · ${fileName(l.model)}`" class="ep">
+        <template #actions>
+          <Stamp text="arrancando" tone="warn" :tilt="0" />
+          <button class="btn btn--danger" type="button" :disabled="stopping[-l.pid]" @click="stopPid(g.host.id, l.pid, -l.pid)">■ Parar</button>
+        </template>
+        <p class="dim small">Lanzado desde Arena; aparece como servidor en cuanto responda. Registro del arranque:</p>
+        <pre class="mono small startlog">{{ startLog(l) }}</pre>
+      </BlueprintCard>
+      <div v-if="!g.endpoints.length && !starting(g.host.id, g.endpoints).length" class="empty">
         <p>Ningún servidor detectado en este equipo.</p>
         <p class="dim">Lanza <code>llama-server</code>; aparece aquí en unos 5 segundos con su configuración.</p>
       </div>
@@ -477,6 +490,12 @@ const STATUS_TONE: Record<string, "info" | "warn" | "crit" | "dim"> = {
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--line);
+}
+.startlog {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink-faint);
 }
 .tab {
   background: none;
