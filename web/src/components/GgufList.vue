@@ -121,6 +121,7 @@ onMounted(async () => {
   loadLaunched();
   await loadModels();
   await computeFits();
+  void loadBandwidth();
 });
 onBeforeUnmount(() => {
   window.clearInterval(poll);
@@ -231,12 +232,22 @@ const launchModel = (f: ModelFile, opt: LaunchOption) =>
 const stopModel = (f: ModelFile, pid: number) => act(f, "/launch/stop", { pid });
 
 // --- recomendados para este hardware (ESTIMADO): los que caben enteros en GPU con más parámetros efectivos
+const bandwidth = reactive<Record<string, number>>({});
+async function loadBandwidth() {
+  try {
+    const bw = await api<Record<string, { gbs: number }>>("/api/devices/bandwidth");
+    for (const [id, v] of Object.entries(bw)) bandwidth[id] = v.gbs;
+  } catch {
+    /* sin medidas de F6: se desempata por memoria libre */
+  }
+}
 const recs = computed(() =>
   recommend(
     files.value.map((f) => ({ path: f.path, r: ok(fits[f.path]) })),
     target.value,
     Math.floor(params.ctx / Math.max(params.parallel, 1)),
     shortName,
+    bandwidth,
   ),
 );
 

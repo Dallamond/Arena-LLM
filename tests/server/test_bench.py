@@ -183,3 +183,26 @@ def test_cancelar_un_bench(bench_lab):
     run = run_finished(c, run_id)
     assert run["status"] == "cancelled"
     assert 0 < len(run["bench_rows"]) < 30
+
+
+def _bench_run(rid, suite, ids, gbs, status="done", kind="bench"):
+    return {
+        "id": rid, "kind": kind, "suite": suite, "status": status, "params": {"device_ids": ids},
+        "summary": {"bench": {"best_tg": {"t_s": 50.0, "bandwidth_gbs": gbs}}},
+    }  # fmt: skip
+
+
+def test_ancho_de_banda_por_gpu_usa_el_ultimo_run_de_un_solo_dispositivo():
+    from server.runs.bench import device_bandwidth
+
+    runs = [  # del más reciente al más antiguo
+        _bench_run(9, "bench-dispositivo", ["gpu:A"], 300.0),
+        _bench_run(8, "bench-dispositivo", ["gpu:A"], 100.0),  # más viejo: se ignora
+        _bench_run(7, "bench-ts", ["gpu:A", "gpu:B"], 999.0),  # reparto: no es de un dispositivo
+        _bench_run(6, "bench-dispositivo", ["cpu"], 40.0),  # CPU: no es una GPU
+        _bench_run(5, "bench-ngl", ["gpu:B"], 150.0),
+        _bench_run(4, "bench-dispositivo", ["gpu:C"], 200.0, status="error"),
+        _bench_run(3, "libre", ["gpu:C"], 200.0, kind="free"),
+        _bench_run(2, "bench-dispositivo", ["gpu:D"], None),
+    ]
+    assert device_bandwidth(runs) == {"gpu:A": {"gbs": 300.0, "run_id": 9}, "gpu:B": {"gbs": 150.0, "run_id": 5}}

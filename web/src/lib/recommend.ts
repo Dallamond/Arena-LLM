@@ -59,12 +59,15 @@ function sizeText(nParams: number): string {
  * @param target "auto" (cualquier GPU) o el `device_id` elegido como destino.
  * @param ctxPerSlot contexto por slot elegido: se descartan modelos entrenados con menos.
  * @param shortName nombre corto de GPU para el motivo.
+ * @param bandwidth ancho de banda efectivo medido (GB/s, ESTIMADO) por `device_id`: con «Automático», entre las GPU
+ *   donde cabe se elige la más rápida medida en vez de la que tiene más memoria libre.
  */
 export function recommend(
   items: Candidate[],
   target: string,
   ctxPerSlot: number,
   shortName: (n: string | null | undefined) => string,
+  bandwidth: Record<string, number> = {},
 ): Map<string, Recommendation> {
   const scored: (Recommendation & { path: string; family: string })[] = [];
   for (const { path, r } of items) {
@@ -77,13 +80,17 @@ export function recommend(
     if (typeof need !== "number") continue;
 
     let where: string | null = null;
+    let fastest = false;
     if (r.fit.verdict === "gpu") {
       // La GPU con más memoria libre entre las que lo alojan con margen (o la elegida).
       const ok = r.fit.gpus
         .filter((g) => g.fits && typeof g.free === "number" && need <= g.free * MARGIN)
         .filter((g) => target === "auto" || g.device_id === target)
-        .sort((a, b) => (b.free ?? 0) - (a.free ?? 0));
-      if (ok.length) where = shortName(ok[0].name);
+        .sort((a, b) => (bandwidth[b.device_id] ?? 0) - (bandwidth[a.device_id] ?? 0) || (b.free ?? 0) - (a.free ?? 0));
+      if (ok.length) {
+        where = shortName(ok[0].name);
+        if (target === "auto" && ok.length > 1 && bandwidth[ok[0].device_id] > 0) fastest = true;
+      }
     } else if (r.fit.verdict === "split" && target === "auto") {
       const free = r.fit.gpus.reduce((a, g) => a + (g.free ?? 0), 0);
       if (need <= free * MARGIN) where = "varias GPU";
@@ -96,7 +103,7 @@ export function recommend(
       rank: 0,
       score: m.n_params * quantQuality(m.file_type),
       where,
-      reason: `${sizeText(m.n_params)} en ${m.file_type ?? "?"}: cabe entero en ${where} con margen. Estimación; confírmalo midiendo en Calidad o Batalla.`,
+      reason: `${sizeText(m.n_params)} en ${m.file_type ?? "?"}: cabe entero en ${where} con margen${fastest ? " (la GPU con más ancho de banda medido)" : ""}. Estimación; confírmalo midiendo en Calidad o Batalla.`,
     });
   }
 

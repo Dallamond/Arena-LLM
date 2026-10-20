@@ -22,7 +22,7 @@ from server.fit import FitParams
 from server.fitting import GGUF_TIMEOUT_S, HostError, fit_model
 from server.hub import EventHub, sse_format
 from server.runs.battle import BattleManager
-from server.runs.bench import BENCH_SUITES
+from server.runs.bench import BENCH_SUITES, device_bandwidth
 from server.runs.manager import BENCH_DEVICES_TIMEOUT_S, RunError, RunManager, _run_public
 from server.runs.suites import SUITES
 from server.runs.sweep import SweepManager
@@ -628,6 +628,11 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
             raise HTTPException(409, "La prueba está en marcha: detenla antes de borrarla")
         if not request.app.state.db.delete_run(run_id):
             raise HTTPException(404, "Run no encontrado")
+
+    @app.get("/api/devices/bandwidth")
+    def devices_bandwidth(request: Request) -> dict[str, dict[str, Any]]:
+        """Ancho de banda efectivo (ESTIMADO) medido por GPU en el último bench; sirve para desempatar recomendaciones."""
+        return device_bandwidth(request.app.state.db.list_runs(500))
 
     @app.get("/api/devices")
     def devices(request: Request) -> list[dict[str, Any]]:

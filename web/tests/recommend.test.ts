@@ -94,3 +94,22 @@ describe("recomendación de modelos", () => {
     expect(quantQuality("Q2_K")).toBeLessThan(quantQuality("Q4_K_M"));
   });
 });
+
+describe("recomendación · desempate por ancho de banda", () => {
+  // Dos GPU donde cabe: gpu0 tiene más memoria libre, gpu1 es más rápida (medida)
+  const m = () => model({ name: "m", params: 8e9, need: 5 * GIB, free: [24 * GIB, 12 * GIB] });
+  it("sin medidas elige la GPU con más memoria libre", () => {
+    const r = recommend([item(m())], "auto", 4096, short).get("m");
+    expect(r?.where).toBe("GPU 0");
+    expect(r?.reason).not.toContain("ancho de banda");
+  });
+  it("con medidas elige la GPU más rápida y lo dice", () => {
+    const r = recommend([item(m())], "auto", 4096, short, { gpu0: 80, gpu1: 300 }).get("m");
+    expect(r?.where).toBe("GPU 1");
+    expect(r?.reason).toContain("ancho de banda medido");
+  });
+  it("una GPU sin medir no gana a una medida; con destino fijo se respeta el destino", () => {
+    expect(recommend([item(m())], "auto", 4096, short, { gpu1: 10 }).get("m")?.where).toBe("GPU 1");
+    expect(recommend([item(m())], "gpu0", 4096, short, { gpu1: 300 }).get("m")?.where).toBe("GPU 0");
+  });
+});

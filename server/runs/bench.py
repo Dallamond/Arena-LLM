@@ -306,3 +306,25 @@ def bench_summary(suite: BenchSuite, rows: list[dict[str, Any]]) -> dict[str, An
             "model_n_params": first.get("model_n_params"),
         }
     }
+
+
+#: Pruebas de llama-bench cuyo mejor `tg` representa a un solo dispositivo con la carga completa.
+SINGLE_DEVICE_SUITES = ("bench-dispositivo", "bench-ngl")
+
+
+def device_bandwidth(runs: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Último ancho de banda efectivo medido (ESTIMADO) por GPU, a partir de runs de bench ya terminados.
+
+    `runs` va del más reciente al más antiguo; solo cuentan los de un único dispositivo que no sea la CPU.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for run in runs:
+        if run.get("kind") != "bench" or run.get("status") != "done" or run.get("suite") not in SINGLE_DEVICE_SUITES:
+            continue
+        ids = (run.get("params") or {}).get("device_ids") or []
+        if len(ids) != 1 or ids[0] == "cpu" or ids[0] in out:
+            continue
+        gbs = (((run.get("summary") or {}).get("bench") or {}).get("best_tg") or {}).get("bandwidth_gbs")
+        if isinstance(gbs, (int, float)) and gbs > 0:
+            out[ids[0]] = {"gbs": gbs, "run_id": run["id"]}
+    return out
