@@ -195,3 +195,24 @@ def test_series_desde_el_inicio_de_la_carga_y_de_la_gpu_del_run():
     s = compare.series(r, tps, samples)
     assert s["tps"] == [{"t": 1.0, "v": 30.0}]
     assert s["temp"] == [{"t": 2.0, "v": 65}] and s["device"] == "M40"
+
+
+def test_metricas_normalizadas_con_sello_estimado():
+    out = build(run(1, tps=30, energy=1.0, tokens=1000), run(2, tps=45, energy=2.0, tokens=1000, gpu=GPU_B))
+    rows = {r["key"]: r for r in out["metrics"]}
+    assert rows["tps_per_gib"]["values"][0] == round(30 / (8000 / 1024), 10) or abs(
+        rows["tps_per_gib"]["values"][0] - 30 / (8000 / 1024)
+    ) < 1e-9
+    assert rows["tps_per_w"]["values"] == [30 / 150, 45 / 150] and rows["tps_per_w"]["best"] == [1]
+    assert rows["wh_per_ktok"]["values"] == [1.0, 2.0] and rows["wh_per_ktok"]["best"] == [0]
+    assert all(rows[k]["group"] == "normalizada" for k in ("tps_per_gib", "tps_per_w", "wh_per_ktok"))
+    assert rows["tps_per_w"]["estimated"] and rows["wh_per_ktok"]["estimated"] and not rows["tps_per_gib"]["estimated"]
+    assert rows["tps"]["group"] is None and not rows["tps"]["estimated"]
+
+
+def test_normalizadas_sin_datos_son_null_nunca_cero():
+    r = run(1)
+    r["summary"]["devices"] = {}  # equipo sin GPU o sin telemetría
+    m = compare.run_metrics(r)
+    assert m["tps_per_gib"] is None and m["tps_per_w"] is None and m["wh_per_ktok"] is None
+    assert compare._ratio(5, 0) is None and compare._ratio(None, 3) is None

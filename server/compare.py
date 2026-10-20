@@ -207,6 +207,13 @@ def _sum(vals: list[Any]) -> float | None:
     return sum(nums) if nums else None
 
 
+def _ratio(num: Any, den: Any, scale: float = 1.0) -> float | None:
+    """num/den·scale; `None` si falta un dato o el divisor es 0 (nunca se inventa un 0)."""
+    if not isinstance(num, (int, float)) or not isinstance(den, (int, float)) or den <= 0:
+        return None
+    return num / den * scale
+
+
 def run_metrics(run: dict[str, Any]) -> dict[str, Any]:
     s = run.get("summary") or {}
     bench = s.get("bench") or {}
@@ -215,11 +222,14 @@ def run_metrics(run: dict[str, Any]) -> dict[str, Any]:
     tokens = s.get("completion_tokens")
     is_bench = run.get("kind") == "bench"
     quality = s.get("quality") or {}
+    tps = (bench.get("best_tg") or {}).get("t_s") if is_bench else (s.get("tps_client") or {}).get("median")
+    vram_peak = _sum([d.get("vram_peak_mib") for d in own])
+    power_mean = _sum([d.get("power_mean_w") for d in own])
     return {
         "accuracy": quality.get("accuracy_pct"),
         "context_ok": quality.get("max_size_ok"),
         "best_agg": quality.get("best_tps_aggregate"),
-        "tps": (bench.get("best_tg") or {}).get("t_s") if is_bench else (s.get("tps_client") or {}).get("median"),
+        "tps": tps,
         "tps_server": None if is_bench else (s.get("tps_server") or {}).get("median"),
         "pp": (bench.get("best_pp") or {}).get("t_s") if is_bench else (s.get("pp_server") or {}).get("median"),
         "ttft": None if is_bench else (s.get("ttft_s") or {}).get("median"),
@@ -228,12 +238,16 @@ def run_metrics(run: dict[str, Any]) -> dict[str, Any]:
         "degradation": s.get("degradation_pct"),
         "temp_max": _max([d.get("temp_max_c") for d in own]),
         "temp_rise": _max([d.get("temp_rise_c") for d in own]),
-        "power_mean": _sum([d.get("power_mean_w") for d in own]),
+        "power_mean": power_mean,
         "throttle": _max([d.get("throttle_pct") for d in own]),
-        "vram_peak": _sum([d.get("vram_peak_mib") for d in own]),
+        "vram_peak": vram_peak,
         "energy": energy,
         "tokens_per_wh": tokens / energy if isinstance(tokens, (int, float)) and tokens and energy else None,
         "duration": s.get("duration_s"),
+        # Normalizadas: permiten comparar tarjetas de distinto tamaño o consumo
+        "tps_per_gib": _ratio(tps, vram_peak, 1024),
+        "tps_per_w": _ratio(tps, power_mean),
+        "wh_per_ktok": _ratio(energy, tokens, 1000),
     }
 
 
@@ -257,7 +271,13 @@ METRICS = (
     ("energy", "energía (GPU del run)", "Wh", None, 2),
     ("tokens_per_wh", "tokens por Wh", "tok/Wh", "high", 0),
     ("duration", "duración de la carga", "s", None, 0),
+    ("tps_per_gib", "t/s por GiB de VRAM pico", "t/s/GiB", "high", 1),
+    ("tps_per_w", "t/s por W de potencia media", "t/s/W", "high", 2),
+    ("wh_per_ktok", "energía por 1000 tokens", "Wh/ktok", "low", 3),
 )
+
+#: Métricas derivadas para comparar tarjetas distintas → ¿llevan potencia de placa (ESTIMADO)?
+NORMALIZED = {"tps_per_gib": False, "tps_per_w": True, "wh_per_ktok": True}
 
 
 def metric_table(per_run: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -281,6 +301,8 @@ def metric_table(per_run: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "digits": digits,
                 "values": values,
                 "best": best,
+                "group": "normalizada" if key in NORMALIZED else None,
+                "estimated": NORMALIZED.get(key, False) or key in ("power_mean", "energy", "tokens_per_wh"),
             }
         )
     return rows

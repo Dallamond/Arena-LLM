@@ -754,6 +754,10 @@ export interface CompareMetric {
   digits: number;
   values: (number | null)[];
   best: number[];
+  /** "normalizada" = derivada para comparar tarjetas distintas (por GiB, por W, por ktok). */
+  group?: "normalizada" | null;
+  /** Lleva potencia de placa, no medida en la toma: sello ESTIMADO. */
+  estimated?: boolean;
 }
 
 export interface CompareResponse {

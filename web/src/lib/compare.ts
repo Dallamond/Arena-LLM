@@ -39,10 +39,14 @@ const cellText = (v: unknown): string => {
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
 };
+/** Métricas que se muestran o exportan: las normalizadas solo si se piden. */
+export const visibleMetrics = (c: CompareResponse, normalized: boolean) =>
+  c.metrics.filter((m) => normalized || m.group !== "normalizada");
+
 const md = (s: string) => s.replace(/\|/g, "\|").replace(/\r?\n/g, " ");
 
 /** Markdown para el vault (frontmatter YAML del tipo proyecto + tablas). */
-export function toMarkdown(c: CompareResponse, date: Date = new Date()): string {
+export function toMarkdown(c: CompareResponse, date: Date = new Date(), normalized = true): string {
   const iso = date.toISOString().slice(0, 10);
   const [y, mo, d] = iso.split("-");
   const head = ["métrica", ...c.runs.map((r) => md(r.title))];
@@ -78,9 +82,9 @@ export function toMarkdown(c: CompareResponse, date: Date = new Date()): string 
     lines.push("");
   }
   lines.push("## Métricas", "", `| ${head.join(" | ")} |`, `|${head.map(() => "---").join("|")}|`);
-  for (const m of c.metrics) {
+  for (const m of visibleMetrics(c, normalized)) {
     const vals = m.values.map((v, i) => (m.best.includes(i) ? `**${cellText(v)}**` : cellText(v)));
-    lines.push(`| ${md(m.label)}${m.unit ? ` (${m.unit})` : ""} | ${vals.join(" | ")} |`);
+    lines.push(`| ${md(m.label)}${m.unit ? ` (${m.unit})` : ""}${m.estimated ? " _(estimado)_" : ""} | ${vals.join(" | ")} |`);
   }
   const diff = c.config_diff.filter((r) => !r.same);
   if (diff.length) {
@@ -100,9 +104,10 @@ export function toMarkdown(c: CompareResponse, date: Date = new Date()): string 
 }
 
 /** CSV de métricas (una fila por run), con ; como separador para Excel en español. */
-export function toCsv(c: CompareResponse): string {
+export function toCsv(c: CompareResponse, normalized = true): string {
+  const metrics = visibleMetrics(c, normalized);
   const q = (s: string) => `"${s.replace(/"/g, '""')}"`;
-  const head = ["run", "titulo", ...c.metrics.map((m) => `${m.label}${m.unit ? ` (${m.unit})` : ""}`)];
-  const rows = c.runs.map((r, i) => [String(r.id), r.title, ...c.metrics.map((m) => cellText(m.values[i]))]);
+  const head = ["run", "titulo", ...metrics.map((m) => `${m.label}${m.unit ? ` (${m.unit})` : ""}`)];
+  const rows = c.runs.map((r, i) => [String(r.id), r.title, ...metrics.map((m) => cellText(m.values[i]))]);
   return [head, ...rows].map((row) => row.map(q).join(";")).join("\n") + "\n";
 }

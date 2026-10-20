@@ -9,7 +9,7 @@ import BlueprintCard from "../components/BlueprintCard.vue";
 import LineChart, { type ChartSeries } from "../components/LineChart.vue";
 import ResponsesMatrix from "../components/ResponsesMatrix.vue";
 import Stamp from "../components/Stamp.vue";
-import { toCsv, toMarkdown } from "../lib/compare";
+import { toCsv, toMarkdown, visibleMetrics } from "../lib/compare";
 import { NO_DATA, RUN_STATUS, fmt, fmtDate, suiteLabel } from "../lib/format";
 
 const MAX = 12;
@@ -115,6 +115,22 @@ function onTabKey(e: KeyboardEvent) {
 
 // Resumen: solo lo crítico (velocidad, latencia, temperatura, potencia, energía)
 const SUMMARY_KEYS = ["tps", "ttft", "pp", "degradation", "temp_max", "throttling", "power_mean", "vram_peak", "tokens_per_wh"];
+// Métricas normalizadas (por GiB de VRAM, por W, por ktok): opcionales, se recuerda la elección
+const NORM_KEY = "arena.compareNormalized";
+const normalized = ref(false);
+try {
+  normalized.value = localStorage.getItem(NORM_KEY) === "1";
+} catch {
+  /* sin almacenamiento: se queda apagado */
+}
+watch(normalized, (v) => {
+  try {
+    localStorage.setItem(NORM_KEY, v ? "1" : "0");
+  } catch {
+    /* solo se pierde la preferencia */
+  }
+});
+const shownMetrics = computed(() => (data.value ? visibleMetrics(data.value, normalized.value) : []));
 const summaryMetrics = computed(() => (data.value?.metrics ?? []).filter((m) => SUMMARY_KEYS.includes(m.key)));
 
 // --- visor de gráficas --------------------------------------------------------
@@ -153,11 +169,11 @@ const stamp = () => new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
 async function copyMarkdown() {
   if (!data.value) return;
   try {
-    await navigator.clipboard.writeText(toMarkdown(data.value));
+    await navigator.clipboard.writeText(toMarkdown(data.value, new Date(), normalized.value));
     copied.value = true;
     window.setTimeout(() => (copied.value = false), 2000);
   } catch {
-    download(`comparacion-${stamp()}.md`, toMarkdown(data.value), "text/markdown");
+    download(`comparacion-${stamp()}.md`, toMarkdown(data.value, new Date(), normalized.value), "text/markdown");
   }
 }
 </script>
@@ -295,6 +311,9 @@ async function copyMarkdown() {
       <!-- MÉTRICAS -->
       <section v-show="tab === 'metricas'" id="panel-metricas" role="tabpanel" aria-labelledby="tab-metricas">
         <BlueprintCard title="Todas las métricas">
+          <template #actions>
+            <label class="check small"><input v-model="normalized" type="checkbox" /> normalizar (por GiB, por W, por ktok)</label>
+          </template>
           <div class="scroll">
             <table class="tbl mono">
               <thead>
@@ -304,8 +323,8 @@ async function copyMarkdown() {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="m in data.metrics" :key="m.key">
-                  <td class="sans">{{ m.label }}<span v-if="m.better" class="dim"> ({{ m.better === "high" ? "más es mejor" : "menos es mejor" }})</span></td>
+                <tr v-for="m in shownMetrics" :key="m.key">
+                  <td class="sans">{{ m.label }}<Stamp v-if="m.estimated" text="ESTIMADO" tone="dim" :tilt="0" class="est" /><span v-if="m.better" class="dim"> ({{ m.better === "high" ? "más es mejor" : "menos es mejor" }})</span></td>
                   <td v-for="(v, i) in m.values" :key="i" :class="{ best: m.best.includes(i) }">
                     {{ fmt(v, m.digits, m.unit) }}<span v-if="m.best.includes(i)" class="best__mark" title="Mejor valor"> ▲</span>
                   </td>
@@ -415,8 +434,8 @@ async function copyMarkdown() {
       <BlueprintCard title="Exportar" class="gap">
         <div class="exports">
           <button class="btn" type="button" @click="copyMarkdown">{{ copied ? "✓ Copiado" : "Copiar Markdown para el vault" }}</button>
-          <button class="btn" type="button" @click="download(`comparacion-${stamp()}.md`, toMarkdown(data!), 'text/markdown')">Descargar .md</button>
-          <button class="btn" type="button" @click="download(`comparacion-${stamp()}.csv`, toCsv(data!), 'text/csv')">Descargar CSV</button>
+          <button class="btn" type="button" @click="download(`comparacion-${stamp()}.md`, toMarkdown(data!, new Date(), normalized), 'text/markdown')">Descargar .md</button>
+          <button class="btn" type="button" @click="download(`comparacion-${stamp()}.csv`, toCsv(data!, normalized), 'text/csv')">Descargar CSV</button>
           <button class="btn" type="button" @click="download(`comparacion-${stamp()}.json`, JSON.stringify(data, null, 2), 'application/json')">
             Descargar JSON
           </button>

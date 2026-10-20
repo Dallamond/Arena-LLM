@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CompareResponse, RunItem } from "../src/api/types";
-import { itemsToRows, toCsv, toMarkdown } from "../src/lib/compare";
+import { itemsToRows, toCsv, toMarkdown, visibleMetrics } from "../src/lib/compare";
 
 const item = (idx: number, prompt: string, response: string, over: Partial<RunItem> = {}): RunItem => ({
   id: idx + 100,
@@ -79,5 +79,24 @@ describe("comparar · etiquetas y notas", () => {
   });
   it("sin etiquetas ni notas no añade la sección", () => {
     expect(toMarkdown(cmp(), new Date("2026-10-20T10:00:00Z"))).not.toContain("## Runs");
+  });
+});
+
+describe("comparar · métricas normalizadas", () => {
+  const withNorm = (): CompareResponse => {
+    const c = cmp();
+    c.metrics.push({ key: "tps_per_w", label: "t/s por W", unit: "t/s/W", better: "high", digits: 2, values: [0.2, 0.3], best: [1], group: "normalizada", estimated: true });
+    return c;
+  };
+  it("las normalizadas se pueden ocultar", () => {
+    expect(visibleMetrics(withNorm(), false).map((m) => m.key)).toEqual(["tps"]);
+    expect(visibleMetrics(withNorm(), true).map((m) => m.key)).toEqual(["tps", "tps_per_w"]);
+  });
+  it("el Markdown y el CSV respetan el interruptor y marcan lo estimado", () => {
+    const d = new Date("2026-10-20T10:00:00Z");
+    expect(toMarkdown(withNorm(), d, false)).not.toContain("t/s por W");
+    expect(toMarkdown(withNorm(), d, true)).toContain("_(estimado)_");
+    expect(toCsv(withNorm(), false)).not.toContain("t/s por W");
+    expect(toCsv(withNorm(), true)).toContain("t/s por W");
   });
 });
