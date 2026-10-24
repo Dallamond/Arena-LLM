@@ -55,6 +55,10 @@ Pruebas contra el servidor que elijas. El perfil estándar fija temperatura 0, s
 ### Batalla y Asistente
 Ver flujo B. Cada lado guarda su propio run; **Ver en Comparar**, **Repetir** y **Borrar** al terminar.
 
+- **Paquetes de batalla**: 8 pruebas predeterminadas (Duelo rápido, Razonamiento, Programador, Programador calentamiento, Memoria larga, Velocidad pura, Lectura y Seguir instrucciones). Un clic carga la prueba, sus opciones y los pesos de la nota; solo queda elegir los lados. Los tuyos van en `battles.json` dentro de la carpeta de datos.
+- **Nota 0-100** por lado: calidad (absoluta, solo si la prueba se corrige sola), velocidad y eficiencia (relativas al mejor lado) y estabilidad (throttling térmico y degradación). Sin datos en una dimensión, se omite y su peso se reparte. La nota solo es comparable dentro de la batalla; la calidad vale en cualquier sitio.
+- **Ranking por paquete**: al cargar un paquete se ve el ranking acumulado por modelo y GPU, solo con batallas del mismo hash del paquete.
+
 ### Historial
 Todos los runs con sus métricas principales.
 - **Buscar** por prueba, nombre, etiqueta, nota, modelo o estado.

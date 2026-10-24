@@ -6,11 +6,11 @@ Resuelve un problema concreto: comparar dos modelos, dos cuantizaciones o dos ta
 
 ![Panel de Arena LLM: dos GPU, CPU y RAM en vivo, con medidores y avisos](docs/img/panel.png)
 
-> Todas las capturas y animaciones están hechas con el **modo simulado** (perfil `nvidia2`, `llama-server` simulados y GGUF falsos): no hay datos, rutas ni modelos reales. Los nombres de GPU ("GPU simulada 12 GB") son del simulador.
+> **Sobre las imágenes.** Las capturas y animaciones de Panel, Calidad, Rendimiento, Historial y Ajustes están hechas con el **modo simulado** (perfil `nvidia2`, `llama-server` simulados y GGUF falsos; las GPU se llaman "GPU simulada 12 GB"). Las de **Servidores, Batalla (nota, podio, paquetes y ranking) y Comparar con nota** (formato `.jpg`) son de un equipo real (Tesla M40 24 GB + RTX 3060 + Ryzen 5 3600, con Qwen2.5-Coder-14B Q4_K_M). En ellas el nombre del equipo se ha sustituido por «MI-PC» y las rutas de modelos se han acortado; no hay claves ni tokens.
 
 ## Índice
 
-- [Funciones](#funciones): Panel, Servidores, Calidad, Rendimiento, Batalla, Historial, Comparar, Ajustes y exportación.
+- [Funciones](#funciones): Panel, Servidores (detectar, lanzar y parar), Calidad, Rendimiento, Batalla (paquetes, nota 0-100, podio y ranking), Historial, Comparar, Ajustes y exportación.
 - [Novedades recientes de la interfaz](#novedades-recientes-de-la-interfaz)
 - Guías: [uso](docs/USO.md) y [cómo ampliar Arena](docs/EXTENDER.md)
 - [Instalación y arranque](#instalación-y-arranque)
@@ -34,7 +34,11 @@ Dos pestañas: **En marcha** y **GGUF en disco**.
 
 **En marcha.** Arena detecta los `llama-server` del equipo (proceso, `/props`, `/slots`, `/v1/models`): modelo, cuantización, contexto por slot, flags, build y en qué GPU corre, y los vuelve a mirar cada 5 s anotando cualquier cambio de configuración con su diff. Se puede **dar de alta un endpoint a mano** (otra máquina, un contenedor), **asignar GPU a mano**, ponerle alias y pulsar **▶ Probar** para ir a Calidad con ese servidor elegido.
 
-![Servidores en marcha: configuración detectada, flags y cambios](docs/img/servidores.png)
+![Servidores en marcha en un equipo real: dos llama-server (puertos 8080 y 8081), cada uno en su GPU, con flags detectados, GPU atribuida y registro de cambios](docs/img/servidores-reales.jpg)
+
+Aquí se ven dos `llama-server` lanzados desde Arena, uno por GPU (`-dev CUDA0` y `CUDA1`). Cada tarjeta muestra modelo, cuantización, contexto por slot, build, PID, GPU (con **Cambiar** para asignarla a mano) y el historial de cambios de configuración. **Parar todos los de Arena** solo apaga los que lanzó ella. (Al ser una captura de equipo real, las del perfil simulado también aparecen listadas en otro equipo más abajo.)
+
+![Servidores en marcha: configuración detectada, flags y cambios (perfil simulado)](docs/img/servidores.png)
 
 **GGUF en disco.** Lee la cabecera de cada GGUF de las carpetas permitidas y estima pesos por capa, caché KV, búfer de cómputo y reserva por GPU. Con el contexto, los slots y el tipo de caché KV que elijas, el veredicto se compara con la VRAM y la RAM **libres ahora**: cabe en una GPU, cabe repartido, necesita RAM (con el `-ngl` sugerido), solo CPU o no cabe. Todo lleva el sello `ESTIMADO`, y **Ver desglose** enseña cada partida.
 
@@ -44,7 +48,9 @@ Dos pestañas: **En marcha** y **GGUF en disco**.
 
 **Lanzar y parar `llama-server` desde la GUI.** Eliges la GPU destino arriba (**Lanzar en**: automático, que usa la recomendada, o una GPU concreta) y **Lanzar** arranca ese modelo con el contexto, los slots y la caché KV elegidos; mientras carga se ve su registro, y **Parar** lo detiene. Arena solo para los servidores que lanzó ella. El agente es quien ejecuta el binario, con una lista cerrada de flags validados, siempre en `127.0.0.1` y con modelos de las carpetas permitidas. Necesita `llama_server` (o un `llama-server` junto a `llama_bench`) en la configuración del agente.
 
-> No he podido capturar un lanzamiento real: el agente simulado no tiene un `llama-server` que ejecutar. Los botones se ven en la captura de arriba.
+![GGUF en disco en un equipo real: elección de la GPU destino, contexto, slots, caché KV y encaje de cada modelo con el botón Lanzar](docs/img/servidores-gguf-lanzar.jpg)
+
+La captura muestra el selector **Lanzar en** (Automático, Tesla M40 o RTX 3060, con la memoria libre de cada una), los controles de contexto, slots y caché KV, y cada modelo con su veredicto y los botones **Lanzar en <GPU>**, **Ver desglose** y **Copiar comando** (el botón de lanzar queda desactivado si el modelo no cabe). Los servidores de la captura anterior se lanzaron así. No se grabó un GIF del lanzamiento para no tocar los servidores que estaban midiendo.
 
 **Comando copiable.** **Copiar comando** compone la línea equivalente para ejecutarla a mano, en otro equipo o con otros flags: binario, `-m`, `-c`, `-ngl` sugerido, `-np`, tipo de caché KV, `-fa on` y un `--port` libre. Si cabe en varias GPU eliges en cuál (`-dev`); si va repartido añade `-ts`. Sale en la sintaxis de cmd y PowerShell en Windows, o de bash en Linux, con `CUDA_DEVICE_ORDER=PCI_BUS_ID` cuando fija dispositivo.
 
@@ -107,11 +113,53 @@ Los mismos prompts contra 2–6 servidores (lados), **en paralelo** (cada lado e
 
 <sub>Acelerado ×1,3, de 40 s reales. Las respuestas son texto fijo del `llama-server` simulado, no responden al prompt.</sub>
 
-Al terminar quedan las cifras de cada lado, el **marcador** (más rápido, responde antes, más frío, más eficiente, con su margen) y la tabla de métricas, más las respuestas de todos los lados prompt a prompt. Botones: **Ver en Comparar**, **Repetir** y **Borrar**.
+Al terminar quedan las cifras de cada lado, el **marcador** (más rápido, responde antes, más frío, más eficiente, con su margen) y la tabla de métricas, más las respuestas de todos los lados prompt a prompt. Botones: **Ver en Comparar**, **Repetir** y **Borrar**. Antes de nada puedes cargar un **paquete** (más abajo), que fija prueba, opciones y pesos de la nota.
 
 ![Batalla terminada: cifras de cada lado](docs/img/batalla.png)
 
 ![Marcador y tabla de métricas de la batalla, con la insignia de comparabilidad](docs/img/batalla-marcador.png)
+
+#### Paquetes de batalla y ranking
+
+Arriba de la preparación hay **8 paquetes predeterminados**: un clic carga la prueba, sus opciones y los pesos de la nota, y después solo eliges los lados. Cada tarjeta dice qué mide, cuánto tarda y si **se corrige sola** o es **solo rendimiento**.
+
+| Paquete | Prueba | Tiempo aprox. | Qué mide |
+|---|---|---|---|
+| Duelo rápido | QA (6 preguntas) | 3 min | Lógica y cálculo con respuesta conocida |
+| Razonamiento | QA (12 preguntas) | 8 min | Razonamiento, cultura y precisión |
+| Programador | Código (10 problemas) | 15 min | Python en sandbox, pass@1 |
+| Programador (calentamiento) | Código (3 problemas) | 4 min | Descarta modelos pequeños sin esperar |
+| Memoria larga | Contexto (aguja en un pajar) | 10 min | Hasta dónde lee bien y cuánto tarda |
+| Velocidad pura | Prompt libre | 4 min | t/s, TTFT, eficiencia y estabilidad |
+| Lectura: redacción y explicación | Prompt libre | 4 min | Prompts de escritura para leer lado a lado |
+| Seguir instrucciones | Prompt libre | 3 min | JSON, listas y restricciones de letras |
+
+Los paquetes son un fichero de datos ([`server/catalog/battles.json`](server/catalog/battles.json)); para añadir los tuyos, crea un `battles.json` con la misma forma en la carpeta de datos (`data/` o `ARENA_DATA_DIR`). Un `id` repetido sustituye al de la base. Cada batalla guarda su paquete (id, nombre y hash) y los pesos usados.
+
+![Selector de paquetes de batalla con las 8 tarjetas predeterminadas](docs/img/batalla-paquetes.jpg)
+
+Al cargar un paquete aparece su **ranking acumulado**: modelo, equipo/GPU, aciertos (media), mejor t/s, TTFT y número de batallas. Solo cuentan las batallas con **el mismo hash del paquete** (mismas preguntas y opciones), así que los aciertos son comparables entre días; las de otra versión se cuentan aparte. Si el paquete no se corrige solo, manda la velocidad.
+
+![Paquete Programador cargado: ranking acumulado por modelo y GPU, y formulario de la prueba](docs/img/batalla-paquete-ranking.jpg)
+
+![Cargar varios paquetes seguidos: cambian la prueba, las opciones y el ranking](docs/img/batalla-paquetes.gif)
+
+<sub>Solo se rellena el formulario; no se lanza nada hasta pulsar Iniciar.</sub>
+
+#### Nota 0-100 y podio
+
+Al terminar, cada lado recibe una **nota de 0 a 100** con cuatro dimensiones y un **podio**:
+
+- **Calidad** (absoluta): aciertos de las pruebas que se corrigen solas. Vale entre batallas. Si no hay corrección (prompts libres), se omite.
+- **Velocidad** (relativa): t/s y TTFT frente al mejor lado de la batalla (70 % / 30 %).
+- **Eficiencia** (relativa): tokens por Wh, o t/s por GiB de VRAM si no hay potencia.
+- **Estabilidad** (absoluta): 100 menos el tiempo en throttling y la degradación de t/s. Solo cuenta el límite térmico y el frenado de hardware, no el límite de potencia por software.
+
+Los pesos los fija el paquete (por ejemplo, Programador 70/10/10/10; Velocidad pura 0/55/25/20) o, sin paquete, 50/25/15/10. Una dimensión sin datos no puntúa 0: se omite y su peso se reparte. Un run en error no recibe nota ni puede ganar. La nota global solo es comparable dentro de su batalla; la calidad, en cualquier sitio.
+
+![Batalla terminada con prueba de QA: podio con calidad, velocidad, eficiencia y estabilidad de cada lado, y aciertos 8/12](docs/img/batalla-nota-calidad.jpg)
+
+![Batalla de rendimiento puro (sin calidad): la nota solo usa velocidad, eficiencia y estabilidad](docs/img/batalla-nota-podio.jpg)
 
 ### Comparar
 
@@ -123,7 +171,9 @@ Elige runs en el Historial (bandeja «Comparar (N)»), desde una batalla o en la
 
 Cuatro pestañas:
 
-- **Resumen**: veredictos con su margen y los datos principales con el mejor valor marcado (▲).
+- **Resumen**: la **Puntuación** 0-100 de cada run (calidad, velocidad, eficiencia y estabilidad), los veredictos con su margen y los datos principales con el mejor valor marcado (▲).
+
+  ![Comparar con la puntuación de cada run, la insignia Parcialmente comparables y los veredictos](docs/img/comparar-nota.jpg)
 
   ![Comparar, pestaña Resumen: insignia, veredictos y datos principales](docs/img/comparar-resumen.png)
 
@@ -221,6 +271,8 @@ La configuración se busca, por este orden, en `--config <fichero>`, en la varia
 
 ### 3. Uso normal
 
+Lo más cómodo en Windows: **`scriptsrena.bat`** (doble clic). Arranca el agente y el servidor si no están ya en marcha y abre la GUI en `http://127.0.0.1:8090`. Si prefieres controlarlo:
+
 ```bat
 scripts\start-agent.bat    :: agente en 127.0.0.1:9100 (déjalo abierto)
 scripts\start-server.bat --agent http://127.0.0.1:9100    :: servidor en http://127.0.0.1:8090
@@ -285,7 +337,7 @@ Los perfiles simulados son `nvidia2` (dos GPU NVIDIA con servidores simulados), 
 | F6 | Rendimiento por componente (`llama-bench`) | ✅ (reparto `-ts` probado solo en simulado) |
 | — | Recomendaciones de modelos según el hardware | ✅ (falta el catálogo editable) |
 | F7 | Pruebas de calidad (razonamiento, código aislado, contexto largo, concurrencia) y Asistente de barridos | ✅ (contexto y concurrencia sin probar con GPU reales) |
-| F8 | Batalla: el mismo prompt en dos o más lados | ✅ (falta la prueba real con dos GPU) |
+| F8 | Batalla: el mismo prompt en dos o más lados, con paquetes predeterminados, nota 0-100 y ranking por paquete | ✅ (probada con dos GPU reales: M40 y RTX 3060) |
 | F9 | Historial, comparación (insignia de comparabilidad) y exportación | ✅ |
 | F10 | Modo vídeo, accesibilidad y documentación de uso | ✅ (accesibilidad sin probar con lector de pantalla) |
 | F11–F12 | Despliegue en Linux y backlog | Pendiente |
