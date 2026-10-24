@@ -161,9 +161,10 @@ def test_validaciones_y_avisos(bench_lab):
     assert post("bench-dispositivo", model=str(gguf)).status_code == 422  # sin dispositivo
     assert post("bench-ngl", model=str(gguf), device_ids=["nvidia:NO-EXISTE"]).status_code == 422
     assert post("bench-ngl", model=str(gguf), n_prompt=["512"]).status_code == 422
-    r = post("bench-cpu", model=str(gguf), repetitions=1)
+    r = post("bench-cpu", model=str(gguf), repetitions=1, baseline_s=0.5)
     assert r.status_code == 201, r.text
     run = run_finished(c, r.json()["id"])
+    assert run["params"]["baseline_s"] == 0.5  # no se trunca a 0
     assert run["params"]["device_ids"] == ["cpu"] and run["servers_snapshot"]["spec"]["devices"] == ["none"]
     assert run["params"]["sweep"] == sorted(set(run["params"]["sweep"]))
     assert run["host_snapshot"]["thresholds"] == {}  # solo CPU: no se vigila ninguna GPU

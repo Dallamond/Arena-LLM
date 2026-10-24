@@ -218,8 +218,9 @@ class RunManager:
         for key in ("baseline_s", "cooldown_s", "timeout_s"):
             lo, hi = LIMITS[key]
             try:
-                params[key] = int(float(params.get(key) or 0))
-            except (TypeError, ValueError) as exc:
+                value = float(params.get(key) or 0)
+                params[key] = int(value) if value == int(value) else round(value, 2)  # 0.5 no se trunca a 0
+            except (TypeError, ValueError, OverflowError) as exc:
                 raise RunError(422, f"'{key}' debe ser un número") from exc
             if not lo <= params[key] <= hi:
                 raise RunError(422, f"'{key}' fuera de rango ({lo}–{hi})")
