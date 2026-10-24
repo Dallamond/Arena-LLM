@@ -55,6 +55,17 @@ LIMITS = {
     "repeats": (1, 100),
     "timeout_s": (5, 3600),
 }
+#: Muestreo que se envía al servidor: vacío = el de llama-server; si viene, debe ser un número en rango.
+SAMPLING_LIMITS = {
+    "temperature": (0, 5),
+    "top_p": (0, 1),
+    "top_k": (0, 100000),
+    "min_p": (0, 1),
+    "repeat_penalty": (0, 10),
+    "presence_penalty": (-2, 2),
+    "frequency_penalty": (-2, 2),
+    "seed": (-1, 4294967295),
+}
 
 
 class RunError(Exception):
@@ -101,6 +112,18 @@ def _stored(case: Case | None) -> str | None:
 
 
 def validate(suite: Suite, params: dict[str, Any]) -> dict[str, Any]:
+    for key, (lo, hi) in SAMPLING_LIMITS.items():
+        v = params.get(key)
+        if v is None or v == "":
+            continue
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            raise RunError(422, f"'{key}' debe ser un número")
+        if not lo <= v <= hi:
+            raise RunError(422, f"'{key}' fuera de rango ({lo}–{hi})")
+    if params.get("cache_prompt") is not None and not isinstance(params["cache_prompt"], bool):
+        raise RunError(422, "'cache_prompt' debe ser verdadero o falso")
+    if params.get("system") is not None and not isinstance(params["system"], str):
+        raise RunError(422, "'system' debe ser texto")
     for key, (lo, hi) in LIMITS.items():
         if key in params and params[key] is not None:
             try:

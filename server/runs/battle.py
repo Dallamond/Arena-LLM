@@ -14,7 +14,7 @@ from typing import Any
 
 from server.db import Database
 from server.hub import EventHub
-from server.runs.manager import RunError, RunManager
+from server.runs.manager import RunError, RunManager, validate
 from server.runs.suites import SUITES
 
 log = logging.getLogger(__name__)
@@ -122,6 +122,12 @@ class BattleManager:
                     "_full": side_params(prompts, common, own, suite),
                 }
             )
+
+        for p in plan:  # todos los lados se comprueban ya: uno inválido no debe descubrirse a mitad de batalla
+            try:
+                validate(SUITES[suite], SUITES[suite].params(dict(p["_full"])))
+            except RunError as exc:
+                raise RunError(exc.status, f"Lado {p['side']}: {exc.message}") from exc
 
         battle = self.db.create_battle(
             label=(label or "").strip() or None,
