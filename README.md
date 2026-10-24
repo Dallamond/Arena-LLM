@@ -271,7 +271,7 @@ La configuración se busca, por este orden, en `--config <fichero>`, en la varia
 
 ### 3. Uso normal
 
-Lo más cómodo en Windows: **`scriptsrena.bat`** (doble clic). Arranca el agente y el servidor si no están ya en marcha y abre la GUI en `http://127.0.0.1:8090`. Si prefieres controlarlo:
+Lo más cómodo en Windows: **`scripts\arena.bat`** (doble clic). Arranca el agente y el servidor si no están ya en marcha y abre la GUI en `http://127.0.0.1:8090`. Si prefieres controlarlo:
 
 ```bat
 scripts\start-agent.bat    :: agente en 127.0.0.1:9100 (déjalo abierto)
