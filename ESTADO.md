@@ -365,3 +365,32 @@ Primera pasada completa con la M40 y la RTX 3060 libres (se cerró LocalHarness,
 - Las capturas de pantalla del navegador de pruebas se atascaron varias veces con la 3060 casi llena de VRAM; no afecta a la app (el JS respondía).
 - Sin hacer: el paquete «Completo» multietapa, el catálogo editable de modelos, F11, y repetir `llama-bench` con la referencia exacta de Llama 2 7B Q4_0.
 - Tests: 362 de Python y 72 de la web; `ruff` y `vue-tsc` limpios.
+
+### Consumo y coste 24/7 (24/10/2026, estimación)
+
+Arena solo mide la potencia de placa de las GPU (no la de la pared ni la de la CPU), así que lo de abajo es una **estimación (±20 %)**; el resto del PC se supone (~60 W en reposo, ~90 W en carga). Para datos reales hace falta un enchufe con medidor y la tarifa en €/kWh (no se conoce; se supuso 0,15 €/kWh).
+
+- **Medido** (55 runs): reposo M40 ≈ 18 W y 3060 ≈ 25 W; en carga real M40 ≈ 189 W (máx. 247) y 3060 ≈ 157 W (máx. 171). Eficiencia con Qwen3-4B Q8: 3060 ≈ 1400 tok/Wh, M40 ≈ 530 tok/Wh.
+- **Estimado a 0,15 €/kWh (mes de 30 días):** encendido sin uso ≈ 105 W → 0,38 €/día, 2,65 €/semana, 11,3 €/mes · uso moderado (5 % en carga) ≈ 113 W → 12,2 €/mes · inferencia continua en la 3060 ≈ 265 W → 28,6 €/mes · en la M40 ≈ 304 W → 32,8 €/mes · las dos a tope ≈ 436 W → 1,57 €/día, 47,1 €/mes. Con 0,10 €/kWh multiplicar por 0,67; con 0,20, por 1,33.
+- Rendimiento por modelo (QA, ctx 8192; t/s M40 / 3060): Qwen3-4B Q8 32/64 · Llama 3.1 8B Q4_K_M 25/60 · Qwen2.5-Coder 14B 14/28–31 · Qwen3-30B-A3B 30 (solo M40) · Gemma 12B Q6 11,6 y Qwen3-32B 6,8 abortan en la M40 por 84 °C (repartido: 7,4 t/s).
+
+## Para retomar (mejoras pendientes, por orden)
+
+**Ideas de producto**
+1. **Coste y consumo reales**: ajuste «precio del kWh» y «consumo base del resto del PC» (o lectura de un enchufe medidor); mostrar €/día, €/mes y €/1000 tokens en Comparar y en la Batalla. Hoy solo hay Wh de placa.
+2. **Paquete «Completo» multietapa** (varias pruebas encadenadas con una nota total); una batalla es de una sola prueba.
+3. **Catálogo editable de modelos** para las recomendaciones por hardware.
+4. **Prompts con `ref`** de la biblioteca: corregirlos solos con la respuesta de referencia.
+5. **F11**: servidor en Proxmox/Docker, agente como servicio, copia de seguridad de la BD, prueba tras el dual boot a Linux.
+6. Una vista de «ficha del equipo» con las cifras de referencia de arriba (M40 + 3060) para compararlas con otros equipos.
+
+**Fallos y cabos sueltos conocidos**
+- Los id de batalla se reutilizan al borrar la última (un enlace `/batalla/N` guardado puede apuntar a otra); los de servidor ya no (migración 9).
+- El agente admite `GET` con cabecera `Origin` (solo se rechaza en `POST`).
+- «GGUF en disco» tarda ~20 s con 19 modelos (lee todas las cabeceras): cachear por `mtime`.
+- El agente simulado y sus restos de demo ya no mezclan datos, pero el host simulado puede reaparecer si se arranca `scripts\demo.bat` con la base real.
+- Repetir `llama-bench` con la referencia exacta Llama 2 7B Q4_0 para cerrar F0.
+- 14 archivos no cumplen `ruff format` (viene de antes).
+- La M40 llega a 84 °C con modelos grandes en pocos minutos: más caudal de aire.
+
+**Cómo retomar:** `scripts\demo.bat` (o `scripts\arena.bat`) arranca todo; en una terminal nueva: `python -m agent --port 9100` y `python -m server --agent http://127.0.0.1:9100`. LocalHarness usa el puerto 8095 y el «Dashboard homelab» también carga modelos en las GPU: antes de medir, comprobar con `nvidia-smi` que están libres. Arena fija `CUDA_DEVICE_ORDER=PCI_BUS_ID` (CUDA0 = M40, CUDA1 = 3060). La base está en `data/arena.db` (versión 9).
