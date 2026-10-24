@@ -219,8 +219,14 @@ class EndpointDetector:
             except AgentError:
                 pass
         manual = [e for e in self.db.list_endpoints(state.pk) if e["manual"]]
-        if not agent_ok and not manual:
-            return []
+        if not agent_ok:
+            # Sin agente no se sabe si siguen en marcha: se sondea su URL en vez de dejar un «listo» obsoleto
+            for ep in self.db.list_endpoints(state.pk):
+                if not ep["manual"] and ep["status"] != "detenido":
+                    self.db.set_endpoint_status(ep["id"], (await self.probe(ep["base_url"]))["status"])
+            if not manual:
+                self.hub.publish("endpoints", {"host": state.pk, "endpoints": self.db.list_endpoints(state.pk)})
+                return []
         seen: set[int] = set()
         out = []
         for srv in servers:

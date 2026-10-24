@@ -61,3 +61,12 @@ def test_con_el_agente_caido_no_se_borra_nada():
     detected, running, manual = seed(db, state)
     detect(det, state, client)
     assert {e["id"] for e in db.list_endpoints(state.pk)} == {detected["id"], running["id"], manual["id"]}
+
+
+def test_con_el_agente_caido_un_servidor_muerto_deja_de_figurar_como_listo():
+    db, state, det, client = make(FakeAgent(fail=True))
+    detected, running, manual = seed(db, state)
+    detect(det, state, client)  # nada escucha en esos puertos
+    by_id = {e["id"]: e["status"] for e in db.list_endpoints(state.pk)}
+    assert by_id[running["id"]] == "sin respuesta"  # antes se quedaba «listo» para siempre
+    assert by_id[detected["id"]] == "detenido"  # lo ya parado no se toca
