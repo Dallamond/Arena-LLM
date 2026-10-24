@@ -41,3 +41,18 @@ def test_reserva_el_puerto_de_lo_recien_lanzado(monkeypatch):
 
 def test_si_el_agente_no_responde_a_launched_sigue_como_antes(monkeypatch):
     assert run(monkeypatch, FakeAgent(fail=True)) == {8090}
+
+
+def test_dev_de_un_servidor_lanzado_por_arena_se_traduce_a_su_gpu():
+    from server.launch import devices_for_dev_flag
+
+    devs = [
+        {"device_id": "nvidia:A", "provider": "nvidia", "index": 0},
+        {"device_id": "nvidia:B", "provider": "nvidia", "index": 1},
+        {"device_id": "cpu", "provider": "cpu"},
+    ]
+    assert devices_for_dev_flag("CUDA1", devs) == ["nvidia:B"]
+    assert devices_for_dev_flag("CUDA0,CUDA1", devs) == ["nvidia:A", "nvidia:B"]
+    assert devices_for_dev_flag("CUDA2", devs) is None  # no existe
+    assert devices_for_dev_flag("Vulkan0", devs) is None  # backend sin traducción
+    assert devices_for_dev_flag(None, devs) is None

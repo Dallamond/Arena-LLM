@@ -30,6 +30,30 @@ def _port_of(url: str) -> int | None:
         return None
 
 
+def devices_for_dev_flag(dev: Any, host_devices: list[dict[str, Any]]) -> list[str] | None:
+    """`device_id` de las GPU que nombra `-dev` (p. ej. "CUDA0,CUDA1"), o None si alguna no se reconoce.
+
+    Solo vale para servidores lanzados por Arena, que siempre fija `CUDA_DEVICE_ORDER=PCI_BUS_ID`
+    (el mismo orden que el índice de cada dispositivo): en un servidor ajeno el orden es incierto.
+    """
+    out: list[str] = []
+    for name in str(dev or "").split(","):
+        name = name.strip()
+        for provider, prefix in BACKEND_PREFIX.items():
+            if name.startswith(prefix) and name[len(prefix) :].isdigit():
+                index = int(name[len(prefix) :])
+                found = next(
+                    (d for d in host_devices if d.get("provider") == provider and d.get("index") == index), None
+                )
+                if found is None:
+                    return None
+                out.append(found["device_id"])
+                break
+        else:
+            return None
+    return out or None
+
+
 def free_port(used: set[int]) -> int:
     port = FIRST_PORT
     while port in used:

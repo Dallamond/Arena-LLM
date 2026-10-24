@@ -22,6 +22,7 @@ import httpx
 from server.agents import AgentError, AgentMonitor, HostState
 from server.db import Database
 from server.hub import EventHub
+from server.launch import devices_for_dev_flag
 
 log = logging.getLogger(__name__)
 
@@ -210,6 +211,13 @@ class EndpointDetector:
                 agent_ok = True
             except AgentError:
                 pass
+        launched: set[int] = set()  # PID de los llama-server que lanzó Arena y siguen vivos
+        if agent_ok:
+            try:
+                out = await self.monitor.agent.get(state, "/launched")
+                launched = {x["pid"] for x in out.get("launched") or [] if x.get("alive")}
+            except AgentError:
+                pass
         manual = [e for e in self.db.list_endpoints(state.pk) if e["manual"]]
         if not agent_ok and not manual:
             return []
@@ -220,6 +228,13 @@ class EndpointDetector:
             if base is None:
                 continue
             probe = await self.probe(base)
+            devices, gpu_link = srv.get("devices") or [], srv.get("gpu_link")
+            if srv.get("pid") in launched:
+                # nvidia-smi no separa procesos por GPU en Windows (WDDM): Arena sabe dónde lo puso
+                host_devices = (state.info or {}).get("devices") or []
+                ids = devices_for_dev_flag((srv.get("flags") or {}).get("device"), host_devices)
+                if ids:
+                    devices, gpu_link = [{"device_id": i, "mem_used_mib": None} for i in ids], "lanzado"
             snapshot = {
                 "engine": srv.get("engine"),
                 "base_url": base,
@@ -233,8 +248,8 @@ class EndpointDetector:
                 "model_path": srv.get("model_path"),
                 "model_file": srv.get("model_file"),
                 "port_source": srv.get("port_source"),
-                "devices": srv.get("devices") or [],
-                "gpu_link": srv.get("gpu_link"),
+                "devices": devices,
+                "gpu_link": gpu_link,
             }
             ep = self._record(state, base, probe, snapshot)
             seen.add(ep["id"])
