@@ -12,7 +12,7 @@ import Sparkline from "../components/Sparkline.vue";
 import Stamp from "../components/Stamp.vue";
 import { shortName } from "../lib/devices";
 import { scoreboardPng } from "../lib/scoreboardImage";
-import { NO_DATA, RUN_STATUS, fmt, fmtDate, isNum } from "../lib/format";
+import { RUN_STATUS, fmt, fmtDate, isNum } from "../lib/format";
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
@@ -89,6 +89,13 @@ function median(xs: number[] | undefined): number | null {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
+const SUITE_NAMES: Record<string, string> = {
+  qa: "preguntas con respuesta (QA)",
+  codigo: "calidad de código",
+  contexto: "contexto largo",
+};
+const suiteName = computed(() => SUITE_NAMES[battle.value?.params?.suite ?? ""] ?? null);
+
 const columns = computed(() =>
   (battle.value?.sides ?? []).map((s, i) => {
     const run = battle.value?.runs[i] ?? null;
@@ -99,7 +106,9 @@ const columns = computed(() =>
     const snap = run?.servers_snapshot ?? null;
     const host = run?.host_pk ? live.hosts[run.host_pk] : undefined;
     const gpus = (snap?.devices ?? []).map((d) => shortName(host?.devices.find((x) => x.device_id === d.device_id)?.name ?? d.device_id));
-    const total = (battle.value?.params?.prompts.length ?? 0) * Number(battle.value?.params?.common?.repeats ?? 1);
+    // QA, código y contexto no llevan lista de prompts: su total solo se conoce al terminar
+    const planned = (battle.value?.params?.prompts.length ?? 0) * Number(battle.value?.params?.common?.repeats ?? 1);
+    const total = planned > 0 ? planned : st === "running" ? 0 : (summary?.requests ?? 0);
     // En marcha: la máxima en vivo; al terminar, la del resumen, solo de las GPU de este lado
     const own = Object.keys(summary?.thresholds ?? {});
     const doneTemps = own.map((d) => summary?.devices?.[d]?.temp_max_c).filter(isNum);
@@ -217,7 +226,7 @@ const paramText = (p: Record<string, unknown>) =>
           </h2>
           <p class="dim small">
             {{ fmtDate(battle.created_at, true) }} · {{ battle.sides.length }} lados ·
-            {{ battle.mode === "paralelo" ? "en paralelo" : "uno detrás de otro" }} · {{ battle.params?.prompts.length }} prompts ·
+            {{ battle.mode === "paralelo" ? "en paralelo" : "uno detrás de otro" }} · {{ battle.params?.prompts.length ? `${battle.params.prompts.length} prompts` : (suiteName ?? "prueba corregida") }} ·
             semilla {{ battle.params?.common?.seed ?? 42 }}
           </p>
         </div>
@@ -249,7 +258,7 @@ const paramText = (p: Record<string, unknown>) =>
           <div class="progress">
             <div class="progress__nums">
               <span class="clock mono" :aria-label="`Tiempo transcurrido: ${clock_(c.elapsed)}`"><span class="dim small">tiempo</span> {{ clock_(c.elapsed) }}</span>
-              <span class="answered mono"><span class="dim small">prompts contestados</span> {{ fmt(c.done) }}<span class="dim"> / {{ c.total || NO_DATA }}</span></span>
+              <span class="answered mono"><span class="dim small">prompts contestados</span> {{ fmt(c.done) }}<span v-if="c.total" class="dim"> / {{ c.total }}</span></span>
             </div>
             <div class="bar" role="progressbar" aria-label="Prompts contestados" :aria-valuenow="c.done ?? 0" aria-valuemin="0" :aria-valuemax="c.total || 0">
               <div class="bar__fill" :style="{ width: c.total ? Math.min(100, ((c.done ?? 0) / c.total) * 100) + '%' : '0%', background: c.color }" />

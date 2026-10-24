@@ -80,6 +80,33 @@ watch(
 </template>
 
 <style scoped>
+.scroll {
+  overflow-x: auto;
+}
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.tbl th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--ink-faint);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.tbl td {
+  padding: 4px 8px;
+  border-bottom: 1px dotted var(--line);
+}
+.tbl .sans {
+  font-family: var(--font-sans);
+  color: var(--ink-dim);
+}
 .note {
   margin: 8px 0 0;
 }
