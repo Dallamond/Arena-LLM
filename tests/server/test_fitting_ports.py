@@ -56,3 +56,17 @@ def test_dev_de_un_servidor_lanzado_por_arena_se_traduce_a_su_gpu():
     assert devices_for_dev_flag("CUDA2", devs) is None  # no existe
     assert devices_for_dev_flag("Vulkan0", devs) is None  # backend sin traducción
     assert devices_for_dev_flag(None, devs) is None
+
+
+def test_borrar_un_equipo_retira_sus_servidores(tmp_path):
+    from server.db import Database
+
+    db = Database(tmp_path / "x.db")
+    a = db.add_host("http://127.0.0.1:9100")
+    b = db.add_host("http://127.0.0.1:9101")
+    ep_a, _ = db.upsert_endpoint(a["id"], "http://127.0.0.1:8080", "llama.cpp", "listo", "x", {})
+    ep_b, _ = db.upsert_endpoint(b["id"], "http://127.0.0.1:18081", "llama.cpp", "listo", "y", {})
+    assert db.delete_host(b["id"]) is True
+    assert [e["id"] for e in db.list_endpoints()] == [ep_a["id"]]
+    assert ep_b["id"] not in [e["id"] for e in db.list_endpoints()]
+    db.close()

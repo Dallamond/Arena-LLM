@@ -249,6 +249,11 @@ class Database:
 
     def delete_host(self, host_pk: int) -> bool:
         with self.lock:
+            # sus servidores no cuelgan del equipo por clave foránea: se retiran con él
+            self.conn.execute(
+                "DELETE FROM config_changes WHERE endpoint_id IN (SELECT id FROM endpoints WHERE host_pk=?)", (host_pk,)
+            )
+            self.conn.execute("DELETE FROM endpoints WHERE host_pk=?", (host_pk,))
             return self.conn.execute("DELETE FROM hosts WHERE id=?", (host_pk,)).rowcount > 0
 
     def save_host_info(self, host_pk: int, info: dict[str, Any]) -> None:
