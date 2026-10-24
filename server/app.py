@@ -462,6 +462,8 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
             if found is None:
                 raise HTTPException(404, f"Paquete de batalla desconocido: {body.pack}")
             meta["pack"] = {k: found[k] for k in ("id", "nombre", "hash")}
+        if body.weights is not None and (reason := scoring.weights_error(body.weights)):
+            raise HTTPException(422, reason)
         weights = body.weights or (found or {}).get("pesos")
         if weights:
             meta["weights"] = scoring.clean_weights(weights)

@@ -35,6 +35,19 @@ def clean_weights(weights: dict[str, Any] | None) -> dict[str, float]:
     return out if sum(out.values()) > 0 else dict(DEFAULT_WEIGHTS)
 
 
+def weights_error(weights: dict[str, Any]) -> str | None:
+    """Motivo por el que unos pesos enviados por el usuario no valen, o None. Estricto: no corrige en silencio."""
+    unknown = sorted(set(weights) - set(DIMENSIONS))
+    if unknown:
+        return f"Dimensiones desconocidas: {', '.join(unknown)} (valen {', '.join(DIMENSIONS)})"
+    nums = {k: _num(v) for k, v in weights.items()}
+    if any(v is None or v < 0 for v in nums.values()):
+        return "Los pesos deben ser números no negativos"
+    if not sum(nums.values()) > 0:
+        return "Al menos un peso debe ser mayor que 0"
+    return None
+
+
 def _relative_high(values: list[float | None]) -> list[float | None]:
     """100·v/máximo; `None` si hay menos de dos valores o el máximo no es positivo."""
     nums = [v for v in values if v is not None]

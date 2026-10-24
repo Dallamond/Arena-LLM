@@ -205,3 +205,11 @@ def test_parametros_de_muestreo_invalidos_se_rechazan_antes_de_empezar(arena):
     r = c.post("/api/runs", json={"suite": "libre", "endpoint_id": eps[0]["id"],
                                   "params": {"prompts": ["x"], "temperature": "caliente"}})  # fmt: skip
     assert r.status_code == 422
+
+
+def test_pesos_absurdos_se_rechazan_en_la_api(arena):
+    c, _, eps = arena
+    for weights in ({"quality": -1}, {"calidad": 5}, {"quality": 0, "speed": 0}):
+        r = c.post("/api/battles", json=body(eps, weights=weights))
+        assert r.status_code == 422, (weights, r.text)
+    assert c.get("/api/battles").json() == []

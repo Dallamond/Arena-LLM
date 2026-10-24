@@ -109,3 +109,13 @@ def test_estabilidad_no_penaliza_el_limite_de_potencia():
     out = score_runs([m(throttle=71, throttle_hard=0), m(throttle=71)])  # el segundo es un run antiguo
     assert out["scores"][0]["dims"]["stability"] == pytest.approx(100)
     assert out["scores"][1]["dims"]["stability"] == pytest.approx(29)  # sin el dato duro, el total
+
+
+def test_pesos_enviados_por_el_usuario_se_validan_sin_corregir_en_silencio():
+    from server.scoring import weights_error
+
+    assert weights_error({"quality": 70, "speed": 30}) is None
+    assert "desconocidas" in weights_error({"calidad": 1})
+    assert "no negativos" in weights_error({"quality": -1})
+    assert "no negativos" in weights_error({"quality": "mucho"})
+    assert "mayor que 0" in weights_error({"quality": 0, "speed": 0})
