@@ -355,10 +355,10 @@ Primera pasada completa con la M40 y la RTX 3060 libres (se cerró LocalHarness,
 12. Asistente: repartir lo que ya cabe en una GPU salía «no cabe» (ahora «omitido») y un aborto térmico salía «error» (ahora «abortado»).
 13. Web: tabla del ranking por paquete sin estilo y «12 / sin datos» en las batallas de QA y código.
 14. Un test de velocidad de la fase 2 dependía del ruido de la máquina.
+15. Un run abortado con una muestra mínima («1/1 = 100 %») podía ganar a uno completo: ahora conserva su nota provisional pero no compite por el puesto.
+16. Con el agente de un equipo apagado, sus servidores seguían como «listo»: ahora se sondea su URL.
 
 **Pendiente / avisos**
-- Un run abortado con muy pocos ítems puede sacar «100 %» de calidad con una muestra ridícula (sale marcado como parcial, pero compite).
-- Si el agente de un equipo se apaga, sus servidores siguen como «listo» hasta que se borra el equipo.
 - Los id de batalla se reutilizan al borrar la última (un enlace `/batalla/N` guardado puede apuntar a otra).
 - El agente admite `GET` con cabecera `Origin` (solo se rechaza en `POST`; el navegador no puede leer la respuesta sin CORS).
 - «GGUF en disco» tarda ~20 s con 19 modelos (lee todas las cabeceras).
