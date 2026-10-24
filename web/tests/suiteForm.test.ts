@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Suite } from "../src/api/types";
-import { initialState, parseNumList, parsePairs, toParams } from "../src/lib/suiteForm";
+import { initialState, parseNumList, parsePairs, stateWithParams, toParams } from "../src/lib/suiteForm";
 
 const suite = {
   id: "contexto",
@@ -45,5 +45,12 @@ describe("formulario de suites de calidad", () => {
     state.sizes = "1";
     state.max_tokens = "";
     expect(() => toParams(suite, state)).toThrow(/Tokens/);
+  });
+
+  it("aplica los valores de un paquete sobre los de por defecto, sin tocar lo que no menciona", () => {
+    const state = stateWithParams(suite, { sizes: [2048, 16384], include: ["a"], max_tokens: 128 });
+    expect(state).toMatchObject({ sizes: "2048, 16384", include: ["a"], max_tokens: 128, custom: "" });
+    expect(toParams(suite, state)).toMatchObject({ sizes: [2048, 16384], include: ["a"], max_tokens: 128 });
+    expect(stateWithParams(suite, {}).sizes).toBe("2048, 4096");
   });
 });

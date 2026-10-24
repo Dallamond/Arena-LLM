@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 
-from server import __version__, compare, library, pack
+from server import __version__, battle_packs, compare, library, pack, ranking, scoring
 from server.agents import AgentError, AgentMonitor
 from server.db import Database
 from server.detect import EndpointDetector, normalize_base_url
@@ -45,6 +45,8 @@ class BattleIn(BaseModel):
     prompts: list[str] = []
     common: dict[str, Any] = {}
     sides: list[BattleSideIn]
+    pack: str | None = None  # id de un paquete de batalla: aporta los pesos de la nota si no se dan
+    weights: dict[str, float] | None = None
 
 
 class SweepIn(BaseModel):
@@ -453,9 +455,19 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
 
     @app.post("/api/battles", status_code=201)
     async def start_battle(request: Request, body: BattleIn) -> dict[str, Any]:
+        meta: dict[str, Any] = {}
+        found = None
+        if body.pack:
+            found = battle_packs.find(settings.data_dir, body.pack)
+            if found is None:
+                raise HTTPException(404, f"Paquete de batalla desconocido: {body.pack}")
+            meta["pack"] = {k: found[k] for k in ("id", "nombre", "hash")}
+        weights = body.weights or (found or {}).get("pesos")
+        if weights:
+            meta["weights"] = scoring.clean_weights(weights)
         try:
             return await request.app.state.battles.start(
-                body.mode, body.prompts, body.common, [s.model_dump() for s in body.sides], body.label, body.suite
+                body.mode, body.prompts, body.common, [s.model_dump() for s in body.sides], body.label, body.suite, meta
             )
         except RunError as exc:
             raise HTTPException(exc.status, exc.message) from exc
@@ -538,13 +550,35 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
         found = db.get_runs(list(dict.fromkeys(ids)))
         if not found:
             raise HTTPException(404, "Ningún run encontrado")
+        # Los pesos de la nota los fija el paquete de la batalla, si todos los runs son de la misma
+        battle_ids = {r.get("battle_id") for r in found}
+        weights = None
+        if len(battle_ids) == 1 and None not in battle_ids:
+            battle = db.get_battle(battle_ids.pop())
+            weights = ((battle or {}).get("params") or {}).get("weights")
         return compare.build(
             found,
             {r["id"]: db.list_items(r["id"]) for r in found},
             {r["id"]: db.list_tps(r["id"]) for r in found},
             {r["id"]: db.list_samples(r["id"]) for r in found},
             {r["id"]: db.list_bench_rows(r["id"]) for r in found},
+            weights,
         )
+
+    @app.get("/api/battle-packs")
+    def battle_pack_catalog() -> dict[str, Any]:
+        return battle_packs.load(settings.data_dir)
+
+    @app.get("/api/battle-packs/{pack_id}/ranking")
+    def battle_pack_ranking(request: Request, pack_id: str) -> dict[str, Any]:
+        found = battle_packs.find(settings.data_dir, pack_id)
+        if found is None:
+            raise HTTPException(404, f"Paquete de batalla desconocido: {pack_id}")
+        db: Database = request.app.state.db
+        battles = [b for b in db.list_battles(1000) if ((b.get("params") or {}).get("pack") or {}).get("id") == pack_id]
+        run_ids = [s["run_id"] for b in battles for s in b.get("sides") or [] if s.get("run_id")]
+        runs = {r["id"]: r for r in db.get_runs(run_ids)}
+        return ranking.pack_ranking(found, battles, runs)
 
     @app.get("/api/runs/pack")
     def export_runs_pack(request: Request, runs: str) -> Response:

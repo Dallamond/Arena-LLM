@@ -142,3 +142,48 @@ def test_parametros_por_lado():
     assert p == {"seed": 3, "temperature": 1.0, "repeats": 2, "prompts": ["x"]}
     with pytest.raises(RunError):
         side_params(["x"], {}, {"repeats": 3})
+
+
+def test_paquete_guarda_pesos_y_la_nota_los_usa(arena):
+    c, _, eps = arena
+    r = c.post("/api/battles", json=body(eps, pack="velocidad-pura"))
+    assert r.status_code == 201, r.text
+    b = finished(c, r.json()["id"])
+    assert b["params"]["pack"]["id"] == "velocidad-pura"
+    assert b["params"]["weights"]["quality"] == 0 and b["params"]["weights"]["speed"] == 55
+    runs = b["runs"]
+    cmp = c.get("/api/compare", params={"runs": f"{runs[0]['id']},{runs[1]['id']}"}).json()
+    assert cmp["scoring"]["weights"]["speed"] == 55  # los pesos del paquete, no los de por defecto
+    assert cmp["scoring"]["has_quality"] is False  # prompts libres: la calidad no puntúa
+    speed = [s["dims"]["speed"] for s in cmp["scoring"]["scores"]]
+    assert speed[0] > speed[1]  # A es el servidor rápido; el ganador global depende de la telemetría simulada
+    # Sin batalla común (un run de cada una) se usan los pesos por defecto
+    again = finished(c, c.post("/api/battles", json=body(eps)).json()["id"])
+    mixed = c.get("/api/compare", params={"runs": f"{runs[0]['id']},{again['runs'][1]['id']}"}).json()
+    assert mixed["scoring"]["weights"]["quality"] == 50
+
+
+def test_paquete_desconocido_y_pesos_propios(arena):
+    c, _, eps = arena
+    r = c.post("/api/battles", json=body(eps, pack="no-existe"))
+    assert r.status_code == 404
+    r = c.post("/api/battles", json=body(eps, weights={"quality": 10, "speed": 0}))
+    assert r.status_code == 201
+    b = finished(c, r.json()["id"])
+    assert b["params"]["weights"] == {"quality": 10.0, "speed": 0.0} and "pack" not in b["params"]
+
+
+def test_ranking_acumulado_del_paquete(arena):
+    c, _, eps = arena
+    assert c.get("/api/battle-packs/no-existe/ranking").status_code == 404
+    empty = c.get("/api/battle-packs/velocidad-pura/ranking").json()
+    assert empty["rows"] == [] and empty["battles"] == 0
+    for _ in range(2):
+        r = c.post("/api/battles", json=body(eps, pack="velocidad-pura"))
+        assert r.status_code == 201, r.text
+        assert finished(c, r.json()["id"])["status"] == "done"
+    c.post("/api/battles", json=body(eps))  # sin paquete: no cuenta
+    out = c.get("/api/battle-packs/velocidad-pura/ranking").json()
+    assert out["battles"] == 2 and out["by_quality"] is False
+    assert len(out["rows"]) == 2 and all(r["battles"] == 2 for r in out["rows"])
+    assert out["rows"][0]["tps"] >= out["rows"][1]["tps"]  # sin calidad, manda la velocidad

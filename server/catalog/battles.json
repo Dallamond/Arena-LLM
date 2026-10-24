@@ -1,0 +1,83 @@
+{
+  "version": "1",
+  "paquetes": [
+    {
+      "id": "duelo-rapido",
+      "nombre": "Duelo rápido",
+      "descripcion": "6 preguntas de lógica y cálculo con respuesta conocida. Para decidir entre dos modelos en pocos minutos.",
+      "minutos": 3,
+      "suite": "qa",
+      "params": {
+        "include": ["maquinas", "producto", "bate", "dias", "segundos", "silogismo"],
+        "max_tokens": 1024
+      },
+      "pesos": {"quality": 55, "speed": 25, "efficiency": 10, "stability": 10}
+    },
+    {
+      "id": "razonamiento",
+      "nombre": "Razonamiento",
+      "descripcion": "Las 12 preguntas de razonamiento, cultura y precisión con respuesta conocida. Mide si el modelo se equivoca.",
+      "minutos": 8,
+      "suite": "qa",
+      "params": {"include": null, "max_tokens": 1536},
+      "pesos": {"quality": 65, "speed": 15, "efficiency": 10, "stability": 10}
+    },
+    {
+      "id": "programador",
+      "nombre": "Programador",
+      "descripcion": "10 problemas de Python en 3 niveles. Se ejecuta el código en un entorno aislado y se pasan los tests (pass@1).",
+      "minutos": 15,
+      "suite": "codigo",
+      "params": {"include": null, "max_tokens": 2048, "code_timeout_s": 10},
+      "pesos": {"quality": 70, "speed": 10, "efficiency": 10, "stability": 10}
+    },
+    {
+      "id": "programador-facil",
+      "nombre": "Programador (calentamiento)",
+      "descripcion": "Los 3 problemas de nivel 1: sirve para descartar modelos pequeños sin esperar a la prueba entera.",
+      "minutos": 4,
+      "suite": "codigo",
+      "params": {"include": ["palindromo", "dos_suma", "romano"], "max_tokens": 1536},
+      "pesos": {"quality": 60, "speed": 20, "efficiency": 10, "stability": 10}
+    },
+    {
+      "id": "memoria-larga",
+      "nombre": "Memoria larga",
+      "descripcion": "Aguja en un pajar a 2k, 4k, 8k y 16k tokens y tres profundidades. Mide hasta dónde lee bien y cuánto tarda en procesar.",
+      "minutos": 10,
+      "suite": "contexto",
+      "params": {"sizes": [2048, 4096, 8192, 16384], "depths": [10, 50, 90], "max_tokens": 64},
+      "pesos": {"quality": 60, "speed": 25, "efficiency": 5, "stability": 10}
+    },
+    {
+      "id": "velocidad-pura",
+      "nombre": "Velocidad pura",
+      "descripcion": "Prompts de explicación y redacción, sin corrección. Compara solo rendimiento: t/s, TTFT, eficiencia y estabilidad.",
+      "minutos": 4,
+      "suite": "libre",
+      "prompt_ids": ["explicar-vram", "explicar-cuantizacion", "redaccion-correo", "redaccion-producto", "codigo-sql"],
+      "params": {"max_tokens": 512, "repeats": 2},
+      "pesos": {"quality": 0, "speed": 55, "efficiency": 25, "stability": 20}
+    },
+    {
+      "id": "lectura-redaccion",
+      "nombre": "Lectura: redacción y explicación",
+      "descripcion": "Prompts de escritura para leer las respuestas lado a lado. No hay nota de calidad (no se puede corregir sola).",
+      "minutos": 4,
+      "suite": "libre",
+      "prompt_ids": ["redaccion-correo", "redaccion-haiku", "redaccion-producto", "explicar-cielo", "explicar-vram"],
+      "params": {"max_tokens": 512, "repeats": 1},
+      "pesos": {"quality": 0, "speed": 50, "efficiency": 25, "stability": 25}
+    },
+    {
+      "id": "instrucciones",
+      "nombre": "Seguir instrucciones",
+      "descripcion": "Formato JSON, listas y restricciones de letras: lo que más se rompe en modelos pequeños. Se leen las respuestas.",
+      "minutos": 3,
+      "suite": "libre",
+      "prompt_ids": ["formato-json", "formato-lista", "formato-sin-letra", "ci-analogia", "ci-intruso"],
+      "params": {"max_tokens": 256, "repeats": 1},
+      "pesos": {"quality": 0, "speed": 50, "efficiency": 25, "stability": 25}
+    }
+  ]
+}

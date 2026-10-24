@@ -2,18 +2,19 @@
 // Configurar una batalla: los mismos prompts contra 2–6 lados (servidores), en paralelo o
 // uno detrás de otro. Lo común (prompts, semilla, fases) es igual para todos; cada lado
 // solo cambia su muestreo y su prompt de sistema.
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { api, hostList, live } from "../api/live";
-import type { Battle, Endpoint, Suite } from "../api/types";
+import type { Battle, BattlePack, Endpoint, Suite } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
+import PackRanking from "../components/PackRanking.vue";
 import PromptPicker from "../components/PromptPicker.vue";
 import SuiteForm from "../components/SuiteForm.vue";
 import Stamp from "../components/Stamp.vue";
 import { shortName } from "../lib/devices";
 import { RUN_STATUS, fmt, fmtDate } from "../lib/format";
 import { splitPrompts } from "../lib/library";
-import { initialState, toParams, type FormState } from "../lib/suiteForm";
+import { initialState, stateWithParams, toParams, type FormState } from "../lib/suiteForm";
 
 const MAX_SIDES = 6;
 const router = useRouter();
@@ -56,6 +57,32 @@ const promptDefaults = ref<string[]>([]);
 const common = reactive({ seed: 42, temperature: 0, max_tokens: 512, repeats: 1, baseline_s: 5 });
 const mode = ref<"paralelo" | "secuencial">("paralelo");
 const label = ref("");
+
+// --- paquetes predeterminados: prueba, opciones, prompts y pesos de la nota ya elegidos ---
+const packs = ref<BattlePack[]>([]);
+const packWarnings = ref<string[]>([]);
+const activePack = ref<BattlePack | null>(null);
+let applying = false;
+
+async function applyPack(p: BattlePack) {
+  applying = true;
+  testId.value = p.suite;
+  const suite = allSuites.value.find((s) => s.id === p.suite);
+  if (p.suite === "libre") {
+    prompts.value = p.prompts.join("\n---\n");
+    if (typeof p.params.max_tokens === "number") common.max_tokens = p.params.max_tokens;
+    common.repeats = typeof p.params.repeats === "number" ? p.params.repeats : 1;
+  } else if (suite) {
+    testForms[p.suite] = stateWithParams(suite, p.params);
+  }
+  activePack.value = p;
+  await nextTick(); // los watchers de abajo corren durante este ciclo, con `applying` activo
+  applying = false;
+}
+// Tocar la prueba, los prompts o sus opciones a mano deja de ser «el paquete»: la nota vuelve a pesos por defecto
+watch([testId, prompts, testForms, common], () => {
+  if (!applying) activePack.value = null;
+}, { deep: true });
 
 // --- lados ---
 interface SideForm {
@@ -148,7 +175,8 @@ async function launch() {
     const graded = gradedSuite.value;
     const body = {
       mode: mode.value,
-      label: label.value || null,
+      label: label.value || activePack.value?.nombre || null,
+      pack: activePack.value?.id ?? null,
       suite: testId.value,
       prompts: graded ? [] : promptList.value,
       // En una prueba corregida, sus opciones (preguntas, tokens, repeticiones…) mandan sobre las del formulario libre
@@ -184,6 +212,12 @@ onMounted(async () => {
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   }
+  api<{ paquetes: BattlePack[]; avisos: string[] }>("/api/battle-packs")
+    .then((r) => {
+      packs.value = r.paquetes;
+      packWarnings.value = r.avisos;
+    })
+    .catch(() => {});
   api<Battle[]>("/api/battles?limit=20")
     .then((b) => (battles.value = b))
     .catch(() => {});
@@ -201,6 +235,34 @@ onMounted(async () => {
       <p>Hace falta al menos un servidor listo (dos para el modo paralelo).</p>
       <p class="dim">Lanza tus <code>llama-server</code> (en Servidores → GGUF en disco tienes el comando) y aparecerán aquí.</p>
     </div>
+
+    <BlueprintCard v-if="packs.length" title="Paquetes de batalla" class="gap-b">
+      <p class="dim small desc">Un clic carga la prueba, sus opciones y los pesos de la nota. Después solo eliges los lados.</p>
+      <div class="packs" role="group" aria-label="Paquetes de batalla">
+        <button
+          v-for="p in packs"
+          :key="p.id"
+          type="button"
+          class="pack"
+          :class="{ 'pack--on': activePack?.id === p.id }"
+          :aria-pressed="activePack?.id === p.id"
+          @click="applyPack(p)"
+        >
+          <span class="pack__name">{{ p.nombre }}<span v-if="activePack?.id === p.id" class="pack__tick"> ✓ cargado</span></span>
+          <span class="pack__desc dim small">{{ p.descripcion }}</span>
+          <span class="pack__meta mono small">
+            <span v-if="p.minutos">≈ {{ p.minutos }} min</span>
+            <span>{{ p.graded ? "se corrige sola" : "solo rendimiento" }}</span>
+            <span v-if="p.origen === 'propio'">propio</span>
+          </span>
+        </button>
+      </div>
+      <p v-for="w in packWarnings" :key="w" class="warn small">▲ {{ w }}</p>
+    </BlueprintCard>
+
+    <BlueprintCard v-if="activePack" :title="`Ranking · ${activePack.nombre}`" class="gap-b">
+      <PackRanking :pack-id="activePack.id" />
+    </BlueprintCard>
 
     <BlueprintCard title="Prueba (común a todos los lados)">
       <div class="seg tests" role="radiogroup" aria-label="Prueba de la batalla">
@@ -312,6 +374,54 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.gap-b {
+  margin-bottom: 14px;
+}
+.packs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.pack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 12px 14px;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.pack:hover {
+  border-color: var(--line-strong);
+}
+.pack:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.pack--on {
+  border: 2px solid var(--accent);
+  padding: 11px 13px;
+}
+.pack__name {
+  font-weight: 600;
+}
+.pack__tick {
+  color: var(--ok);
+  font-weight: 500;
+  font-size: 12px;
+}
+.pack__meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--ink-dim);
+}
+
 .head {
   display: flex;
   align-items: baseline;

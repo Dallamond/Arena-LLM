@@ -642,12 +642,35 @@ export interface BattleSide {
   run_id: number | null;
 }
 
+/** Paquete de batalla predeterminado (catálogo del servidor): prueba, opciones, prompts y pesos listos. */
+export interface BattlePack {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  minutos: number | null;
+  suite: string;
+  params: Record<string, unknown>;
+  /** Prompts ya resueltos (solo en pruebas libres). */
+  prompts: string[];
+  pesos: Partial<Record<ScoreDim, number>> | null;
+  hash: string;
+  graded: boolean;
+  origen: "base" | "propio";
+}
+
 export interface Battle {
   id: number;
   label: string | null;
   mode: "paralelo" | "secuencial";
   status: RunStatus;
-  params: { prompts: string[]; common: Record<string, unknown> } | null;
+  params: {
+    prompts: string[];
+    common: Record<string, unknown>;
+    suite?: string;
+    /** Paquete de batalla usado (si se lanzó desde uno) y pesos de la nota. */
+    pack?: { id: string; nombre: string; hash: string };
+    weights?: Partial<Record<ScoreDim, number>>;
+  } | null;
   sides: BattleSide[];
   error: string | null;
   created_at: number;
@@ -795,4 +818,32 @@ export interface CompareResponse {
   verdicts: { key: string; title: string; run_index: number; value: number; runner_up: number; margin_pct: number | null }[];
   items: CompareRow[];
   series: { tps: { t: number; v: number }[]; temp: { t: number; v: number }[]; power: { t: number; v: number }[]; device: string | null }[];
+}
+
+/** Ranking acumulado de un paquete: una fila por modelo (y equipo) con lo medido en todas sus batallas. */
+export interface PackRankingRow {
+  rank: number;
+  model: string;
+  quant: string | null;
+  devices: string | null;
+  host: string | null;
+  battles: number;
+  accuracy_best: number | null;
+  accuracy_mean: number | null;
+  correct: number | null;
+  total: number | null;
+  tps: number | null;
+  ttft: number | null;
+  tokens_per_wh: number | null;
+  last_battle_id: number;
+  last_at: number | null;
+}
+
+export interface PackRanking {
+  pack: { id: string; nombre: string; hash: string; suite: string; graded: boolean };
+  rows: PackRankingRow[];
+  battles: number;
+  /** Batallas del mismo paquete con otra versión (no se mezclan). */
+  other_versions: number;
+  by_quality: boolean;
 }

@@ -83,3 +83,17 @@ export function describeScope(suite: Suite, state: FormState): string {
   }
   return parts.join(" · ");
 }
+
+/** Estado del formulario con los valores de un paquete (o de otra batalla) sobre los de por defecto. */
+export function stateWithParams(suite: Suite, params: Record<string, unknown>): FormState {
+  const out = initialState(suite);
+  for (const f of suite.fields ?? []) {
+    if (!(f.key in params)) continue;
+    const v = params[f.key];
+    if (f.type === "numlist") out[f.key] = Array.isArray(v) ? v.join(", ") : String(v ?? "");
+    else if (f.type === "choices") out[f.key] = Array.isArray(v) ? (v as string[]) : [];
+    else if (f.type === "pairs") out[f.key] = pairsToText(v);
+    else out[f.key] = (v as string | number | undefined) ?? "";
+  }
+  return out;
+}

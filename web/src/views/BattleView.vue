@@ -171,6 +171,9 @@ async function repeat() {
       body: JSON.stringify({
         mode: b.mode,
         label: b.label,
+        suite: b.params.suite ?? "libre", // sin esto, repetir una batalla de QA/código/contexto fallaba (libre sin prompts)
+        pack: b.params.pack?.id ?? null,
+        weights: b.params.pack ? undefined : b.params.weights,
         prompts: b.params.prompts,
         common: b.params.common,
         sides: b.sides.map((s) => ({ endpoint_id: s.endpoint_id, label: s.label, params: s.params })),

@@ -77,6 +77,7 @@ class BattleManager:
         sides: list[dict[str, Any]],
         label: str | None,
         suite: str = "libre",
+        meta: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if mode not in MODES:
             raise RunError(422, f"Modo desconocido: {mode}")
@@ -91,7 +92,7 @@ class BattleManager:
         if bad:
             raise RunError(422, f"Parámetros comunes desconocidos: {', '.join(bad)}")
         endpoint_ids = [s.get("endpoint_id") for s in sides]
-        if not all(isinstance(e, int) for e in endpoint_ids):
+        if not all(isinstance(e, int) and not isinstance(e, bool) for e in endpoint_ids):
             raise RunError(422, "Cada lado necesita un servidor")
         if mode == "paralelo" and len(set(endpoint_ids)) < len(endpoint_ids):
             raise RunError(
@@ -126,7 +127,8 @@ class BattleManager:
             label=(label or "").strip() or None,
             mode=mode,
             status="running",
-            params={"suite": suite, "prompts": prompts, "common": common},
+            # `meta`: paquete usado y pesos de la nota (no afectan a lo que se mide)
+            params={"suite": suite, "prompts": prompts, "common": common, **(meta or {})},
             sides=[{k: v for k, v in p.items() if k != "_full"} for p in plan],
         )
         bid = battle["id"]
