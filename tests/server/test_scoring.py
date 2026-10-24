@@ -119,3 +119,15 @@ def test_pesos_enviados_por_el_usuario_se_validan_sin_corregir_en_silencio():
     assert "no negativos" in weights_error({"quality": -1})
     assert "no negativos" in weights_error({"quality": "mucho"})
     assert "mayor que 0" in weights_error({"quality": 0, "speed": 0})
+
+
+def test_run_incompleto_no_gana_a_uno_completo_con_una_muestra_minima():
+    # el abortado acertó 1 de 1 (100 %); el completo, 5 de 6 (83 %) y mucho más rápido
+    abortado = m(accuracy=100, tps=10, quality_correct=1, quality_total=1)
+    completo = m(accuracy=83, tps=40, quality_correct=5, quality_total=6)
+    out = score_runs([abortado, completo], ["aborted", "done"])
+    a, c = out["scores"]
+    assert a["score"] is not None and a["partial"] and a["rank"] is None  # conserva la nota, no compite
+    assert c["rank"] == 1 and out["winner"] == 1
+    solo_parciales = score_runs([abortado, completo], ["aborted", "cancelled"])
+    assert [s["rank"] for s in solo_parciales["scores"]] in ([1, 2], [2, 1])  # si todos lo son, se ordenan

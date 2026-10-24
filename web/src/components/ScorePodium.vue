@@ -49,7 +49,9 @@ const tiedTop = computed(() => (props.scoring.tied?.length ?? 0) > 1);
             <span class="dim small">/ 100</span>
           </div>
         </div>
-        <p v-if="r.partial" class="warn small">Run incompleto: nota provisional.</p>
+        <p v-if="r.partial" class="warn small">
+          Run incompleto: nota provisional{{ r.rank === null ? ", no compite por el puesto" : "" }}.
+        </p>
         <ul class="dims">
           <li v-for="d in scoring.dimensions" :key="d" :title="HINT[d]">
             <span class="dims__name">{{ LABEL[d] }}</span>

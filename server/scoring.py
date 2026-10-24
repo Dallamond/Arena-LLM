@@ -111,7 +111,8 @@ def score_runs(
     """Nota por run (mismo orden que `metrics`) y ranking.
 
     `metrics` son los `run_metrics` de cada run; `statuses` sus estados (un run cancelado o abortado
-    puntúa igual pero queda marcado `partial`; uno en `error` no puntúa). Con menos de dos runs no
+    conserva su nota, marcada `partial`, pero no compite por el puesto mientras haya runs completos:
+    con una muestra mínima («1/1») podría ganar a uno completo; uno en `error` no puntúa). Con menos de dos runs no
     hay batalla: sin notas.
     """
     w = clean_weights(weights)
@@ -136,7 +137,9 @@ def score_runs(
                 "quality_total": m.get("quality_total"),
             }
         )
-    ranked = sorted((i for i, s in enumerate(scores) if s["score"] is not None), key=lambda i: -scores[i]["score"])
+    scored = [i for i, s in enumerate(scores) if s["score"] is not None]
+    complete = [i for i in scored if not scores[i]["partial"]]
+    ranked = sorted(complete or scored, key=lambda i: -scores[i]["score"])
     place, anchor = 0, 0.0
     for pos, i in enumerate(ranked):
         if pos == 0 or anchor - scores[i]["score"] >= TIE_POINTS:  # contra el primero del grupo: sin empates en cadena
