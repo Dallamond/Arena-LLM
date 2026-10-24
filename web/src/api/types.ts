@@ -688,7 +688,8 @@ export type SweepStepState =
   | "error"
   | "no cabe"
   | "omitido"
-  | "detenido";
+  | "detenido"
+  | "abortado";
 
 export interface SweepStep {
   i: number;

@@ -231,3 +231,10 @@ def test_borrar_el_barrido_borra_sus_runs(lab):
     assert c.delete(f"/api/sweeps/{sw['id']}").status_code == 204
     assert c.get(f"/api/sweeps/{sw['id']}").status_code == 404
     assert all(c.get(f"/api/runs/{i}").status_code == 404 for i in ids)
+
+
+def test_repartir_lo_que_ya_cabe_en_una_gpu_se_omite(lab):
+    c, host, models, _, log, _ = lab
+    sw = finished(c, c.post("/api/sweeps", json=body(host, models, targets=["reparto"])).json()["id"])
+    assert [s["state"] for s in sw["steps"]] == ["omitido", "omitido"]  # no es que no quepa
+    assert "repartirse" in sw["steps"][0]["message"] and not log

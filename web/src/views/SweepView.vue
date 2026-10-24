@@ -64,8 +64,9 @@ const STATE: Record<SweepStepState, { icon: string; text: string; tone: "info" |
   "no cabe": { icon: "▲", text: "no cabe", tone: "warn" },
   omitido: { icon: "–", text: "omitido", tone: "dim" },
   detenido: { icon: "■", text: "detenido", tone: "warn" },
+  abortado: { icon: "▲", text: "abortado por seguridad", tone: "crit" },
 };
-const done = computed(() => steps.value.filter((s) => ["hecho", "error", "no cabe", "omitido", "detenido"].includes(s.state)).length);
+const done = computed(() => steps.value.filter((s) => ["hecho", "error", "no cabe", "omitido", "detenido", "abortado"].includes(s.state)).length);
 const progress = computed(() => (steps.value.length ? done.value / steps.value.length : 0));
 const doneRuns = computed(() => steps.value.filter((s) => s.state === "hecho" && s.run_id).map((s) => s.run_id as number));
 

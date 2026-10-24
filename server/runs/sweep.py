@@ -32,7 +32,7 @@ STOP_WAIT_S = 20.0
 #: Pruebas que acepta el asistente (la de estrés y las de rendimiento tienen su propia pantalla).
 SWEEP_SUITES = ("libre", "qa", "codigo", "contexto", "concurrencia")
 #: Pasos que ya no cambian.
-FINAL = ("hecho", "error", "no cabe", "omitido", "detenido")
+FINAL = ("hecho", "error", "no cabe", "omitido", "detenido", "abortado")
 
 
 def _name(path: str) -> str:
@@ -230,7 +230,9 @@ class SweepManager:
                 raise _StepError("error", exc.message) from exc
             option, why = step_option(fitted["command"], step["target"])
             if option is None:
-                raise _StepError("no cabe", why)
+                # repartir entre GPU no hace falta si ya cabe en una: no es que «no quepa»
+                unneeded = step["target"] == "reparto" and fitted["command"].get("available")
+                raise _StepError("omitido" if unneeded else "no cabe", why)
 
             self._set(sid, step, steps, state="arrancando", option=option["label"], message=None)
             try:
@@ -259,7 +261,8 @@ class SweepManager:
                 raise _StepError("detenido", "Cancelado durante la medición")
             if final.get("status") in ("error", "aborted"):
                 reason = final.get("abort_reason") or final.get("error") or "La prueba falló"
-                raise _StepError("error", reason)
+                # un aborto es la protección de temperatura actuando, no un fallo de la prueba
+                raise _StepError("abortado" if final.get("status") == "aborted" else "error", reason)
             self._set(sid, step, steps, state="hecho", message=None)
         except _StepError as exc:
             self._set(sid, step, steps, state=exc.state, message=exc.message)
