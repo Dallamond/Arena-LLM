@@ -189,3 +189,28 @@ def test_api_lanzar_parar_y_origen(setup):
 def test_equipo_simulado_no_lanza():
     app = build_app(AgentConfig(), None, simulated="nvidia2")
     assert app.launcher.available is False
+
+
+def test_un_cuerpo_demasiado_grande_se_rechaza_en_vez_de_tratarlo_como_vacio(setup):
+    from agent.api import MAX_BODY
+
+    cfg, f, _, launcher = setup
+    app, server = agent(cfg, launcher)
+    try:
+        c = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=5)
+        c.request("POST", "/launch", "x" * (MAX_BODY + 1), {"Content-Type": "application/json"})
+        r = c.getresponse()
+        assert r.status == 413 and json.loads(r.read())["error"]["code"] == "too_large"
+        c.close()
+        c = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=5)
+        c.putrequest("POST", "/launch")
+        c.putheader("Content-Length", "abc")
+        c.endheaders()
+        r = c.getresponse()
+        assert r.status == 400 and json.loads(r.read())["error"]["code"] == "length"
+        c.close()
+        status, listed = call(server, "GET", "/launched")  # el agente sigue atendiendo
+        assert status == 200 and listed["launched"] == []
+    finally:
+        server.shutdown()
+        server.server_close()

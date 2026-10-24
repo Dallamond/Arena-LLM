@@ -337,10 +337,19 @@ def make_handler(app: AgentApp) -> type[BaseHTTPRequestHandler]:
             try:
                 length = int(self.headers.get("Content-Length") or 0)
             except ValueError:
-                length = 0
-            if 0 < length <= MAX_BODY:
-                body = self.rfile.read(length)
-            status, payload = app.handle(self.command, self.path, self.headers, body)
+                length = -1
+            if length < 0:
+                status = HTTPStatus.BAD_REQUEST
+                payload = {"error": {"code": "length", "message": "Content-Length no válido"}}
+                self.close_connection = True
+            elif length > MAX_BODY:  # no se lee (tratarlo como vacío daba un error que no explicaba nada)
+                status = HTTPStatus.REQUEST_ENTITY_TOO_LARGE
+                payload = {"error": {"code": "too_large", "message": f"El cuerpo pasa de {MAX_BODY // 1024} KB"}}
+                self.close_connection = True
+            else:
+                if length:
+                    body = self.rfile.read(length)
+                status, payload = app.handle(self.command, self.path, self.headers, body)
             body = envelope(payload)
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
