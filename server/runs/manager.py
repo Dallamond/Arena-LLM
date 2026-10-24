@@ -439,27 +439,41 @@ class RunManager:
                 status, error = "error", "Todas las peticiones fallaron (ver ítems)"
             elif status == "done" and ar.bench_error:
                 status, error = "error", ar.bench_error
-            items = self.db.list_items(ar.id)
-            samples = self.db.list_samples(ar.id)
-            summary = stats.run_summary(items, self.db.list_tps(ar.id), samples, (ar.load_start, ar.load_end))
-            if not isinstance(ar.suite, BenchSuite):
-                quality = quality_summary(ar.suite.id, items, samples)
-                if quality:
-                    summary["quality"] = quality
-            summary["thresholds"] = ar.watch
-            summary["phases"] = {"load_start": ar.load_start, "load_end": ar.load_end}
-            if isinstance(ar.suite, BenchSuite):
-                summary.update(bench_summary(ar.suite, self.db.list_bench_rows(ar.id)))
-            self.db.update_run(
-                ar.id,
-                status=status,
-                error=error,
-                abort_reason=ar.abort_reason,
-                finished_at=time.time(),
-                summary=summary,
-            )
-            self.active.pop(ar.id, None)
-            self._publish_run(ar.id)
+            try:
+                items = self.db.list_items(ar.id)
+                samples = self.db.list_samples(ar.id)
+                summary = stats.run_summary(items, self.db.list_tps(ar.id), samples, (ar.load_start, ar.load_end))
+                if not isinstance(ar.suite, BenchSuite):
+                    quality = quality_summary(ar.suite.id, items, samples)
+                    if quality:
+                        summary["quality"] = quality
+                summary["thresholds"] = ar.watch
+                summary["phases"] = {"load_start": ar.load_start, "load_end": ar.load_end}
+                if isinstance(ar.suite, BenchSuite):
+                    summary.update(bench_summary(ar.suite, self.db.list_bench_rows(ar.id)))
+                self.db.update_run(
+                    ar.id,
+                    status=status,
+                    error=error,
+                    abort_reason=ar.abort_reason,
+                    finished_at=time.time(),
+                    summary=summary,
+                )
+            except Exception as exc:  # sin esto el run se quedaría «running» y ocupado para siempre
+                log.exception("Run %s: no se pudo guardar el resumen", ar.id)
+                try:
+                    self.db.update_run(
+                        ar.id,
+                        status="error",
+                        error=f"No se pudo guardar el resumen: {type(exc).__name__}: {exc}",
+                        abort_reason=ar.abort_reason,
+                        finished_at=time.time(),
+                    )
+                except Exception:
+                    log.exception("Run %s: tampoco se pudo marcar como error", ar.id)
+            finally:
+                self.active.pop(ar.id, None)
+                self._publish_run(ar.id)
 
     async def _run_items(self, ar: ActiveRun) -> None:
         repeats = int(ar.params.get("repeats") or 1)

@@ -196,3 +196,23 @@ def test_historial_indica_equipo_y_dispositivos(lab):
     row = c.get("/api/runs").json()[0]
     assert row["host_name"] and row["device_names"]
     assert "host_snapshot" not in row and "servers_snapshot" not in row
+
+
+def test_si_falla_el_resumen_el_run_no_se_queda_en_marcha(lab, monkeypatch):
+    from server.runs import manager
+
+    def roto(*a, **k):
+        raise RuntimeError("disco lleno")
+
+    monkeypatch.setattr(manager.stats, "run_summary", roto)
+    c, _ = lab()
+    ep = endpoint_ready(c)
+    params = {"prompts": ["Hola"], "max_tokens": 8, "baseline_s": 0}
+    body = {"suite": "libre", "endpoint_id": ep["id"], "params": params}
+    r = c.post("/api/runs", json=body)
+    run = run_finished(c, r.json()["id"])
+    assert run["status"] == "error" and "disco lleno" in run["error"]
+    # y el servidor queda libre para otra prueba
+    monkeypatch.undo()
+    r2 = c.post("/api/runs", json=body)
+    assert r2.status_code == 201, r2.text
