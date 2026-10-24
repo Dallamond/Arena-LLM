@@ -103,3 +103,9 @@ def test_run_en_error_no_puntua_ni_gana():
     fallido, bueno = out["scores"]
     assert fallido["score"] is None and fallido["rank"] is None
     assert bueno["rank"] == 1 and out["winner"] == 1
+
+
+def test_estabilidad_no_penaliza_el_limite_de_potencia():
+    out = score_runs([m(throttle=71, throttle_hard=0), m(throttle=71)])  # el segundo es un run antiguo
+    assert out["scores"][0]["dims"]["stability"] == pytest.approx(100)
+    assert out["scores"][1]["dims"]["stability"] == pytest.approx(29)  # sin el dato duro, el total

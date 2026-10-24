@@ -245,6 +245,7 @@ def run_metrics(run: dict[str, Any]) -> dict[str, Any]:
         "temp_rise": _max([d.get("temp_rise_c") for d in own]),
         "power_mean": power_mean,
         "throttle": _max([d.get("throttle_pct") for d in own]),
+        "throttle_hard": _max([d.get("throttle_hard_pct") for d in own]),
         "vram_peak": vram_peak,
         "energy": energy,
         "tokens_per_wh": tokens / energy if isinstance(tokens, (int, float)) and tokens and energy else None,

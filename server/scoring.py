@@ -73,7 +73,12 @@ def _efficiency(metrics: list[dict[str, Any]]) -> list[float | None]:
 
 
 def _stability(m: dict[str, Any]) -> float | None:
-    throttle, degradation = _num(m.get("throttle")), _num(m.get("degradation"))
+    # Sin el límite de potencia por software: en su tope de potencia una GPU rinde con normalidad.
+    # Un run guardado antes de separarlo solo trae el total.
+    throttle = _num(m.get("throttle_hard"))
+    if throttle is None:
+        throttle = _num(m.get("throttle"))
+    degradation = _num(m.get("degradation"))
     if throttle is None and degradation is None:
         return None
     penalty = (throttle or 0.0) + max(degradation or 0.0, 0.0)

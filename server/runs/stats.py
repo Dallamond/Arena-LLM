@@ -12,6 +12,9 @@ from typing import Any
 #: Bits de la máscara de clocks event reasons que cuentan como throttling
 #: (potencia y térmico; no reposo ni ajustes de aplicación). Igual que agent/throttle.py.
 THROTTLING_BITS = 0x004 | 0x008 | 0x020 | 0x040 | 0x080
+#: Lo mismo sin el límite de potencia por software (0x004): una GPU en su tope de potencia con los
+#: relojes altos es el funcionamiento normal; térmico y frenado de hardware sí son un problema.
+HARD_THROTTLING_BITS = THROTTLING_BITS & ~0x004
 DEGRADATION_MIN_S = 30.0
 #: Error con el que se guarda una petición cortada al acabar el tiempo o al abortar.
 #: No cuenta como error ni entra en las estadísticas de velocidad.
@@ -51,11 +54,11 @@ def energy_wh(points: Sequence[tuple[float, Any]]) -> float | None:
     return total / 3600 if used else None
 
 
-def throttle_pct(masks: Iterable[Any]) -> float | None:
+def throttle_pct(masks: Iterable[Any], bits: int = THROTTLING_BITS) -> float | None:
     vals = [int(m) for m in masks if isinstance(m, int) and not isinstance(m, bool)]
     if not vals:
         return None
-    return 100.0 * sum(1 for m in vals if m & THROTTLING_BITS) / len(vals)
+    return 100.0 * sum(1 for m in vals if m & bits) / len(vals)
 
 
 def degradation_pct(series: Sequence[tuple[float, float]]) -> float | None:
@@ -108,6 +111,7 @@ def device_summary(samples: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "clock_sm_mean_mhz": statistics.fmean(clocks) if clocks else None,
         "clock_sm_min_mhz": min(clocks) if clocks else None,
         "throttle_pct": throttle_pct(s["data"].get("throttle_mask") for s in load),
+        "throttle_hard_pct": throttle_pct((s["data"].get("throttle_mask") for s in load), HARD_THROTTLING_BITS),
         "cpu_util_mean_pct": statistics.fmean(vals(load, "util_pct")) if vals(load, "util_pct") else None,
         "ram_used_peak_mib": max(vals(load + base, "used_mib")) if vals(load + base, "used_mib") else None,
         "n_samples": len(load),

@@ -122,3 +122,9 @@ def test_historial_reciente_del_equipo_esta_acotado():
         st.recent.append({"t": i})
     assert len(st.recent) == RECENT_SAMPLES
     assert st.recent[0]["t"] == 30 and st.recent[-1]["t"] == RECENT_SAMPLES + 29
+
+
+def test_throttling_duro_no_cuenta_el_limite_de_potencia():
+    masks = [0x4, 0x4, 0x20, 0x0]  # dos topes de potencia, un térmico, uno limpio
+    assert stats.throttle_pct(masks) == 75.0
+    assert stats.throttle_pct(masks, stats.HARD_THROTTLING_BITS) == 25.0
