@@ -96,3 +96,10 @@ def test_pesos_invalidos_vuelven_a_los_de_por_defecto():
     assert clean_weights({"quality": -5, "x": 3}) == DEFAULT_WEIGHTS
     assert clean_weights({"quality": 0, "speed": 0}) == DEFAULT_WEIGHTS
     assert clean_weights({"quality": 2, "speed": "a"}) == {"quality": 2.0}
+
+
+def test_run_en_error_no_puntua_ni_gana():
+    out = score_runs([m(accuracy=0, throttle=0), m(accuracy=50, tps=20)], ["error", "done"])
+    fallido, bueno = out["scores"]
+    assert fallido["score"] is None and fallido["rank"] is None
+    assert bueno["rank"] == 1 and out["winner"] == 1

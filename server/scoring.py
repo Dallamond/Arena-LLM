@@ -92,8 +92,9 @@ def score_runs(
 ) -> dict[str, Any]:
     """Nota por run (mismo orden que `metrics`) y ranking.
 
-    `metrics` son los `run_metrics` de cada run; `statuses` sus estados (un run que no terminó
-    puntúa igual pero queda marcado `partial`). Con menos de dos runs no hay batalla: sin notas.
+    `metrics` son los `run_metrics` de cada run; `statuses` sus estados (un run cancelado o abortado
+    puntúa igual pero queda marcado `partial`; uno en `error` no puntúa). Con menos de dos runs no
+    hay batalla: sin notas.
     """
     w = clean_weights(weights)
     n = len(metrics)
@@ -105,7 +106,8 @@ def score_runs(
         dims = {"quality": _quality(m), "speed": speed[i], "efficiency": eff[i], "stability": _stability(m)}
         used = {k: w.get(k, 0.0) for k, v in dims.items() if v is not None and w.get(k, 0.0) > 0}
         total = sum(used.values())
-        score = _weighted([(dims[k], used[k]) for k in used]) if total else None
+        failed = bool(statuses and statuses[i] == "error")  # sin respuestas válidas: ni puntúa ni gana
+        score = _weighted([(dims[k], used[k]) for k in used]) if total and not failed else None
         scores.append(
             {
                 "score": score,
