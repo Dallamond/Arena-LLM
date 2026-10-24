@@ -442,7 +442,11 @@ class RunManager:
             try:
                 items = self.db.list_items(ar.id)
                 samples = self.db.list_samples(ar.id)
-                summary = stats.run_summary(items, self.db.list_tps(ar.id), samples, (ar.load_start, ar.load_end))
+                summary = stats.run_summary(
+                    items, self.db.list_tps(ar.id), samples, (ar.load_start, ar.load_end), own_devices=ar.watch
+                )
+                if ar.suite.mode == "concurrency":
+                    summary["degradation_pct"] = None  # la carga sube a propósito: no mide degradación
                 if not isinstance(ar.suite, BenchSuite):
                     quality = quality_summary(ar.suite.id, items, samples)
                     if quality:

@@ -128,3 +128,19 @@ def test_throttling_duro_no_cuenta_el_limite_de_potencia():
     masks = [0x4, 0x4, 0x20, 0x0]  # dos topes de potencia, un térmico, uno limpio
     assert stats.throttle_pct(masks) == 75.0
     assert stats.throttle_pct(masks, stats.HARD_THROTTLING_BITS) == 25.0
+
+
+def _samples(dev, watts):
+    return [
+        {"device_id": dev, "phase": "carga", "t": float(t), "data": {"power_w": watts}} for t in range(0, 4)
+    ]
+
+
+def test_energia_del_run_solo_cuenta_sus_gpu():
+    samples = _samples("nvidia:A", 100.0) + _samples("nvidia:B", 300.0)  # B trabaja para otro run
+    todo = stats.run_summary([], [], samples, (0.0, 3.0))
+    suyo = stats.run_summary([], [], samples, (0.0, 3.0), own_devices=["nvidia:A"])
+    assert todo["energy_wh"] == pytest.approx(suyo["energy_wh"] * 4)  # 400 W frente a 100 W
+    assert set(suyo["devices"]) == {"nvidia:A", "nvidia:B"}  # el contexto se conserva
+    sin_datos = stats.run_summary([], [], samples, (0.0, 3.0), own_devices=["nvidia:Z"])
+    assert sin_datos["energy_wh"] == todo["energy_wh"]  # un id desconocido no deja el run sin energía

@@ -123,7 +123,10 @@ def run_summary(
     tps_series: Sequence[dict[str, Any]],
     samples: Sequence[dict[str, Any]],
     load_window: tuple[float | None, float | None],
+    own_devices: Iterable[str] | None = None,
 ) -> dict[str, Any]:
+    """`own_devices`: dispositivos que usa el run. Se resumen todos los muestreados (contexto), pero la
+    energía y los tokens/Wh solo cuentan los propios: lo que gaste otra GPU no es de este run."""
     ok = [i for i in items if not i.get("error")]
     cut = [i for i in items if i.get("error") == CUT_MSG]
     m = [i.get("metrics") or {} for i in ok]
@@ -132,7 +135,10 @@ def run_summary(
     for s in samples:
         by_dev.setdefault(s["device_id"], []).append(s)
     devices = {d: device_summary(rows) for d, rows in by_dev.items()}
-    energy = [v["energy_wh"] for v in devices.values() if v.get("energy_wh") is not None]
+    own = set(own_devices or ()) & set(devices)
+    energy = [
+        v["energy_wh"] for d, v in devices.items() if (not own or d in own) and v.get("energy_wh") is not None
+    ]
     total_energy = sum(energy) if energy else None
     t0, t1 = load_window
     series = [(p["t"], p["tps"]) for p in tps_series]
