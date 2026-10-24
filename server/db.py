@@ -195,6 +195,36 @@ MIGRATIONS: list[str] = [
     ALTER TABLE runs ADD COLUMN pack_hash TEXT;
     CREATE INDEX runs_pack_hash ON runs(pack_hash);
     """,
+    # 9 — los id de servidor no se reutilizan: un run (o «Repetir») que guarda su endpoint_id no puede acabar
+    # apuntando a otro servidor que heredó el número al borrarse el anterior
+    """
+    CREATE TABLE endpoints_v9 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        host_pk INTEGER NOT NULL,
+        base_url TEXT NOT NULL,
+        alias TEXT,
+        engine TEXT,
+        status TEXT,
+        fingerprint TEXT,
+        snapshot TEXT,
+        first_seen_at REAL NOT NULL,
+        last_seen_at REAL NOT NULL,
+        manual INTEGER NOT NULL DEFAULT 0,
+        device_ids TEXT,
+        UNIQUE(host_pk, base_url)
+    );
+    INSERT INTO endpoints_v9 (id, host_pk, base_url, alias, engine, status, fingerprint, snapshot,
+                              first_seen_at, last_seen_at, manual, device_ids)
+        SELECT id, host_pk, base_url, alias, engine, status, fingerprint, snapshot,
+               first_seen_at, last_seen_at, manual, device_ids FROM endpoints;
+    DROP TABLE endpoints;
+    ALTER TABLE endpoints_v9 RENAME TO endpoints;
+    DELETE FROM sqlite_sequence WHERE name='endpoints';
+    INSERT INTO sqlite_sequence(name, seq)
+        SELECT 'endpoints', MAX(COALESCE((SELECT MAX(id) FROM endpoints), 0),
+                                COALESCE((SELECT MAX(endpoint_id) FROM runs), 0),
+                                COALESCE((SELECT MAX(endpoint_id) FROM config_changes), 0));
+    """,
 ]
 
 #: Tamaño de la paleta de dispositivos de la GUI (--dev-1 … --dev-N).

@@ -70,3 +70,35 @@ def test_borrar_un_equipo_retira_sus_servidores(tmp_path):
     assert [e["id"] for e in db.list_endpoints()] == [ep_a["id"]]
     assert ep_b["id"] not in [e["id"] for e in db.list_endpoints()]
     db.close()
+
+
+def test_los_id_de_servidor_no_se_reutilizan(tmp_path):
+    from server.db import Database
+
+    db = Database(tmp_path / "x.db")
+    host = db.add_host("http://127.0.0.1:9100")["id"]
+    a, _ = db.upsert_endpoint(host, "http://127.0.0.1:8080", "llama.cpp", "listo", "x", {})
+    db.delete_endpoint(a["id"])
+    b, _ = db.upsert_endpoint(host, "http://127.0.0.1:8081", "llama.cpp", "listo", "y", {})
+    assert b["id"] > a["id"]  # antes el borrado liberaba el número
+    db.close()
+
+
+def test_la_migracion_no_reparte_id_que_ya_usa_un_run(tmp_path):
+    import sqlite3
+
+    from server.db import MIGRATIONS, Database
+
+    path = tmp_path / "viejo.db"
+    con = sqlite3.connect(path)
+    for i, sql in enumerate(MIGRATIONS[:8], start=1):  # una base de antes de la migración 9
+        con.executescript(f"BEGIN;{sql};PRAGMA user_version={i};COMMIT;")
+    con.execute("INSERT INTO hosts(agent_url, created_at) VALUES ('http://x', 0)")
+    con.execute("INSERT INTO runs(kind, suite, status, endpoint_id, created_at) VALUES ('free','libre','done',7,0)")
+    con.commit()
+    con.close()
+    db = Database(path)  # migra
+    host = db.list_hosts()[0]["id"]
+    ep, _ = db.upsert_endpoint(host, "http://127.0.0.1:8080", "llama.cpp", "listo", "x", {})
+    assert ep["id"] > 7  # el 7 ya lo guarda un run: no se vuelve a dar
+    db.close()
