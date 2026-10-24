@@ -209,11 +209,11 @@ Fórmulas y avisos están en `VIABILIDAD.md` §6; el ancho de banda efectivo es 
 ### F0 — Preparación del primer equipo (Lucas + Claude; sin código del proyecto)
 - [ ] Comprobar la **RAM real** (16 o 32 GB) y activar el perfil XMP.
 - [ ] Instalar en `D:`: Python 3.11+, Node 20+, git. Anotar rutas.
-- [ ] Llega la M40: instalar con ventilador y EPS; BIOS con *Above 4G decoding*; ambas visibles en `nvidia-smi`; anotar driver, modo (WDDM/TCC) e índices.
-- [ ] Build de llama.cpp con CUDA 12.x que soporte Maxwell; `llama-bench` en cada tarjeta con un modelo pequeño y comparar con la referencia de la M40 (~283 / ~38 t/s con Llama 2 7B Q4_0).
-- [ ] Dos `llama-server` (puertos 8081/8082) con `CUDA_DEVICE_ORDER=PCI_BUS_ID`; comprobar qué GPU ocupa cada uno.
-- [ ] Prueba térmica de 5 minutos en la M40 (¿aguanta por debajo de 85 °C?).
-- [ ] Verificar: `/props`, `/slots`, `timings` en el streaming, y qué devuelve `nvidia-smi --query-compute-apps` en tu driver.
+- [x] Llega la M40: instalar con ventilador y EPS; BIOS con *Above 4G decoding*; ambas visibles en `nvidia-smi`; anotar driver, modo (WDDM/TCC) e índices. *(24/10/2026: ambas visibles, driver 580.97, modo WDDM; con `CUDA_DEVICE_ORDER=PCI_BUS_ID` CUDA0 = M40 y CUDA1 = RTX 3060. Ventilador y BIOS no los puede comprobar Arena.)*
+- [ ] Build de llama.cpp con CUDA 12.x que soporte Maxwell; `llama-bench` en cada tarjeta con un modelo pequeño y comparar con la referencia de la M40 (~283 / ~38 t/s con Llama 2 7B Q4_0). *(Parcial, 24/10/2026: build b11379 funciona en Maxwell. Llama 3.1 8B Q4_K_M, pp256 / tg32: M40 222 / 24,8 t/s; RTX 3060 1909 / 58,2 t/s. Falta repetir con la referencia exacta de Llama 2 7B Q4_0.)*
+- [x] Dos `llama-server` (puertos 8081/8082) con `CUDA_DEVICE_ORDER=PCI_BUS_ID`; comprobar qué GPU ocupa cada uno. *(24/10/2026: lanzados desde Arena en 8080 y 8081; cada uno ocupa solo la GPU de su `-dev`, comprobado por la VRAM de `nvidia-smi`.)*
+- [x] Prueba térmica de 5 minutos en la M40 (¿aguanta por debajo de 85 °C?). *(24/10/2026: depende de la carga. Con Qwen3-4B Q8, 2 peticiones en paralelo, 5 min: 72 °C máx., 177 W, sin throttle y degradación −0,3 %. Con modelos grandes (Qwen2.5-Coder 14B, Gemma 12B Q6, Qwen3-32B) pasa de 200 W y llega a 84 °C —su umbral crítico— en pocos minutos: Arena aborta la prueba. Conviene más caudal de aire.)*
+- [x] Verificar: `/props`, `/slots`, `timings` en el streaming, y qué devuelve `nvidia-smi --query-compute-apps` en tu driver. *(24/10/2026: `/props`, `/slots` y `timings` correctos. En Windows (WDDM) `compute-apps` no da memoria por proceso y lista el proceso en las dos GPU: Arena atribuye cada servidor lanzado por ella a la GPU de su `-dev`; los ajenos requieren asociarla a mano.)*
 **Entregable:** nota con driver, build, flags y resultados (primera ficha de referencia).
 
 ### F1 — Esqueleto y agente

@@ -10,7 +10,7 @@ relacionado: ["Arena LLM"]
 ---
 # Arena LLM — Estado
 
-> Leer al retomar. Última actualización: 18/10/2026 (F7, Batalla corregida, Asistente). Las secciones están en orden de más antigua a más reciente salvo esta cabecera; lo último está al final.
+> Leer al retomar. Última actualización: 24/10/2026 (primera pasada con las dos GPU reales). Las secciones están en orden de más antigua a más reciente salvo esta cabecera; lo último está al final.
 
 ## Resumen
 
@@ -27,7 +27,7 @@ relacionado: ["Arena LLM"]
 | F9 — Historial y comparación | ✅ Cerrada (20/10/2026): etiquetas/notas, filtros, métricas normalizadas, imagen PNG del marcador y paquete de resultados; criterio probado con 6 runs de dos equipos simulados |
 | F10 — Modo vídeo y pulido | ✅ (20/10/2026): modo vídeo, accesibilidad (axe 0 infracciones) y documentación (`docs/USO.md`, `docs/EXTENDER.md`) |
 | Ideas de Lucas | ✅ Biblioteca de prompts · ✅ comando copiable de llama-server · ✅ ver todas las respuestas · ✅ recomendaciones por hardware (v2 con ancho de banda; falta el catálogo editable) |
-| Siguiente | Con las GPU libres: contexto/concurrencia reales, térmica 5 min, `-ts`, Batalla M40 + 3060 → F11 (despliegue y Linux) |
+| Siguiente | Hecho el 24/10 con las GPU reales: contexto, concurrencia, térmica 5 min, `-ts` y Batalla M40 + 3060 (ver la última sección). Queda el paquete «Completo» multietapa, el catálogo editable de modelos y F11 (despliegue y Linux) |
 
 ## Batalla, Comparar y respuestas (04/10/2026, tarde)
 
@@ -313,3 +313,55 @@ Sesión autónoma sin GPU (las dos seguían ocupadas). Todo en `main`, un commit
   - No depender solo del color: trazo distinto (sólido, rayas, puntos) por serie en las gráficas y en la leyenda.
 - **Documentación**: `docs/USO.md` (flujos, pantallas, atajos) y `docs/EXTENDER.md` (añadir servidor, equipo, GPU de otro fabricante —proveedor de telemetría, prefijo de backend, umbrales— y prueba); README actualizado.
 - **Sin probar**: lector de pantalla real (NVDA), zoom 200 % / 320 px, contraste del texto dentro del PNG del marcador, líneas de ejes de las gráficas; pocos `aria-live` para estados de carga.
+
+## Pruebas con las dos GPU reales (24/10/2026)
+
+Primera pasada completa con la M40 y la RTX 3060 libres (se cerró LocalHarness, que tenía sus propios `llama-server` con clave de API; Arena no los toca). Arena lanzó sus servidores con «GGUF en disco». Se borró antes todo el historial de pruebas (queda una copia fuera del repo).
+
+**Qué se ejercitó** (todo con modelos reales de `D:\ollama\models`)
+- **Batalla**: los 8 paquetes entre M40 y 3060 (Qwen2.5-Coder 14B y Qwen3-4B), modo paralelo y secuencial con un mismo servidor, cancelar a mitad, borrar, «Repetir» y lanzar desde la GUI; ranking acumulado por paquete.
+- **Pruebas sueltas** en las dos GPU: libre, QA, código, contexto, concurrencia y estrés (incluidos 5 min en la M40).
+- **Asistente**: barrido de 5 modelos (4B a 32B) × 3 destinos (M40, 3060, reparto) y un reparto real de Qwen3-32B con `-c 32768` (`-ts 21.6,10`, 7,4 t/s, 2/2 aciertos).
+- **Rendimiento (`llama-bench`)**: dispositivo (×2), curva `-ngl`, reparto `-ts` y CPU con Llama 3.1 8B Q4_K_M.
+- **Resto**: Comparar con 5 runs, exportar e importar un paquete en una base vacía, validaciones de la API, seguridad del agente, consola del navegador limpia en las 13 pantallas.
+
+**Cifras de referencia** (equipo de Lucas, build b11379; son una foto, no un benchmark general)
+
+| | M40 | RTX 3060 |
+|---|---|---|
+| Qwen2.5-Coder 14B Q4_K_M, generación | 13,6 t/s | 28,3–30,7 t/s |
+| Qwen3-4B Q8_0, generación | 32,1 t/s | 60,2 t/s |
+| Qwen3-4B Q8_0, procesado de prompt | 232–441 t/s | 1760–3240 t/s |
+| Llama 3.1 8B Q4_K_M, `llama-bench` pp256 / tg32 | 222 / 24,8 t/s | 1909 / 58,2 t/s |
+| Llama 3.1 8B, mejor `-ngl` | — | 33 capas: 62,8 t/s (0 capas: 4,8 t/s) |
+| Llama 3.1 8B, mejor `-ts` M40/3060 | 1/3: 44,4 t/s (1/1: 35,9 t/s) | |
+| Llama 3.1 8B solo CPU (Ryzen 5 3600) | mejor con 3 hilos: 5,1 t/s | |
+| Estrés 5 min, Qwen3-4B, 2 peticiones | 72 °C, 177 W, sin throttle, −0,3 % | |
+
+**Térmica de la M40.** Aguanta con carga ligera, pero con modelos grandes (14B, Gemma 12B Q6, Qwen3-32B) pasa de 200 W y llega a 84 °C —su umbral crítico— en pocos minutos, y Arena aborta la prueba (el sistema de seguridad funciona). Necesita más caudal de aire para pruebas largas.
+
+**Fallos encontrados y corregidos** (cada uno con su test; todo en `main`)
+1. El puerto propuesto al lanzar un segundo `llama-server` coincidía con el del primero aún sin detectar.
+2. Un run en error recibía nota y podía ganar la batalla.
+3. Los servidores lanzados por Arena se atribuían a las dos GPU (en Windows `nvidia-smi` no separa procesos): ahora se usa el `-dev` con el que se lanzaron.
+4. La estabilidad penalizaba el límite de potencia por software (3060: 71 % de «throttle» a 1890 MHz y 60 °C). Ahora solo cuenta térmico y frenado de hardware (`throttle_hard_pct`).
+5. La energía y los tokens/Wh de un run sumaban también la otra GPU; la concurrencia calculaba una «degradación» sin sentido.
+6. Si fallaba el resumen al cerrar un run, se quedaba «running» y bloqueaba el servidor.
+7. `baseline_s` y `cooldown_s` de `llama-bench` se truncaban a entero.
+8. Borrar un equipo dejaba sus servidores huérfanos.
+9. Los id de servidor se reutilizaban al borrarse (Historial y «Repetir» podían apuntar a otro servidor): migración 9 con `AUTOINCREMENT`.
+10. No se validaba el muestreo (`temperature: "caliente"` arrancaba la batalla) ni todos los lados antes de lanzar; los pesos negativos se corregían en silencio.
+11. El agente trataba un cuerpo de más de 64 KB como vacío: ahora 413 (y 400 con `Content-Length` inválido).
+12. Asistente: repartir lo que ya cabe en una GPU salía «no cabe» (ahora «omitido») y un aborto térmico salía «error» (ahora «abortado»).
+13. Web: tabla del ranking por paquete sin estilo y «12 / sin datos» en las batallas de QA y código.
+14. Un test de velocidad de la fase 2 dependía del ruido de la máquina.
+
+**Pendiente / avisos**
+- Un run abortado con muy pocos ítems puede sacar «100 %» de calidad con una muestra ridícula (sale marcado como parcial, pero compite).
+- Si el agente de un equipo se apaga, sus servidores siguen como «listo» hasta que se borra el equipo.
+- Los id de batalla se reutilizan al borrar la última (un enlace `/batalla/N` guardado puede apuntar a otra).
+- El agente admite `GET` con cabecera `Origin` (solo se rechaza en `POST`; el navegador no puede leer la respuesta sin CORS).
+- «GGUF en disco» tarda ~20 s con 19 modelos (lee todas las cabeceras).
+- Las capturas de pantalla del navegador de pruebas se atascaron varias veces con la 3060 casi llena de VRAM; no afecta a la app (el JS respondía).
+- Sin hacer: el paquete «Completo» multietapa, el catálogo editable de modelos, F11, y repetir `llama-bench` con la referencia exacta de Llama 2 7B Q4_0.
+- Tests: 362 de Python y 72 de la web; `ruff` y `vue-tsc` limpios.
