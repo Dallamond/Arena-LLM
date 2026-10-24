@@ -15,6 +15,7 @@ en una batalla en paralelo en el mismo equipo cada lado se queda con su tarjeta.
 from typing import Any
 
 from server.detect import config_view
+from server.scoring import score_runs
 
 LEVELS = {"si": "Comparables", "parcial": "Parcialmente comparables", "no": "No comparables"}
 STATUS_TEXT = {"cancelled": "detenido", "aborted": "abortado", "error": "con error", "running": "en marcha"}
@@ -229,6 +230,8 @@ def run_metrics(run: dict[str, Any]) -> dict[str, Any]:
     power_mean = _sum([d.get("power_mean_w") for d in own])
     return {
         "accuracy": quality.get("accuracy_pct"),
+        "quality_correct": quality.get("correct"),
+        "quality_total": quality.get("total"),
         "context_ok": quality.get("max_size_ok"),
         "best_agg": quality.get("best_tps_aggregate"),
         "tps": tps,
@@ -413,6 +416,7 @@ def build(
     tps: dict[int, list[dict[str, Any]]],
     samples: dict[int, list[dict[str, Any]]],
     bench_rows: dict[int, list[dict[str, Any]]] | None = None,
+    weights: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     configs = [run_config(r) for r in runs]
     diff = config_diff(configs)
@@ -445,6 +449,7 @@ def build(
         "config_diff": diff,
         "metrics": metric_table(per_run),
         "verdicts": verdicts(per_run),
+        "scoring": score_runs(per_run, [r.get("status") for r in runs], weights),
         "items": item_matrix(runs, items),
         "series": [series(r, tps.get(r["id"], []), samples.get(r["id"], [])) for r in runs],
     }

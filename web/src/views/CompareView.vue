@@ -8,6 +8,7 @@ import type { CompareResponse } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import LineChart, { type ChartSeries } from "../components/LineChart.vue";
 import ResponsesMatrix from "../components/ResponsesMatrix.vue";
+import ScorePodium from "../components/ScorePodium.vue";
 import Stamp from "../components/Stamp.vue";
 import { toCsv, toMarkdown, visibleMetrics } from "../lib/compare";
 import { scoreboardPng } from "../lib/scoreboardImage";
@@ -286,6 +287,13 @@ async function copyMarkdown() {
 
       <!-- RESUMEN -->
       <section v-show="tab === 'resumen'" id="panel-resumen" role="tabpanel" aria-labelledby="tab-resumen">
+        <BlueprintCard v-if="data.scoring.scores.length" title="Puntuación" class="gap">
+          <ScorePodium
+            :scoring="data.scoring"
+            :entries="data.runs.map((r, i) => ({ title: r.side ? `Lado ${r.side}` : `#${r.id}`, sub: r.title, color: color(i) }))"
+          />
+        </BlueprintCard>
+
         <div v-if="data.verdicts.length" class="verdicts">
           <BlueprintCard v-for="v in data.verdicts" :key="v.key" dense :title="v.title">
             <div class="verdict__run" :style="{ color: color(v.run_index) }">■ {{ data.runs[v.run_index].title }}</div>

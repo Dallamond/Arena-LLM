@@ -763,8 +763,32 @@ export interface CompareMetric {
   estimated?: boolean;
 }
 
+export type ScoreDim = "quality" | "speed" | "efficiency" | "stability";
+
+export interface RunScore {
+  /** 0–100, o null si no hay ninguna dimensión con datos. */
+  score: number | null;
+  dims: Record<ScoreDim, number | null>;
+  /** Peso (%) realmente aplicado a cada dimensión con datos. */
+  weights: Partial<Record<ScoreDim, number>>;
+  partial: boolean;
+  quality_correct: number | null;
+  quality_total: number | null;
+  rank: number | null;
+}
+
+export interface Scoring {
+  weights: Partial<Record<ScoreDim, number>>;
+  dimensions: ScoreDim[];
+  scores: RunScore[];
+  winner: number | null;
+  tied?: number[];
+  has_quality: boolean;
+}
+
 export interface CompareResponse {
   runs: CompareRun[];
+  scoring: Scoring;
   comparability: { level: "si" | "parcial" | "no" | null; label: string; reasons: string[]; changes: string[] };
   config_diff: { key: string; factor: string; values: unknown[]; same: boolean }[];
   metrics: CompareMetric[];

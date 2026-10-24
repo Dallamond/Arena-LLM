@@ -28,6 +28,7 @@ const cmp = (): CompareResponse => ({
   ],
   metrics: [{ key: "tps", label: "t/s", unit: "t/s", better: "high", digits: 1, values: [30.25, 45], best: [1] }],
   verdicts: [{ key: "tps", title: "Más rápido", run_index: 1, value: 45, runner_up: 30.25, margin_pct: 48.8 }],
+  scoring: { weights: {}, dimensions: [], scores: [], winner: null, has_quality: false },
   items: [{ prompt: "¿Cuánto es 2+2?\nResponde corto.", rep: 0, cells: [{ response: "4", reasoning: null, error: null, tokens: 1, tps: 1, ttft: 0.1, finish: "stop" }, null] }],
   series: [],
 });

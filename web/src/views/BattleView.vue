@@ -7,6 +7,7 @@ import { api, live, onEvent } from "../api/live";
 import type { BattleDetail, CompareResponse, RunStatus } from "../api/types";
 import BlueprintCard from "../components/BlueprintCard.vue";
 import ResponsesMatrix from "../components/ResponsesMatrix.vue";
+import ScorePodium from "../components/ScorePodium.vue";
 import Sparkline from "../components/Sparkline.vue";
 import Stamp from "../components/Stamp.vue";
 import { shortName } from "../lib/devices";
@@ -277,6 +278,12 @@ const paramText = (p: Record<string, unknown>) =>
         <template #actions>
           <button class="btn" type="button" @click="downloadScoreboard">Imagen (PNG)</button>
         </template>
+        <ScorePodium
+          v-if="cmp.scoring.scores.length"
+          class="podium-gap"
+          :scoring="cmp.scoring"
+          :entries="cmp.runs.map((r, i) => ({ title: `Lado ${r.side ?? '?'}`, sub: sideOf(i)?.model ?? r.title, color: sideOf(i)?.color }))"
+        />
         <div v-if="cmp.verdicts.length" class="verdicts">
           <div v-for="v in cmp.verdicts" :key="v.key" class="verdict" :style="{ borderColor: sideOf(v.run_index)?.color }">
             <span class="label">{{ v.title }}</span>
@@ -500,6 +507,9 @@ const paramText = (p: Record<string, unknown>) =>
   border-top: 1px dotted var(--line);
   padding-top: 8px;
   margin: 8px 0 0;
+}
+.podium-gap {
+  margin-bottom: 14px;
 }
 .verdicts {
   display: grid;
