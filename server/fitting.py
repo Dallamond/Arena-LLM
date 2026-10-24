@@ -45,6 +45,13 @@ async def fit_model(
         g = (await monitor.agent.get(state, "/gguf", {"path": path}, timeout=GGUF_TIMEOUT_S))["gguf"]
     except AgentError as exc:
         raise HostError(403 if exc.status == "unauthorized" else 502, exc.message) from exc
+    # Lo recién lanzado aún puede no estar detectado como servidor: sin esto, dos lanzamientos seguidos
+    # proponen el mismo puerto.
+    try:
+        launched = (await monitor.agent.get(state, "/launched", {})).get("launched") or []
+    except AgentError:
+        launched = []
+    reserved_ports = reserved_ports | {x["port"] for x in launched if x.get("alive") and isinstance(x.get("port"), int)}
     est = estimate(g, params)
     gpus = gpus_from_state(state.info, state.metrics)
     verdict = fit(est, gpus, ram_free_from_metrics(state.metrics))
